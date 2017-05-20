@@ -79,7 +79,14 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 #set(EXTRA_EXECUTABLE_FLAGS "")
 #ENDIF()
 
-add_executable(DynSLAM src/DynSLAM/DynSLAM.cpp ${EXTRA_EXECUTABLE_FLAGS})
+set(DYNSLAM_SOURCES
+    src/DynSLAM/DynSLAM.cpp
+    src/DynSLAM/ImageSourceEngine.cpp
+    src/DynSLAM/ImageSourceEngine.h
+)
+
+
+add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
 target_link_libraries(DynSLAM ${OpenCV_LIBS})
 # TODO(andrei): Rename this to ITMEngine or something for clarity.
 target_link_libraries(DynSLAM Engine)
