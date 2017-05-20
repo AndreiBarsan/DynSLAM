@@ -9,3 +9,5 @@ build/
 install/
 *,ppm
 doxygen-html/
+.idea/
+cmake-build-debug/
