@@ -81,8 +81,11 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 
 add_executable(DynSLAM src/DynSLAM/DynSLAM.cpp ${EXTRA_EXECUTABLE_FLAGS})
 target_link_libraries(DynSLAM ${OpenCV_LIBS})
-#target_link_libraries(DynSLAM Engine)
-#target_link_libraries(InfiniTAM Utils)
+# TODO(andrei): Rename this to ITMEngine or something for clarity.
+target_link_libraries(DynSLAM Engine)
+# TODO(andrei): Ditto. These are the InfiniTAM utilities!
+target_link_libraries(DynSLAM Utils)
+target_link_libraries(DynSLAM InstRecLib)
 
 # TODO(andrei): Re-enable this!
 #IF(WITH_BACKWARDS_CPP)
