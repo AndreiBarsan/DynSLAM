@@ -23,6 +23,18 @@ namespace dynslam {
   /// \brief A simple reconstruction GUI based on the InfiniTAM UIEngine.
   class DynSlamGlutGui {
   public:
+    // Necessary for the GLUT callbacks.
+    // TODO private
+    static DynSlamGlutGui *instance;
+
+    /// \brief Singleton wrapper for supporting GLUT callbacks which take raw function pointers.
+    static DynSlamGlutGui* Instance() {
+      if (instance == nullptr) {
+        instance = new DynSlamGlutGui();
+      }
+
+      return instance;
+    }
 
     // TODO(andrei): Write own image source, since your requirements are different!
     void Initialize(ITMMainEngine *itm_static_scene_engine_, ImageSourceEngine *image_source) {
@@ -46,12 +58,9 @@ namespace dynslam {
       // TODO(andrei): Multiple panel support, if you don't go QT.
       glGenTextures(1, panel_texture_ids_);
 
-      glutDisplayFunc([&]() { this->GlutDisplay(); });
-      glutKeyboardFunc([&](unsigned char key, int x, int y) {
-          // space -> next frame
-          cout << "Key up: " << key << ", x = " << x << ", y =" << y << endl;
-      });
-      glutIdleFunc([&]() { this->GlutIdle(); });
+      glutDisplayFunc(DynSlamGlutGui::GlutDisplay);
+      glutKeyboardUpFunc(DynSlamGlutGui::GlutKeyboard);
+      glutIdleFunc(DynSlamGlutGui::GlutIdle);
 
       bool allocate_gpu = true;
       Vector2i input_shape = image_source->getDepthImageSize();
@@ -59,8 +68,7 @@ namespace dynslam {
       input_rgb_image_= new ITMUChar4Image(input_shape, true, allocate_gpu);
       input_raw_depth_image_ = new ITMShortImage(input_shape, true, allocate_gpu);
 
-
-      // TODO(andrei): Own safety wrapper. With blackjac. And hookers.
+      // TODO(andrei): Own CUDA safety wrapper. With blackjack. And hookers.
       ITMSafeCall(cudaThreadSynchronize());
 
       cout << "DynSLAM initialization complete." << endl;
@@ -87,6 +95,7 @@ namespace dynslam {
     }
 
   private:
+
     ITMLibSettings itm_lib_settings_;
     // TODO(andrei): Write custom.
     ImageSourceEngine *image_source_;
@@ -106,28 +115,78 @@ namespace dynslam {
 
     uint panel_texture_ids_[1];
 
-    void GlutDisplay() {
-      itm_static_scene_engine_->GetImage(out_image_, ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST);
+    /***********************************************************************************************
+     * Static methods used as GLUT UI callbacks.
+     */
+
+    static void GlutDisplay() {
+      DynSlamGlutGui *gui = Instance();
+      gui->itm_static_scene_engine_->GetImage(
+          gui->out_image_,
+          ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST);
 
       glClear(GL_COLOR_BUFFER_BIT);
       glColor3f(1.0f, 1.0f, 1.0f);
+      glEnable(GL_TEXTURE_2D);
 
-      // TODO finish writing
+      glMatrixMode(GL_PROJECTION);
+      glPushMatrix();
+      {
+        glLoadIdentity();
+        glOrtho(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
 
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        {
+          float winReg[][4] = {
+              {0, 0, 1, 1}
+          };
+          glEnable(GL_TEXTURE_2D);
+          // TODO Maybe loop begin, or delete this.
+          int w = 0;
+          glBindTexture(GL_TEXTURE_2D, gui->panel_texture_ids_[0]);
+          glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, gui->out_image_->noDims.x,
+                       gui->out_image_->noDims.y, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                       gui->out_image_->GetData(MEMORYDEVICE_CPU));
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+          glBegin(GL_QUADS); {
+            glTexCoord2f(0, 1); glVertex2f(winReg[w][0], winReg[w][1]); // glVertex2f(0, 0);
+            glTexCoord2f(1, 1); glVertex2f(winReg[w][2], winReg[w][1]); // glVertex2f(1, 0);
+            glTexCoord2f(1, 0); glVertex2f(winReg[w][2], winReg[w][3]); // glVertex2f(1, 1);
+            glTexCoord2f(0, 0); glVertex2f(winReg[w][0], winReg[w][3]); // glVertex2f(0, 1);
+          }
+          glEnd();
+
+          // Maybe loop end
+          glDisable(GL_TEXTURE_2D);
+        }
+        glPopMatrix();
+      }
+      glMatrixMode(GL_PROJECTION);
+      glPopMatrix();
+
+      // TODO(andrei): Render UI text here, if any.
     }
 
-    void GlutIdle() {
+    static void GlutIdle() {
       cout << "GLUT Idle Yay!!" << endl;
+    }
+
+    static void GlutKeyboard(unsigned char key, int x, int y) {
+      cout << "Key up: " << key << ", x = " << x << ", y =" << y << endl;
     }
 
   };
 
+  DynSlamGlutGui* DynSlamGlutGui::instance = nullptr;
+
   /// \brief Crude main loop running InfiniTAM.
   /// In the future, this will be refactored into multiple components.
   void ScaffoldingLoop() {
-    auto gui = DynSlamGlutGui();
-    // TODO pass as arg
+    DynSlamGlutGui *gui = DynSlamGlutGui::Instance();
 
+    // TODO pass as arg to initialize
     const string dataset_root = "/home/andrei/work/libelas/cmake-build-debug/odo_seq_06/";
     const string calib_fpath = dataset_root + "calib.txt";
     const string rgb_image_format = dataset_root + "Frames/%04i.ppm";
@@ -147,7 +206,7 @@ namespace dynslam {
         image_source->getDepthImageSize()
     );
 
-    gui.Initialize(static_scene_engine, image_source);
+    gui->Initialize(static_scene_engine, image_source);
   }
 
   void George() {
