@@ -27,8 +27,8 @@ find_package(OpenCV REQUIRED)
 # TODO(andrei): Is this optional any more?
 OPTION(WITH_CUDA "Build with CUDA support?" ${CUDA_FOUND})
 
-#OPTION(WITH_BACKWARDS_CPP "Build with backwards-cpp stack trace dumping library? (Linux-only)" TRUE)
-#message(STATUS "backwards-cpp-enhanced stack traces? " ${WITH_BACKWARDS_CPP})
+OPTION(WITH_BACKWARDS_CPP "Build with backwards-cpp stack trace dumping library? (Linux-only)" TRUE)
+message(STATUS "backwards-cpp-enhanced stack traces? " ${WITH_BACKWARDS_CPP})
 
 IF(MSVC_IDE)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
@@ -73,18 +73,21 @@ ENDIF()
 
 include_directories(${OpenCV_INCLUDE_DIRS})
 
-#if(WITH_BACKWARDS_CPP)
-#  set(EXTRA_EXECUTABLE_FLAGS ${BACKWARD_ENABLE})
-#ELSE()
-#set(EXTRA_EXECUTABLE_FLAGS "")
-#ENDIF()
+if(WITH_BACKWARDS_CPP)
+  set(EXTRA_EXECUTABLE_FLAGS ${BACKWARD_ENABLE})
+  # We need libbfd for allowing backwards-cpp to read lots of useful
+  # debug data from our binaries.
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lbfd")
+  add_definitions(-DWITH_BACKWARDS_CPP)
+ELSE()
+  set(EXTRA_EXECUTABLE_FLAGS "")
+ENDIF()
 
 set(DYNSLAM_SOURCES
     src/DynSLAM/DynSLAM.cpp
     src/DynSLAM/ImageSourceEngine.cpp
     src/DynSLAM/ImageSourceEngine.h
 )
-
 
 add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
 target_link_libraries(DynSLAM ${OpenCV_LIBS})
@@ -94,11 +97,9 @@ target_link_libraries(DynSLAM Engine)
 target_link_libraries(DynSLAM Utils)
 target_link_libraries(DynSLAM InstRecLib)
 
-# TODO(andrei): Re-enable this!
-#IF(WITH_BACKWARDS_CPP)
-  ## This will add libraries, definitions and include directories needed by backward
-  ## by setting each property on the target.
-  #add_backward(InfiniTAM)
-  #add_backward(InfiniTAM_cli)
-#ENDIF()
+IF(WITH_BACKWARDS_CPP)
+  # This will add libraries, definitions and include directories needed by backward
+  # by setting each property on the target.
+  add_backward(DynSLAM)
+ENDIF()
 
