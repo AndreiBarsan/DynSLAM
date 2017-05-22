@@ -1,7 +1,8 @@
+# Top-level CMake file for the DynSLAM project.
+# TODO(andrei): Check out https://github.com/onqtam/ucm for tools to make cmake files nicer.
+
 cmake_minimum_required(VERSION 3.1)
 project(DynSLAM)
-
-# TODO(andrei): Print TODOs report tool.
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
@@ -27,9 +28,6 @@ find_package(OpenCV REQUIRED)
 # TODO(andrei): Is this optional any more?
 OPTION(WITH_CUDA "Build with CUDA support?" ${CUDA_FOUND})
 
-OPTION(WITH_BACKWARDS_CPP "Build with backwards-cpp stack trace dumping library? (Linux-only)" TRUE)
-message(STATUS "backwards-cpp-enhanced stack traces? " ${WITH_BACKWARDS_CPP})
-
 IF(MSVC_IDE)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
   add_definitions(-DUSING_CMAKE=1)
@@ -52,18 +50,10 @@ ENDIF()
 # Set some additional common compilation flags, like C++11 feature support.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-#if(WITH_BACKWARDS_CPP)
-  #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lbfd")
-  #add_definitions(-DWITH_BACKWARDS_CPP)
-#ENDIF()
-
 # TODO(andrei): You may want to have this dependency in src/DynSLAM/CMakeLists.txt.
 add_subdirectory(src/InfiniTAM/InfiniTAM)
-# TODO(andrei): Enable this and build.
 # TODO(andrei): Then, slowly move its functionality in this parent project, and
 # keep InfiniTAM pure.
-#add_subdirectory(src/InfiniTAM/InfiniTAM/InstRecLib)
-#add_subdirectory(src/DynSLAM)
 
 IF(WITH_CUDA)
   include_directories(${CUDA_INCLUDE_DIRS})
@@ -72,16 +62,6 @@ ELSE()
 ENDIF()
 
 include_directories(${OpenCV_INCLUDE_DIRS})
-
-if(WITH_BACKWARDS_CPP)
-  set(EXTRA_EXECUTABLE_FLAGS ${BACKWARD_ENABLE})
-  # We need libbfd for allowing backwards-cpp to read lots of useful
-  # debug data from our binaries.
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lbfd")
-  add_definitions(-DWITH_BACKWARDS_CPP)
-ELSE()
-  set(EXTRA_EXECUTABLE_FLAGS "")
-ENDIF()
 
 set(DYNSLAM_SOURCES
     src/DynSLAM/DynSLAM.cpp
@@ -95,11 +75,6 @@ target_link_libraries(DynSLAM ${OpenCV_LIBS})
 target_link_libraries(DynSLAM Engine)
 # TODO(andrei): Ditto. These are the InfiniTAM utilities!
 target_link_libraries(DynSLAM Utils)
+target_link_libraries(DynSLAM ORUtils)
 target_link_libraries(DynSLAM InstRecLib)
-
-IF(WITH_BACKWARDS_CPP)
-  # This will add libraries, definitions and include directories needed by backward
-  # by setting each property on the target.
-  add_backward(DynSLAM)
-ENDIF()
 
