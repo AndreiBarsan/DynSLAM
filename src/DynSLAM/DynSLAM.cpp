@@ -252,6 +252,8 @@ namespace dynslam {
   void ScaffoldingLoop() {
     DynSlamGlutGui *gui = DynSlamGlutGui::Instance();
 
+    ITMSafeCall(cudaMemcpy(nullptr, nullptr, 42, cudaMemcpyDeviceToHost));
+
     // TODO pass as arg to initialize
     const string dataset_root = "/home/andrei/work/libelas/cmake-build-debug/odo_seq_06/";
     const string calib_fpath = dataset_root + "calib.txt";
