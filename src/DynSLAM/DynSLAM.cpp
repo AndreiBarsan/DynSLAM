@@ -11,6 +11,7 @@
 #include "../InfiniTAM/InfiniTAM/ITMLib/Engine/ITMMainEngine.h"
 
 #include <GL/glut.h>
+#include <GL/freeglut.h>
 
 
 // TODO(andrei): TODO file for code-specific TODOs.
@@ -20,12 +21,18 @@ namespace dynslam {
   using namespace std;
   using namespace ITMLib::Objects;
 
+  enum Action {
+    kIdle,
+    kProcessFrame,
+    kExit
+  };
+
+  const unsigned char kEscAsciiCode = 27;
+
   /// \brief A simple reconstruction GUI based on the InfiniTAM UIEngine.
   class DynSlamGlutGui {
   public:
     // Necessary for the GLUT callbacks.
-    // TODO private
-    static DynSlamGlutGui *instance;
 
     /// \brief Singleton wrapper for supporting GLUT callbacks which take raw function pointers.
     static DynSlamGlutGui* Instance() {
@@ -38,19 +45,17 @@ namespace dynslam {
 
     // TODO(andrei): Write own image source, since your requirements are different!
     void Initialize(ITMMainEngine *itm_static_scene_engine_, ImageSourceEngine *image_source) {
-      // TODO(andrei): Can't this be a ctor?
 
       this->image_source_ = image_source;
 
       window_size_.x = image_source->getDepthImageSize().x;
       window_size_.y = image_source->getDepthImageSize().y;
 
-
       this->itm_static_scene_engine_ = itm_static_scene_engine_;
       this->current_frame_no_ = 0;
 
-      // TODO(andrei): Do we need specific stuff for glut?
-      glutInit(0, nullptr);
+      int fake_argc = 0;
+      glutInit(&fake_argc, nullptr);
       glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
       glutInitWindowSize(window_size_.x, window_size_.y);
       glutCreateWindow("DynSLAM Lightweight GUI");
@@ -80,6 +85,13 @@ namespace dynslam {
         return;
       }
 
+      // Read the images from the first part of the pipeline
+      image_source_->getImages(input_rgb_image_, input_raw_depth_image_);
+
+      // TODO(andrei): Refactor DynSLAM as separate class, and call it here. DynSLAM should
+      // handle stuff like depth, semantics, separate volumetric integration, etc.
+
+      // Forward them to InfiniTAM for the background reconstruction.
       itm_static_scene_engine_->ProcessFrame(input_rgb_image_, input_raw_depth_image_);
       ITMSafeCall(cudaThreadSynchronize());
 
@@ -91,13 +103,15 @@ namespace dynslam {
     }
 
     void Shutdown() {
+      cout << "DynSLAM GLUT GUI shutting down." << endl;
       // TODO(andrei): Clean up after yourself.
     }
 
   private:
+    DynSlamGlutGui() : needs_refresh_(false), next_action_(Action::kIdle) { }
 
     ITMLibSettings itm_lib_settings_;
-    // TODO(andrei): Write custom.
+    // TODO(andrei): Write custom image source.
     ImageSourceEngine *image_source_;
 
     // This is the main reconstruction component. Should split for dynamic+static.
@@ -114,10 +128,13 @@ namespace dynslam {
     Vector2i window_size_;
 
     uint panel_texture_ids_[1];
+    bool needs_refresh_;
+    Action next_action_;
 
     /***********************************************************************************************
      * Static methods used as GLUT UI callbacks.
      */
+    static DynSlamGlutGui *instance;
 
     static void GlutDisplay() {
       DynSlamGlutGui *gui = Instance();
@@ -145,16 +162,22 @@ namespace dynslam {
           // TODO Maybe loop begin, or delete this.
           int w = 0;
           glBindTexture(GL_TEXTURE_2D, gui->panel_texture_ids_[0]);
-          glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, gui->out_image_->noDims.x,
-                       gui->out_image_->noDims.y, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+          glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                       gui->out_image_->noDims.x, gui->out_image_->noDims.y,
+                       0, GL_RGBA, GL_UNSIGNED_BYTE,
                        gui->out_image_->GetData(MEMORYDEVICE_CPU));
           glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
           glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
           glBegin(GL_QUADS); {
-            glTexCoord2f(0, 1); glVertex2f(winReg[w][0], winReg[w][1]); // glVertex2f(0, 0);
-            glTexCoord2f(1, 1); glVertex2f(winReg[w][2], winReg[w][1]); // glVertex2f(1, 0);
-            glTexCoord2f(1, 0); glVertex2f(winReg[w][2], winReg[w][3]); // glVertex2f(1, 1);
-            glTexCoord2f(0, 0); glVertex2f(winReg[w][0], winReg[w][3]); // glVertex2f(0, 1);
+//            glTexCoord2f(0, 1); glVertex2f(winReg[w][0], winReg[w][1]); // glVertex2f(0, 0);
+//            glTexCoord2f(1, 1); glVertex2f(winReg[w][2], winReg[w][1]); // glVertex2f(1, 0);
+//            glTexCoord2f(1, 0); glVertex2f(winReg[w][2], winReg[w][3]); // glVertex2f(1, 1);
+//            glTexCoord2f(0, 0); glVertex2f(winReg[w][0], winReg[w][3]); // glVertex2f(0, 1);
+
+            glTexCoord2f(0, 1); glVertex2f(0, 0);
+            glTexCoord2f(1, 1); glVertex2f(1, 0);
+            glTexCoord2f(1, 0); glVertex2f(1, 1);
+            glTexCoord2f(0, 0); glVertex2f(0, 1);
           }
           glEnd();
 
@@ -167,14 +190,57 @@ namespace dynslam {
       glPopMatrix();
 
       // TODO(andrei): Render UI text here, if any.
+      glColor3f(1.0f, 0.0f, 0.0f); glRasterPos2f(0.85f, -0.962f);
+
+
+      // End text UI code.
+
+      cout << "Swapping buffers..." << endl;
+      glutSwapBuffers();
+      cout << "Done." << endl;
+      gui->needs_refresh_ = false;
     }
 
     static void GlutIdle() {
-      cout << "GLUT Idle Yay!!" << endl;
+      DynSlamGlutGui *gui = Instance();
+
+      switch (gui->next_action_) {
+        case kIdle:
+          break;
+        case kProcessFrame:
+          gui->ProcessFrame();
+          gui->needs_refresh_ = true;
+          gui->next_action_ = Action::kIdle;
+          break;
+        case kExit:
+          glutLeaveMainLoop();
+          break;
+      }
+
+      if (gui->needs_refresh_) {
+        glutPostRedisplay();
+      }
     }
 
     static void GlutKeyboard(unsigned char key, int x, int y) {
-      cout << "Key up: " << key << ", x = " << x << ", y =" << y << endl;
+      DynSlamGlutGui *gui = Instance();
+
+      switch(key) {
+        case 'n':
+          cout << endl << "Processing frame [" << gui->current_frame_no_ << "]..." << endl;
+          gui->next_action_ = Action::kProcessFrame;
+          break;
+
+        case 'e':
+        case 'q':
+        case  kEscAsciiCode:
+          cout << endl << "Exiting..." << endl;
+          gui->next_action_ = Action::kExit;
+          break;
+
+        default:
+          cout << "Unbound key up: " << key << ", x = " << x << ", y =" << y << endl;
+      }
     }
 
   };
@@ -207,6 +273,8 @@ namespace dynslam {
     );
 
     gui->Initialize(static_scene_engine, image_source);
+    gui->Run();
+    gui->Shutdown();
   }
 
   void George() {
@@ -230,6 +298,6 @@ namespace dynslam {
 
 // TODO(andrei): Use gflags for clean, easy-to-extend flag support.
 int main() {
-//  dynslam::George();
   dynslam::ScaffoldingLoop();
+  return 0;
 }
