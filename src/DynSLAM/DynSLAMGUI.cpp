@@ -17,16 +17,25 @@ namespace gui {
 
 using namespace std;
 
+const int UI_WIDTH = 180;
+
 class PangolinGui {
 public:
   PangolinGui() {
     cout << "Pangolin GUI initialized." << endl;
 
+    // TODO(andrei): Put usefult things here.
+    // Load configuration data
+//    pangolin::ParseVarsFile("app.cfg");
+    // TODO(andrei): Set from input dataset.
+    int width = 640;
+    int height = 480;
+
     cv::Mat img = cv::imread("/home/andrei/Pictures/george.jpg");
     cv::flip(img, img, kCvFlipVertical);
     cout << "Dimensions: " << img.cols << "x" << img.rows << endl;
 
-    pangolin::CreateWindowAndBind("DynSLAM GUI", 640, 480);
+    pangolin::CreateWindowAndBind("DynSLAM GUI", UI_WIDTH + width * 2, 480);
 
     // 3D Mouse handler requires depth testing to be enabled
     glEnable(GL_DEPTH_TEST);
@@ -35,70 +44,63 @@ public:
     glEnable (GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    // GUI stuff
+    pangolin::CreatePanel("ui")
+        .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
+
+    pangolin::Var<function<void(void)>> a_button("ui.Some Button", []() {
+      cout << "Clicked the button!" << endl;
+    });
+    pangolin::Var<function<void(void)>> quite_button("ui.Quit Button", []() {
+      pangolin::QuitAll();
+    });
+
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlMatrix proj = pangolin::ProjectionMatrix(640,480,420,420,320,240,0.1,1000);
-    pangolin::OpenGlRenderState s_cam(proj, pangolin::ModelViewLookAt(1,0.5,-2,0,0,0, pangolin::AxisY) );
-    pangolin::OpenGlRenderState s_cam2(proj, pangolin::ModelViewLookAt(0,0,-2,0,0,0, pangolin::AxisY) );
-    pangolin::OpenGlRenderState s_cam3(proj, pangolin::ModelViewLookAt(0,0,-2, 0,0,0, pangolin::AxisY) );
 
-    // Add named OpenGL viewport to window and provide 3D Handler
-    pangolin::View& d_cam1 = pangolin::Display("cam1")
-        .SetAspect(640.0f/480.0f)
-        .SetHandler(new pangolin::Handler3D(s_cam));
+    float aspect_ratio = static_cast<float>(width) / height;
+    pangolin::View& rgb_view = pangolin::Display("rgb").SetAspect(aspect_ratio);
+    pangolin::View& depth_view = pangolin::Display("depth").SetAspect(aspect_ratio);
+    pangolin::View& segment_view = pangolin::Display("segment").SetAspect(aspect_ratio);
+    pangolin::View& object_view = pangolin::Display("object").SetAspect(aspect_ratio);
 
-    pangolin::View& d_cam2 = pangolin::Display("cam2")
-        .SetAspect(640.0f/480.0f)
-        .SetHandler(new pangolin::Handler3D(s_cam2));
+    pangolin::View& main_view = pangolin::Display("main").SetAspect(aspect_ratio);
+    pangolin::OpenGlRenderState main_view_free_cam(proj, pangolin::ModelViewLookAt(0, 0, -2, 0, 0, 0, pangolin::AxisY));
+    pangolin::View& detail_views = pangolin::Display("detail").SetAspect(aspect_ratio);
 
-    pangolin::View& d_cam3 = pangolin::Display("cam3")
-        .SetAspect(640.0f/480.0f)
-        .SetHandler(new pangolin::Handler3D(s_cam3));
+    // TODO(andrei): Maybe wrap these guys?
+    main_view.SetBounds(0.0, 1.0, pangolin::Attach::Pix(UI_WIDTH), pangolin::Attach::Pix(UI_WIDTH + width));
+    main_view.SetHandler(new pangolin::Handler3D(main_view_free_cam));
 
-    pangolin::View& d_cam4 = pangolin::Display("cam4")
-        .SetAspect(640.0f/480.0f)
-        .SetHandler(new pangolin::Handler3D(s_cam2));
-
-    pangolin::View& d_img1 = pangolin::Display("img1")
-      .SetAspect(640.0f/480.0f);
-
-//  pangolin::View& d_img2 = pangolin::Display("img2")
-//    .SetAspect(640.0f/480.0f);
+    detail_views.SetBounds(0.0, 1.0, pangolin::Attach::Pix(width + UI_WIDTH), 1.0);
+    detail_views.SetLayout(pangolin::LayoutEqual)
+        .AddDisplay(rgb_view)
+        .AddDisplay(depth_view)
+        .AddDisplay(segment_view)
+        .AddDisplay(object_view);
 
     // Custom: Add a plot to one of the views
     // Data logger object
-    pangolin::DataLog log;
+//    pangolin::DataLog log;
 
     // Optionally add named labels
-    std::vector<std::string> labels;
-    labels.push_back(std::string("sin(t)"));
-    log.SetLabels(labels);
+//    std::vector<std::string> labels;
+//    labels.push_back(std::string("sin(t)"));
+//    log.SetLabels(labels);
+//
+//    float t = 0.0f;
+//    const float tinc = 0.1f;
+//    // OpenGL 'view' of data. We might have many views of the same data.
+//    pangolin::Plotter plotter(&log,0.0f,4.0f*(float)M_PI/tinc,-2.0f,2.0f,(float)M_PI/(4.0f*tinc),0.5f);
+//    plotter.SetBounds(0.0, 1.0, 0.0, 1.0);
+//    plotter.Track("$i");
+//    plotter.SetBackgroundColour(pangolin::Colour::White());
+//    plotter.SetTickColour(pangolin::Colour::Black());
+//    plotter.SetAxisColour(pangolin::Colour::Black());
 
-    float t = 0.0f;
-    const float tinc = 0.1f;
-    // OpenGL 'view' of data. We might have many views of the same data.
-    pangolin::Plotter plotter(&log,0.0f,4.0f*(float)M_PI/tinc,-2.0f,2.0f,(float)M_PI/(4.0f*tinc),0.5f);
-    plotter.SetBounds(0.0, 1.0, 0.0, 1.0);
-    plotter.Track("$i");
-    plotter.SetBackgroundColour(pangolin::Colour::White());
-    plotter.SetTickColour(pangolin::Colour::Black());
-    plotter.SetAxisColour(pangolin::Colour::Black());
-
-    // LayoutEqual is an EXPERIMENTAL feature - it requires that all sub-displays
-    // share the same aspect ratio, placing them in a raster fasion in the
-    // viewport so as to maximise display size.
-    pangolin::Display("multi")
-        .SetBounds(0.0, 1.0, 0.0, 1.0)
-        .SetLayout(pangolin::LayoutEqual)
-        .AddDisplay(d_cam1)
-        .AddDisplay(d_img1)
-        .AddDisplay(d_cam2)
-        .AddDisplay(plotter)
-        .AddDisplay(d_cam3)
-        .AddDisplay(d_cam4);
-
-    const int width =  img.cols;
-    const int height = img.rows;
-    pangolin::GlTexture imageTexture(width, height, GL_RGB, false, 0, GL_RGB,GL_UNSIGNED_BYTE);
+    const int george_width =  img.cols;
+    const int george_height = img.rows;
+    pangolin::GlTexture imageTexture(george_width, george_height, GL_RGB, false, 0, GL_RGB,GL_UNSIGNED_BYTE);
 
     // Default hooks for exiting (Esc) and fullscreen (tab).
     while( !pangolin::ShouldQuit() ) {
@@ -106,20 +108,14 @@ public:
 
       glColor3f(1.0,1.0,1.0);
 
-      d_cam1.Activate(s_cam);
-      pangolin::glDrawColouredCube();
-
-      d_cam2.Activate(s_cam2);
-      pangolin::glDrawColouredCube();
-
-      d_cam3.Activate(s_cam3);
-      pangolin::glDrawColouredCube();
-
-      d_cam4.Activate(s_cam2);
-      pangolin::glDrawColouredCube();
-
-      d_img1.Activate();
+      // TODO(andrei): Only use Pangolin camera if not PITA. Otherwise, can just base everything off
+      // InfiniTAM's raycasting.
+      main_view.Activate(main_view_free_cam);
       glColor4f(1.0f,1.0f,1.0f,1.0f);
+      pangolin::glDrawColouredCube();
+
+      rgb_view.Activate();
+      glColor3f(1.0,1.0,1.0);
 
       // Mess with George's bytes a little bit
       //use fast 4-byte alignment (default anyway) if possible
@@ -131,10 +127,19 @@ public:
       imageTexture.Upload(img.data, GL_BGR, GL_UNSIGNED_BYTE);
       imageTexture.RenderToViewport();
 
-      plotter.Activate();
-      float val = static_cast<float>(sin(t));
-      t += tinc;
-      log.Log(val);
+      depth_view.Activate();
+      imageTexture.RenderToViewport();
+
+      segment_view.Activate();
+      imageTexture.RenderToViewport();
+
+      object_view.Activate();
+      imageTexture.RenderToViewport();
+
+//      plotter.Activate();
+//      float val = static_cast<float>(sin(t));
+//      t += tinc;
+//      log.Log(val);
 
       // Swap frames and Process Events
       pangolin::FinishFrame();
