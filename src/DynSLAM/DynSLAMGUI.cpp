@@ -4,6 +4,12 @@
 #include <pangolin/pangolin.h>
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
+#include <backward.hpp>
+
+#include "../InfiniTAM/InfiniTAM/ORUtils/CUDADefines.h"
+
+// TODO(andrei): this is a hack, please remove or depend on backward directly.
+backward::SignalHandling sh;
 
 /// \brief Define these because OpenCV doesn't. Used in the `cv::flip` OpenCV function.
 enum {
@@ -28,13 +34,20 @@ public:
     // Load configuration data
 //    pangolin::ParseVarsFile("app.cfg");
     // TODO(andrei): Set from input dataset.
-    int width = 640;
-    int height = 480;
+    width = 640;
+    height = 480;
 
-    cv::Mat img = cv::imread("/home/andrei/Pictures/george.jpg");
-    cv::flip(img, img, kCvFlipVertical);
-    cout << "Dimensions: " << img.cols << "x" << img.rows << endl;
+    CreatePangolinDisplays();
+    SetupDummyImage();
+  }
 
+  virtual ~PangolinGui() {
+    delete dummy_image_texture;
+  }
+
+  /// \brief Executes the main Pangolin input and rendering loop.
+  void Run() {
+    // TODO move to own method
     pangolin::CreateWindowAndBind("DynSLAM GUI", UI_WIDTH + width * 2, 480);
 
     // 3D Mouse handler requires depth testing to be enabled
@@ -49,10 +62,10 @@ public:
         .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
 
     pangolin::Var<function<void(void)>> a_button("ui.Some Button", []() {
-      cout << "Clicked the button!" << endl;
+                                              cout << "Clicked the button!" << endl;
     });
     pangolin::Var<function<void(void)>> quite_button("ui.Quit Button", []() {
-      pangolin::QuitAll();
+                                              pangolin::QuitAll();
     });
 
     // Define Camera Render Object (for view / scene browsing)
@@ -63,10 +76,17 @@ public:
     pangolin::View& depth_view = pangolin::Display("depth").SetAspect(aspect_ratio);
     pangolin::View& segment_view = pangolin::Display("segment").SetAspect(aspect_ratio);
     pangolin::View& object_view = pangolin::Display("object").SetAspect(aspect_ratio);
+    rgb_view.SetAspect(aspect_ratio);
+    depth_view.SetAspect(aspect_ratio);
+    segment_view.SetAspect(aspect_ratio);
+    object_view.SetAspect(aspect_ratio);
 
-    pangolin::View& main_view = pangolin::Display("main").SetAspect(aspect_ratio);
-    pangolin::OpenGlRenderState main_view_free_cam(proj, pangolin::ModelViewLookAt(0, 0, -2, 0, 0, 0, pangolin::AxisY));
-    pangolin::View& detail_views = pangolin::Display("detail").SetAspect(aspect_ratio);
+    pangolin::View& main_view = pangolin::Display("main");
+    pangolin::View& detail_views = pangolin::Display("detail");
+
+    main_view.SetAspect(aspect_ratio);
+    main_view_free_cam = pangolin::OpenGlRenderState(proj, pangolin::ModelViewLookAt(0, 0, -2, 0, 0, 0, pangolin::AxisY));
+    detail_views.SetAspect(aspect_ratio);
 
     // TODO(andrei): Maybe wrap these guys?
     main_view.SetBounds(0.0, 1.0, pangolin::Attach::Pix(UI_WIDTH), pangolin::Attach::Pix(UI_WIDTH + width));
@@ -79,6 +99,66 @@ public:
         .AddDisplay(segment_view)
         .AddDisplay(object_view);
 
+    cv::Mat dummy_img = cv::imread("/home/andrei/Pictures/george.jpg");
+    cv::flip(dummy_img, dummy_img, kCvFlipVertical);
+    cout << "Dimensions: " << dummy_img.cols << "x" << dummy_img.rows << endl;
+
+    const int george_width = dummy_img.cols;
+    const int george_height = dummy_img.rows;
+    this->dummy_image_texture = new pangolin::GlTexture(
+        george_width, george_height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+
+      // Default hooks for exiting (Esc) and fullscreen (tab).
+      while( !pangolin::ShouldQuit() ) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glColor3f(1.0,1.0,1.0);
+
+        // TODO(andrei): Only use Pangolin camera if not PITA. Otherwise, can just base everything off
+        // InfiniTAM's raycasting.
+        main_view.Activate(main_view_free_cam);
+        glColor4f(1.0f,1.0f,1.0f,1.0f);
+        pangolin::glDrawColouredCube();
+
+        rgb_view.Activate();
+        glColor3f(1.0,1.0,1.0);
+
+        // Mess with George's bytes a little bit
+        //use fast 4-byte alignment (default anyway) if possible
+        glPixelStorei(GL_UNPACK_ALIGNMENT, (dummy_img.step & 3) ? 1 : 4);
+
+        //set length of one complete row in data (doesn't need to equal img.cols)
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, dummy_img.step/dummy_img.elemSize());
+        dummy_image_texture->Upload(dummy_img.data, GL_BGR, GL_UNSIGNED_BYTE);
+
+
+        dummy_image_texture->RenderToViewport();
+
+        depth_view.Activate();
+        glColor3f(1.0,0.0,0.0);
+        dummy_image_texture->RenderToViewport();
+
+        segment_view.Activate();
+        glColor3f(0.0,1.0,0.0);
+        dummy_image_texture->RenderToViewport();
+
+        object_view.Activate();
+        glColor3f(0.0,0.0,1.0);
+        dummy_image_texture->RenderToViewport();
+
+//      plotter.Activate();
+//      float val = static_cast<float>(sin(t));
+//      t += tinc;
+//      log.Log(val);
+
+          // Swap frames and Process Events
+          pangolin::FinishFrame();
+      }
+  }
+
+protected:
+
+  void CreatePangolinDisplays() {
     // Custom: Add a plot to one of the views
     // Data logger object
 //    pangolin::DataLog log;
@@ -97,54 +177,35 @@ public:
 //    plotter.SetBackgroundColour(pangolin::Colour::White());
 //    plotter.SetTickColour(pangolin::Colour::Black());
 //    plotter.SetAxisColour(pangolin::Colour::Black());
-
-    const int george_width =  img.cols;
-    const int george_height = img.rows;
-    pangolin::GlTexture imageTexture(george_width, george_height, GL_RGB, false, 0, GL_RGB,GL_UNSIGNED_BYTE);
-
-    // Default hooks for exiting (Esc) and fullscreen (tab).
-    while( !pangolin::ShouldQuit() ) {
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-      glColor3f(1.0,1.0,1.0);
-
-      // TODO(andrei): Only use Pangolin camera if not PITA. Otherwise, can just base everything off
-      // InfiniTAM's raycasting.
-      main_view.Activate(main_view_free_cam);
-      glColor4f(1.0f,1.0f,1.0f,1.0f);
-      pangolin::glDrawColouredCube();
-
-      rgb_view.Activate();
-      glColor3f(1.0,1.0,1.0);
-
-      // Mess with George's bytes a little bit
-      //use fast 4-byte alignment (default anyway) if possible
-      glPixelStorei(GL_UNPACK_ALIGNMENT, (img.step & 3) ? 1 : 4);
-
-      //set length of one complete row in data (doesn't need to equal img.cols)
-      glPixelStorei(GL_UNPACK_ROW_LENGTH, img.step/img.elemSize());
-
-      imageTexture.Upload(img.data, GL_BGR, GL_UNSIGNED_BYTE);
-      imageTexture.RenderToViewport();
-
-      depth_view.Activate();
-      imageTexture.RenderToViewport();
-
-      segment_view.Activate();
-      imageTexture.RenderToViewport();
-
-      object_view.Activate();
-      imageTexture.RenderToViewport();
-
-//      plotter.Activate();
-//      float val = static_cast<float>(sin(t));
-//      t += tinc;
-//      log.Log(val);
-
-      // Swap frames and Process Events
-      pangolin::FinishFrame();
-    }
   }
+
+  void SetupDummyImage() {
+
+//    cv::Mat dummy_img = cv::imread("/home/andrei/Pictures/george.jpg");
+
+//    // Mess with George's bytes a little bit
+//    //use fast 4-byte alignment (default anyway) if possible
+//    glPixelStorei(GL_UNPACK_ALIGNMENT, (dummy_img.step & 3) ? 1 : 4);
+//
+//    //set length of one complete row in data (doesn't need to equal img.cols)
+//    glPixelStorei(GL_UNPACK_ROW_LENGTH, dummy_img.step/dummy_img.elemSize());
+  }
+
+private:
+  /// Input frame dimensions. They dictate the overall window size.
+  int width, height;
+
+//  pangolin::View& main_view;
+//  pangolin::View& detail_views;
+//  pangolin::View& rgb_view;
+//  pangolin::View& depth_view;
+//  pangolin::View& segment_view;
+//  pangolin::View& object_view;
+
+  pangolin::GlTexture *dummy_image_texture;
+  pangolin::OpenGlRenderState main_view_free_cam;
+
+//  cv::Mat dummy_img;
 };
 
 }
@@ -152,5 +213,6 @@ public:
 
 int main(int argc, char **argv) {
   dynslam::gui::PangolinGui gui;
+  gui.Run();
 }
 
