@@ -24,6 +24,11 @@ message(STATUS "CUDA found: " ${CUDA_FOUND})
 # We rely on OpenCV for image IO and manipulation. Moreover, our (future) Caffe
 # dependencies will require it anyway...
 find_package(OpenCV REQUIRED)
+# We use Pangolin for the main GUI. Pangolin is a lightweight GUI library focused on visual
+# applications with minimal support for multiple panels, widgets, and live plotting.
+# TODO(andrei): Depend on the LOCAL pangolin, not the system-wide one! Check which one this command
+# actually loads!
+find_package(Pangolin 0.1 REQUIRED)
 
 # TODO(andrei): Is this optional any more?
 OPTION(WITH_CUDA "Build with CUDA support?" ${CUDA_FOUND})
@@ -61,15 +66,22 @@ ELSE()
   add_definitions(-DCOMPILE_WITHOUT_CUDA)
 ENDIF()
 
+include_directories(${Pangolin_INCLUDE_DIRS})
 include_directories(${OpenCV_INCLUDE_DIRS})
 
+# TODO(andrei): Make dynslam a library, and link the GUI with it.
 set(DYNSLAM_SOURCES
     src/DynSLAM/DynSLAM.cpp
     src/DynSLAM/ImageSourceEngine.cpp
     src/DynSLAM/ImageSourceEngine.h
 )
+set(DYNSLAM_GUI_SOURCES
+    ${DYNSLAM_SOURCES}
+    src/DynSLAM/DynSLAMGUI.cpp
+)
 
 add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
+
 target_link_libraries(DynSLAM ${OpenCV_LIBS})
 # TODO(andrei): Rename this to ITMEngine or something for clarity.
 target_link_libraries(DynSLAM Engine)
@@ -78,3 +90,10 @@ target_link_libraries(DynSLAM Utils)
 target_link_libraries(DynSLAM ORUtils)
 target_link_libraries(DynSLAM InstRecLib)
 
+add_executable(DynSLAMGUI ${DYNSLAM_GUI_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
+target_link_libraries(DynSLAMGUI Engine)
+target_link_libraries(DynSLAMGUI Utils)
+target_link_libraries(DynSLAMGUI ORUtils)
+target_link_libraries(DynSLAMGUI InstRecLib)
+target_link_libraries(DynSLAMGUI ${Pangolin_LIBRARIES})
+target_link_libraries(DynSLAMGUI ${OpenCV_LIBS})

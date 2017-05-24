@@ -252,7 +252,7 @@ namespace dynslam {
   void ScaffoldingLoop() {
     DynSlamGlutGui *gui = DynSlamGlutGui::Instance();
 
-    ITMSafeCall(cudaMemcpy(nullptr, nullptr, 42, cudaMemcpyDeviceToHost));
+//    ITMSafeCall(cudaMemcpy(nullptr, nullptr, 42, cudaMemcpyDeviceToHost));
 
     // TODO pass as arg to initialize
     const string dataset_root = "/home/andrei/work/libelas/cmake-build-debug/odo_seq_06/";
@@ -299,7 +299,7 @@ namespace dynslam {
 }
 
 // TODO(andrei): Use gflags for clean, easy-to-extend flag support.
-int main() {
-  dynslam::ScaffoldingLoop();
-  return 0;
-}
+//int main() {
+//  dynslam::ScaffoldingLoop();
+//  return 0;
+//}
