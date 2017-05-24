@@ -10,6 +10,10 @@
 #include "../InfiniTAM/InfiniTAM/ORUtils/CUDADefines.h"
 #include "ImageSourceEngine.h"
 
+
+// TODO(andrei): Use [RIP] tags to signal spots where you wasted more than 30 minutes debugging a
+// small, silly issue.
+
 // Handle SIGSEGV and its friends by printing sensible stack traces with code snippets.
 // TODO(andrei): this is a hack, please remove or depend on backward directly.
 backward::SignalHandling sh;
@@ -107,6 +111,10 @@ public:
     return image_source_->getDepthImageSize().height;
   }
 
+  int GetCurrentFrameNo() {
+    return current_frame_no_;
+  }
+
 private:
   ITMLibSettings itm_lib_settings_;
   // TODO(andrei): Write custom image source.
@@ -142,7 +150,7 @@ public:
     // TODO(andrei): Put useful things in this config.
     // Load configuration data
 //    pangolin::ParseVarsFile("app.cfg");
-    // TODO(andrei): Proper scaling.
+    // TODO(andrei): Proper scaling to save space and memory.
     width = dyn_slam->GetInputWidth(); // / 1.5;
     height = dyn_slam->GetInputHeight();// / 1.5;
 
@@ -169,12 +177,18 @@ public:
       glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
       const unsigned char *slam_frame_data = dyn_slam_->GetImageData();
 
-//      UploadDummyTexture();
-//      glPixelStorei(GL_UNPACK_ALIGNMENT, (dummy_img.step & 3) ? 1 : 4);
-      //set length of one complete row in data (doesn't need to equal img.cols)
-//      glPixelStorei(GL_UNPACK_ROW_LENGTH, dummy_img.step/dummy_img.elemSize());
-//      slam_preview->Upload(dummy_img.data, GL_BGR, GL_UNSIGNED_BYTE);
-      slam_preview->Upload(slam_frame_data);
+      if(dyn_slam_->GetCurrentFrameNo() > 0) {
+        // Hack for inspecting stuff
+        // In CV terms, InfiniTAM produces CV_8UC4 output.
+
+//        cv::Mat mat(height, width, CV_8UC4, (void *) slam_frame_data);
+//
+//        cv::imshow("CRAWLING IN MY SKIIIIN", mat);
+//        cv::waitKey(0);
+      }
+
+      // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance!
+      slam_preview->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
       slam_preview->RenderToViewport(true);
 
       rgb_view.Activate();
@@ -213,7 +227,7 @@ protected:
 
   /// \brief Creates the GUI layout and widgets.
   void CreatePangolinDisplays() {
-    pangolin::CreateWindowAndBind("DynSLAM GUI", UI_WIDTH + width * 2, height);
+    pangolin::CreateWindowAndBind("DynSLAM GUI", UI_WIDTH + width, height * 2);
 
     // 3D Mouse handler requires depth testing to be enabled
     glEnable(GL_DEPTH_TEST);
