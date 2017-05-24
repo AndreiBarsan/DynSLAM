@@ -12,7 +12,7 @@
 
 #include <GL/glut.h>
 #include <GL/freeglut.h>
-
+#include <backward.hpp>
 
 // TODO(andrei): TODO file for code-specific TODOs.
 // TODO(andrei): clang-format.
@@ -253,6 +253,8 @@ namespace dynslam {
     DynSlamGlutGui *gui = DynSlamGlutGui::Instance();
 
 //    ITMSafeCall(cudaMemcpy(nullptr, nullptr, 42, cudaMemcpyDeviceToHost));
+    int *x = (int*) 32;
+    *x = 2;
 
     // TODO pass as arg to initialize
     const string dataset_root = "/home/andrei/work/libelas/cmake-build-debug/odo_seq_06/";
