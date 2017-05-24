@@ -47,19 +47,6 @@ public:
       this->itm_static_scene_engine_ = itm_static_scene_engine_;
       this->current_frame_no_ = 0;
 
-//      int fake_argc = 0;
-//      glutInit(&fake_argc, nullptr);
-//      glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
-//      glutInitWindowSize(window_size_.x, window_size_.y);
-//      glutCreateWindow("DynSLAM Lightweight GUI");
-
-      // TODO(andrei): Multiple panel support, if you don't go QT.
-//      glGenTextures(1, panel_texture_ids_);
-
-//      glutDisplayFunc(DynSlamGlutGui::GlutDisplay);
-//      glutKeyboardUpFunc(DynSlamGlutGui::GlutKeyboard);
-//      glutIdleFunc(DynSlamGlutGui::GlutIdle);
-
       bool allocate_gpu = true;
       Vector2i input_shape = image_source->getDepthImageSize();
       out_image_ = new ITMUChar4Image(input_shape, true, allocate_gpu);
@@ -88,19 +75,30 @@ public:
     current_frame_no_++;
   }
 
-  int last_frame = -1;
-  const unsigned char* GetImageData() {
-    // TODO(andrei): Improve this crap.
-    // TODO(andrei): Get rid of reliance on itam enums.
-    if (last_frame != current_frame_no_ ) {
-      last_frame = current_frame_no_;
-      cout << "slam img size: " << itm_static_scene_engine_->GetImageSize() << endl;
-      itm_static_scene_engine_->GetImage(
-        out_image_,
-        ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST);
-    }
+  const unsigned char* GetRaycastPreview() {
+    // TODO(andrei): Get rid of reliance on itam enums via a driver abstraction.
+    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST);
+  }
 
-    return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
+  /// \brief Returns an **RGBA** preview of the latest color frame.
+  const unsigned char* GetRgbPreview() {
+    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_ORIGINAL_RGB);
+  }
+
+  /// \brief Returns an **RGBA** preview of the latest depth frame.
+  const unsigned char* GetDepthPreview() {
+    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_ORIGINAL_DEPTH);
+  }
+
+  /// \brief Returns an RGBA unsigned char frame containing the preview of the most recent frame's
+  /// semantic segmentation.
+  const unsigned char* GetSegmentationPreview() {
+    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SEGMENTATION_RESULT);
+  }
+
+  /// \brief Returns an **RGBA** preview of the latest segmented object instance.
+  const unsigned char* GetObjectPreview() {
+    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_INSTANCE_PREVIEW);
   }
 
   int GetInputWidth() {
@@ -133,9 +131,15 @@ private:
 
   Vector2i window_size_;
 
-//  uint panel_texture_ids_[1];
-//  bool needs_refresh_;
-//  Action next_action_;
+  // TODO(andrei): Put this in a specific itam driver.
+  const unsigned char* GetItamData(ITMMainEngine::GetImageType image_type) {
+//    if (last_frame != current_frame_no_ ) {
+//      last_frame = current_frame_no_;
+    itm_static_scene_engine_->GetImage(out_image_, image_type);
+//    }
+
+    return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
+  }
 };
 
 /// TODO(andrei): Seriously consider using QT or wxWidgets. Pangolin is VERY limited in terms of the
@@ -175,7 +179,7 @@ public:
       // InfiniTAM's raycasting.
       main_view->Activate();
       glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-      const unsigned char *slam_frame_data = dyn_slam_->GetImageData();
+      const unsigned char *slam_frame_data = dyn_slam_->GetRaycastPreview();
 
       if(dyn_slam_->GetCurrentFrameNo() > 0) {
         // Hack for inspecting stuff
@@ -192,25 +196,25 @@ public:
       slam_preview->RenderToViewport(true);
 
       rgb_view.Activate();
-      glColor3f(1.0, 1.0, 1.0);
+      glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+      rgb_preview->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      rgb_preview->RenderToViewport(true);
 
-      // TODO(andrei): Undo these state changes, since they mess up the rest of the pipeline.
-//      UploadDummyTexture();
-//      dummy_image_texture->RenderToViewport();
+      depth_view.Activate();
+      glColor3f(1.0, 0.0, 0.0);
+      depth_preview->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      depth_preview->RenderToViewport(true);
 //
-//      depth_view.Activate();
-//      glColor3f(1.0, 0.0, 0.0);
-//      dummy_image_texture->RenderToViewport();
+      segment_view.Activate();
+      glColor3f(0.0, 1.0, 0.0);
+      segment_preview->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      segment_preview->RenderToViewport(true);
 //
-//      segment_view.Activate();
-//      glColor3f(0.0, 1.0, 0.0);
-//      dummy_image_texture->RenderToViewport();
-//
-//      object_view.Activate();
-//      glColor3f(0.0, 0.0, 1.0);
-//      dummy_image_texture->RenderToViewport();
-//
-//      glColor3f(1.0, 1.0, 1.0);
+      // TODO(andrei): In the future, make this an interactive point cloud/volume visualization.
+      object_view.Activate();
+      glColor3f(1.0, 1.0, 1.0);
+      depth_preview->Upload(dyn_slam_->GetObjectPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      depth_preview->RenderToViewport(true);
 //      pangolin::GlFont::I().Text("No data available").Draw(0,0,0);
 
 //      plotter.Activate();
@@ -224,8 +228,9 @@ public:
   }
 
 protected:
-
   /// \brief Creates the GUI layout and widgets.
+  /// \note The layout is biased towards very wide images (~2:1 aspect ratio or more), which is very
+  /// common in autonomous driving datasets.
   void CreatePangolinDisplays() {
     pangolin::CreateWindowAndBind("DynSLAM GUI", UI_WIDTH + width, height * 2);
 
@@ -275,32 +280,26 @@ protected:
     detail_views = &(pangolin::Display("detail"));
 
     main_view->SetAspect(aspect_ratio);
-//    main_view_free_cam = pangolin::OpenGlRenderState(
-//      proj, pangolin::ModelViewLookAt(0, 0, -2, 0, 0, 0, pangolin::AxisY));
     detail_views->SetAspect(aspect_ratio);
 
-    // TODO(andrei): Maybe wrap these guys?
-    main_view->SetBounds(0.0, 1.0, pangolin::Attach::Pix(UI_WIDTH),
-                         pangolin::Attach::Pix(UI_WIDTH + width));
-//    main_view->SetHandler(new pangolin::Handler3D(main_view_free_cam));
+    // TODO(andrei): Maybe wrap these guys in another controller, make it an equal layout and
+    // automagically support way more aspect ratios?
+    main_view->SetBounds(pangolin::Attach::Pix(height), 1.0,
+                         pangolin::Attach::Pix(UI_WIDTH), 1.0);
 
-    detail_views->SetBounds(0.0, 1.0, pangolin::Attach::Pix(width + UI_WIDTH), 1.0);
+    detail_views->SetBounds(0.0, pangolin::Attach::Pix(height),
+                            pangolin::Attach::Pix(UI_WIDTH), 1.0);
     detail_views->SetLayout(pangolin::LayoutEqual)
       .AddDisplay(rgb_view)
       .AddDisplay(depth_view)
       .AddDisplay(segment_view)
       .AddDisplay(object_view);
 
-    cv::flip(dummy_img, dummy_img, kCvFlipVertical);
-    cout << "Dimensions: " << dummy_img.cols << "x" << dummy_img.rows << endl;
-
-    const int george_width = dummy_img.cols;
-    const int george_height = dummy_img.rows;
-    this->dummy_image_texture = new pangolin::GlTexture(
-      george_width, george_height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
-
-    this->slam_preview = new pangolin::GlTexture(
-      width, height, GL_RGBA, false, 0, GL_RGBA, GL_UNSIGNED_BYTE);
+    this->slam_preview = new pangolin::GlTexture(width, height, GL_RGBA, false, 0, GL_RGBA, GL_UNSIGNED_BYTE);
+    this->rgb_preview = new pangolin::GlTexture(width, height, GL_RGBA, false, 0, GL_RGBA, GL_UNSIGNED_BYTE);
+    this->depth_preview = new pangolin::GlTexture(width, height, GL_RGBA, false, 0, GL_RGBA, GL_UNSIGNED_BYTE);
+    this->segment_preview = new pangolin::GlTexture(width, height, GL_RGBA, false, 0, GL_RGBA, GL_UNSIGNED_BYTE);
+    this->object_preview = new pangolin::GlTexture(width, height, GL_RGBA, false, 0, GL_RGBA, GL_UNSIGNED_BYTE);
 
 
     // Custom: Add a plot to one of the views
@@ -326,6 +325,13 @@ protected:
   void SetupDummyImage() {
     cout << "Loading George..." << endl;
     dummy_img = cv::imread("/home/andrei/Pictures/george.jpg");
+
+    cv::flip(dummy_img, dummy_img, kCvFlipVertical);
+    const int george_width = dummy_img.cols;
+    const int george_height = dummy_img.rows;
+    this->dummy_image_texture = new pangolin::GlTexture(
+      george_width, george_height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+
   }
 
 private:
@@ -343,6 +349,10 @@ private:
 
   pangolin::GlTexture *dummy_image_texture;
   pangolin::GlTexture *slam_preview;
+  pangolin::GlTexture *rgb_preview;
+  pangolin::GlTexture *depth_preview;
+  pangolin::GlTexture *segment_preview;
+  pangolin::GlTexture *object_preview;
 //  pangolin::OpenGlRenderState main_view_free_cam;
 
   cv::Mat dummy_img;
