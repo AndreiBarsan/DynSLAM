@@ -74,27 +74,28 @@ public:
                                                              1000);
 
     float aspect_ratio = static_cast<float>(width) / height;
-    pangolin::View &rgb_view = pangolin::Display("rgb").SetAspect(aspect_ratio);
-    pangolin::View &depth_view = pangolin::Display("depth").SetAspect(aspect_ratio);
-    pangolin::View &segment_view = pangolin::Display("segment").SetAspect(aspect_ratio);
-    pangolin::View &object_view = pangolin::Display("object").SetAspect(aspect_ratio);
+    rgb_view = pangolin::Display("rgb").SetAspect(aspect_ratio);
+    depth_view = pangolin::Display("depth").SetAspect(aspect_ratio);
+    segment_view = pangolin::Display("segment").SetAspect(aspect_ratio);
+    object_view = pangolin::Display("object").SetAspect(aspect_ratio);
 
-    pangolin::View &main_view = pangolin::Display("main");
-    pangolin::View &detail_views = pangolin::Display("detail");
+    // Storing pointers to these objects prevents a series of strange issues. The objects remain
+    // under Pangolin's management, so they don't need to be deleted by the current class.
+    main_view = &(pangolin::Display("main"));
+    detail_views = &(pangolin::Display("detail"));
 
-    main_view.SetAspect(aspect_ratio);
-    main_view_free_cam = pangolin::OpenGlRenderState(proj,
-                                                     pangolin::ModelViewLookAt(0, 0, -2, 0, 0, 0,
-                                                                               pangolin::AxisY));
-    detail_views.SetAspect(aspect_ratio);
+    main_view->SetAspect(aspect_ratio);
+    main_view_free_cam = pangolin::OpenGlRenderState(
+      proj, pangolin::ModelViewLookAt(0, 0, -2, 0, 0, 0, pangolin::AxisY));
+    detail_views->SetAspect(aspect_ratio);
 
     // TODO(andrei): Maybe wrap these guys?
-    main_view.SetBounds(0.0, 1.0, pangolin::Attach::Pix(UI_WIDTH),
+    main_view->SetBounds(0.0, 1.0, pangolin::Attach::Pix(UI_WIDTH),
                         pangolin::Attach::Pix(UI_WIDTH + width));
-    main_view.SetHandler(new pangolin::Handler3D(main_view_free_cam));
+    main_view->SetHandler(new pangolin::Handler3D(main_view_free_cam));
 
-    detail_views.SetBounds(0.0, 1.0, pangolin::Attach::Pix(width + UI_WIDTH), 1.0);
-    detail_views.SetLayout(pangolin::LayoutEqual)
+    detail_views->SetBounds(0.0, 1.0, pangolin::Attach::Pix(width + UI_WIDTH), 1.0);
+    detail_views->SetLayout(pangolin::LayoutEqual)
       .AddDisplay(rgb_view)
       .AddDisplay(depth_view)
       .AddDisplay(segment_view)
@@ -111,12 +112,11 @@ public:
     // Default hooks for exiting (Esc) and fullscreen (tab).
     while (!pangolin::ShouldQuit()) {
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
       glColor3f(1.0, 1.0, 1.0);
 
       // TODO(andrei): Only use Pangolin camera if not PITA. Otherwise, can just base everything off
       // InfiniTAM's raycasting.
-      main_view.Activate(main_view_free_cam);
+      main_view->Activate(main_view_free_cam);
       glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
       pangolin::glDrawColouredCube();
 
@@ -130,7 +130,6 @@ public:
       //set length of one complete row in data (doesn't need to equal img.cols)
       glPixelStorei(GL_UNPACK_ROW_LENGTH, dummy_img.step / dummy_img.elemSize());
       dummy_image_texture->Upload(dummy_img.data, GL_BGR, GL_UNSIGNED_BYTE);
-
       dummy_image_texture->RenderToViewport();
 
       depth_view.Activate();
@@ -182,9 +181,6 @@ protected:
 
     cout << "Loading George..." << endl;
     dummy_img = cv::imread("/home/andrei/Pictures/george.jpg");
-    cout << "Done." << endl;
-
-//    cv::Mat dummy_img = cv::imread("/home/andrei/Pictures/george.jpg");
 
 //    // Mess with George's bytes a little bit
 //    //use fast 4-byte alignment (default anyway) if possible
@@ -198,12 +194,12 @@ private:
   /// Input frame dimensions. They dictate the overall window size.
   int width, height;
 
-//  pangolin::View& main_view;
-//  pangolin::View& detail_views;
-//  pangolin::View& rgb_view;
-//  pangolin::View& depth_view;
-//  pangolin::View& segment_view;
-//  pangolin::View& object_view;
+  pangolin::View *main_view;
+  pangolin::View *detail_views;
+  pangolin::View rgb_view;
+  pangolin::View depth_view;
+  pangolin::View segment_view;
+  pangolin::View object_view;
 
   pangolin::GlTexture *dummy_image_texture;
   pangolin::OpenGlRenderState main_view_free_cam;
