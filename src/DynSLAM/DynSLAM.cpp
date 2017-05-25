@@ -1,3 +1,4 @@
+// Deprecated GUI code. See `DynSLAMGUI.cpp` for more information.
 
 #include <iostream>
 
