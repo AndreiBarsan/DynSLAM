@@ -24,11 +24,6 @@ message(STATUS "CUDA found: " ${CUDA_FOUND})
 # We rely on OpenCV for image IO and manipulation. Moreover, our (future) Caffe
 # dependencies will require it anyway...
 find_package(OpenCV REQUIRED)
-# We use Pangolin for the main GUI. Pangolin is a lightweight GUI library focused on visual
-# applications with minimal support for multiple panels, widgets, and live plotting.
-# TODO(andrei): Depend on the LOCAL pangolin, not the system-wide one! Check which one this command
-# actually loads!
-find_package(Pangolin 0.1 REQUIRED)
 
 # TODO(andrei): Is this optional any more?
 OPTION(WITH_CUDA "Build with CUDA support?" ${CUDA_FOUND})
@@ -57,14 +52,22 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 # TODO(andrei): You may want to have this dependency in src/DynSLAM/CMakeLists.txt.
 add_subdirectory(src/InfiniTAM/InfiniTAM)
-# TODO(andrei): Then, slowly move its functionality in this parent project, and
-# keep InfiniTAM pure.
 
 IF(WITH_CUDA)
   include_directories(${CUDA_INCLUDE_DIRS})
 ELSE()
   add_definitions(-DCOMPILE_WITHOUT_CUDA)
 ENDIF()
+
+# We use Pangolin for the main GUI. Pangolin is a lightweight GUI library focused on visual
+# applications with minimal support for multiple panels, widgets, and live plotting.
+# Note that this part *must* be after the CUDA setup, lest you get errors about hidden symbols
+# referenced by some DSO.
+add_subdirectory(src/Pangolin)
+find_package(Pangolin REQUIRED)
+
+# TODO(andrei): See pangolin's 'external' folder for neat ways of bringing in dependencies
+# from GitHub and building them if necessary.
 
 include_directories(${Pangolin_INCLUDE_DIRS})
 include_directories(${OpenCV_INCLUDE_DIRS})
@@ -97,3 +100,4 @@ target_link_libraries(DynSLAMGUI ORUtils)
 target_link_libraries(DynSLAMGUI InstRecLib)
 target_link_libraries(DynSLAMGUI ${Pangolin_LIBRARIES})
 target_link_libraries(DynSLAMGUI ${OpenCV_LIBS})
+
