@@ -29,6 +29,8 @@ namespace dynslam {
 namespace gui {
 
 using namespace std;
+using namespace InstRecLib::Reconstruction;
+using namespace InstRecLib::Segmentation;
 
 const int UI_WIDTH = 300;
 
@@ -101,6 +103,10 @@ public:
     return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_INSTANCE_PREVIEW);
   }
 
+  InstanceReconstructor * GetInstanceReconstructor() {
+    return itm_static_scene_engine_->GetInstanceReconstructor();
+  }
+
   int GetInputWidth() {
     return image_source_->getDepthImageSize().width;
   }
@@ -151,9 +157,6 @@ public:
   PangolinGui(DynSlam *dyn_slam) : dyn_slam_(dyn_slam) {
     cout << "Pangolin GUI initialized." << endl;
 
-    // TODO(andrei): Put useful things in this config.
-    // Load configuration data
-//    pangolin::ParseVarsFile("app.cfg");
     // TODO(andrei): Proper scaling to save space and memory.
     width = dyn_slam->GetInputWidth(); // / 1.5;
     height = dyn_slam->GetInputHeight();// / 1.5;
@@ -173,8 +176,6 @@ public:
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       glColor3f(1.0, 1.0, 1.0);
 
-      // TODO(andrei): The buffers you're now allocating for intermediate results are very wasteful.
-      // It's almost 800Mb of VRAM just for panel stuff. Please fix this!
       // TODO(andrei): Only use Pangolin camera if not PITA. Otherwise, can just base everything off
       // InfiniTAM's raycasting.
       main_view->Activate();
@@ -187,7 +188,7 @@ public:
 
 //        cv::Mat mat(height, width, CV_8UC4, (void *) slam_frame_data);
 //
-//        cv::imshow("CRAWLING IN MY SKIIIIN", mat);
+//        cv::imshow("Frame-Preview", mat);
 //        cv::waitKey(0);
       }
 
@@ -209,13 +210,47 @@ public:
       glColor3f(0.0, 1.0, 0.0);
       segment_preview->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
       segment_preview->RenderToViewport(true);
-//
-      // TODO(andrei): In the future, make this an interactive point cloud/volume visualization.
+
+      // TODO method
+      pangolin::GlFont& font = pangolin::GlFont::I();
+      // Overlay numbers onto the object detections associated through time, for visualization purposes.
+      const auto& instanceTracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
+      for(const auto& track : instanceTracker.GetTracks()) {
+        if (track.GetLastFrame().frame_idx !=  dyn_slam_->GetCurrentFrameNo() - 1) {
+          continue;
+        }
+
+        InstanceDetection latest_detection = track.GetLastFrame().instance_view.GetInstanceDetection();
+        const auto& bbox = latest_detection.mask->GetBoundingBox();
+
+        // Drawing the text requires converting from pixel coordinates to GL coordinates, which
+        // range from (-1.0, -1.0) in the bottom-left, to (+1.0, +1.0) in the top-right.
+        float panel_width = segment_view.GetBounds().w;
+        float panel_height = segment_view.GetBounds().h;
+
+        float bbox_x = bbox.r.x0 - panel_width;
+        float bbox_y = panel_height - bbox.r.y0 + font.Height();
+
+        float bbox_x_scaled = bbox_x / panel_width;
+        float bbox_y_scaled = bbox_y / panel_height;
+
+        float gl_x = bbox_x_scaled;
+        float gl_y = bbox_y_scaled;
+
+        stringstream idMsg;
+        idMsg << latest_detection.GetClassName() << "#" << track.GetId()
+              << "@" << setprecision(2)
+              << latest_detection.class_probability;
+        glColor3f(1.0f, 0.0f, 0.0f);
+
+        font.Text(idMsg.str()).Draw(gl_x, gl_y, 0);
+      }
+
+      // TODO(andrei): Make this an interactive point cloud/volume visualization.
       object_view.Activate();
       glColor3f(1.0, 1.0, 1.0);
-      depth_preview->Upload(dyn_slam_->GetObjectPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-      depth_preview->RenderToViewport(true);
-//      pangolin::GlFont::I().Text("No data available").Draw(0,0,0);
+      object_preview->Upload(dyn_slam_->GetObjectPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      object_preview->RenderToViewport(true);
 
 //      plotter.Activate();
 //      float val = static_cast<float>(sin(t));
@@ -373,6 +408,7 @@ private:
 
 int main(int argc, char **argv) {
   using namespace dynslam;
+
   gui::DynSlam *dyn_slam = new gui::DynSlam();
   const string dataset_root = "/home/andrei/work/libelas/cmake-build-debug/odo_seq_06/";
   const string calib_fpath = dataset_root + "calib.txt";
