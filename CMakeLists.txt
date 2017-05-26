@@ -29,7 +29,7 @@ IF(MSVC_IDE)
   add_definitions(-DUSING_CMAKE=1)
 ELSE(MSVC_IDE)
   set(CFLAGS_WARN "-Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing")
-  # TODO(andrei): Proper debug build config.
+    # TODO(andrei): Do we still need the '-g' and '-O' flags with -DCMAKE_BUILD_TYPE(=debug) flag?
 #  set(CMAKE_CXX_FLAGS "-fPIC -O3 -march=native ${CFLAGS_WARN} ${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS "-fPIC -g ${CFLAGS_WARN} ${CMAKE_CXX_FLAGS}")
 ENDIF(MSVC_IDE)
@@ -76,7 +76,6 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 set(DYNSLAM_SOURCES
     src/DynSLAM/DynSLAM.cpp
     src/DynSLAM/ImageSourceEngine.cpp
-    src/DynSLAM/ImageSourceEngine.h
 )
 set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
