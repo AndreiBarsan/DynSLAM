@@ -1,7 +1,7 @@
 
 
 #include "DynSlam.h"
-#include "../InfiniTAM/InfiniTAM/InstRecLib/PrecomputedSegmentationProvider.h"
+#include "InstRecLib/PrecomputedSegmentationProvider.h"
 
 namespace dynslam {
 
