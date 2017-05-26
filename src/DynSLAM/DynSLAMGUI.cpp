@@ -9,6 +9,7 @@
 #include <GL/glut.h>
 
 // TODO(andrei): Configure InfiniTAM's includes so we can be less verbose here.
+#include "DynSlam.h"
 #include "ImageSourceEngine.h"
 #include "Utils.h"
 
@@ -34,133 +35,11 @@ using namespace std;
 using namespace InstRecLib::Reconstruction;
 using namespace InstRecLib::Segmentation;
 
+using namespace dynslam;
 using namespace dynslam::utils;
 
 static const int kUiWidth = 300;
 static const float kPlotTimeIncrement = 0.1f;
-
-// TODO(andrei): Move away from here.
-/// \brief Main DynSLAM class interfacing between different submodules.
-class DynSlam {
-
-public:
-    void Initialize(ITMMainEngine *itm_static_scene_engine_, ImageSourceEngine *image_source) {
-
-      this->image_source_ = image_source;
-
-      window_size_.x = image_source->getDepthImageSize().x;
-      window_size_.y = image_source->getDepthImageSize().y;
-
-      this->itm_static_scene_engine_ = itm_static_scene_engine_;
-      this->current_frame_no_ = 0;
-
-      bool allocate_gpu = true;
-      Vector2i input_shape = image_source->getDepthImageSize();
-      out_image_ = new ITMUChar4Image(input_shape, true, allocate_gpu);
-      input_rgb_image_= new ITMUChar4Image(input_shape, true, allocate_gpu);
-      input_raw_depth_image_ = new ITMShortImage(input_shape, true, allocate_gpu);
-
-      // TODO(andrei): Own CUDA safety wrapper. With blackjack. And hookers.
-      ITMSafeCall(cudaThreadSynchronize());
-
-      cout << "DynSLAM initialization complete." << endl;
-    }
-
-  void ProcessFrame() {
-    if (! image_source_->hasMoreImages()) {
-      cout << "No more frames left in image source." << endl;
-      return;
-    }
-
-    // Read the images from the first part of the pipeline
-    image_source_->getImages(input_rgb_image_, input_raw_depth_image_);
-
-    // Forward them to InfiniTAM for the background reconstruction.
-    itm_static_scene_engine_->ProcessFrame(input_rgb_image_, input_raw_depth_image_);
-    ITMSafeCall(cudaThreadSynchronize());
-
-    current_frame_no_++;
-  }
-
-  const unsigned char* GetRaycastPreview() {
-    // TODO(andrei): Get rid of reliance on itam enums via a driver abstraction.
-    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST);
-  }
-
-  /// \brief Returns an **RGBA** preview of the latest color frame.
-  const unsigned char* GetRgbPreview() {
-    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_ORIGINAL_RGB);
-  }
-
-  /// \brief Returns an **RGBA** preview of the latest depth frame.
-  const unsigned char* GetDepthPreview() {
-    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_ORIGINAL_DEPTH);
-  }
-
-  /// \brief Returns an RGBA unsigned char frame containing the preview of the most recent frame's
-  /// semantic segmentation.
-  const unsigned char* GetSegmentationPreview() {
-    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SEGMENTATION_RESULT);
-  }
-
-  /// \brief Returns an **RGBA** preview of the latest segmented object instance.
-  const unsigned char* GetObjectPreview(int object_idx) {
-//    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_INSTANCE_PREVIEW);
-    ITMUChar4Image *preview = itm_static_scene_engine_->GetInstanceReconstructor()->GetInstancePreviewRGB(object_idx);
-    if (nullptr == preview) {
-      // This happens when there's no instances to preview.
-      out_image_->Clear();
-    } else {
-      out_image_->SetFrom(preview, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
-    }
-
-    return out_image_->GetData(MemoryDeviceType::MEMORYDEVICE_CPU)->getValues();
-  }
-
-  InstanceReconstructor * GetInstanceReconstructor() {
-    return itm_static_scene_engine_->GetInstanceReconstructor();
-  }
-
-  int GetInputWidth() {
-    return image_source_->getDepthImageSize().width;
-  }
-
-  int GetInputHeight() {
-    return image_source_->getDepthImageSize().height;
-  }
-
-  int GetCurrentFrameNo() {
-    return current_frame_no_;
-  }
-
-private:
-  ITMLibSettings itm_lib_settings_;
-  // TODO(andrei): Write custom image source.
-  ImageSourceEngine *image_source_;
-
-  // This is the main reconstruction component. Should split for dynamic+static.
-  // In the future, we may need to write our own.
-  // For now, this shall only handle reconstructing the static part of a scene.
-  ITMMainEngine *itm_static_scene_engine_;
-
-  ITMUChar4Image *out_image_;
-  ITMUChar4Image *input_rgb_image_;
-  ITMShortImage  *input_raw_depth_image_;
-
-  int current_frame_no_;
-
-  Vector2i window_size_;
-
-  // TODO(andrei): Put this in a specific itam driver.
-  const unsigned char* GetItamData(ITMMainEngine::GetImageType image_type) {
-//    if (last_frame != current_frame_no_ ) {
-//      last_frame = current_frame_no_;
-    itm_static_scene_engine_->GetImage(out_image_, image_type);
-//    }
-
-    return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
-  }
-};
 
 /// TODO(andrei): Seriously consider using QT or wxWidgets. Pangolin is VERY limited in terms of the
 /// widgets it supports. It doesn't even seem to support multiline text, or any reasonable way to
