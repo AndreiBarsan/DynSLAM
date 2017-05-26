@@ -76,7 +76,7 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 set(DYNSLAM_SOURCES
     src/DynSLAM/DynSLAM.cpp
     src/DynSLAM/ImageSourceEngine.cpp
-)
+    src/DynSLAM/Utils.cpp src/DynSLAM/Utils.h)
 set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
     src/DynSLAM/DynSLAMGUI.cpp
