@@ -1,0 +1,6 @@
+---
+# Base everything on Google's C++ style guide.
+BasedOnStyle: Google
+# ---
+# Language: Cpp
+# ---
