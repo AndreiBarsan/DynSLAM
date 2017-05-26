@@ -1,6 +1,7 @@
 
 
 #include "DynSlam.h"
+#include "../InfiniTAM/InfiniTAM/InstRecLib/PrecomputedSegmentationProvider.h"
 
 namespace dynslam {
 
@@ -13,7 +14,7 @@ void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_, ImageSourceE
   window_size_.x = image_source->getDepthImageSize().x;
   window_size_.y = image_source->getDepthImageSize().y;
 
-  this->itm_static_scene_engine_ = itm_static_scene_engine_;
+  this->static_scene_ = itm_static_scene_engine_;
   this->current_frame_no_ = 0;
 
   bool allocate_gpu = true;
@@ -24,6 +25,11 @@ void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_, ImageSourceE
 
   // TODO(andrei): Own CUDA safety wrapper. With blackjack. And hookers.
   ITMSafeCall(cudaThreadSynchronize());
+
+  // TODO(andrei): Pass root path of seg folder.
+  const string segFolder = "/home/andrei/datasets/kitti/odometry-dataset/sequences/06/seg_image_2/mnc";
+  segmentationProvider = new InstRecLib::Segmentation::PrecomputedSegmentationProvider(segFolder);
+  instance_reconstructor_ = new InstRecLib::Reconstruction::InstanceReconstructor();
 
   cout << "DynSLAM initialization complete." << endl;
 }
@@ -36,9 +42,29 @@ void DynSlam::ProcessFrame() {
 
   // Read the images from the first part of the pipeline
   image_source_->getImages(input_rgb_image_, input_raw_depth_image_);
+  static_scene_->UpdateView(input_rgb_image_, input_raw_depth_image_);
 
-  // Forward them to InfiniTAM for the background reconstruction.
-  itm_static_scene_engine_->ProcessFrame(input_rgb_image_, input_raw_depth_image_);
+  // InstRec: semantic segmentation
+  auto segmentationResult = segmentationProvider->SegmentFrame(input_rgb_image_);
+  if (segmentationResult->instance_detections.size() > 0) {
+    std::cout << "Detected " << segmentationResult->instance_detections.size()
+              << " objects in the frame." << std::endl;
+    for(const auto& instance : segmentationResult->instance_detections) {
+      std::cout << "\t " << instance << std::endl;
+    }
+  }
+  else {
+    std::cout << "Nothing detected in the frame." << std::endl;
+  }
+
+  // Split the scene up into instances, and fuse each instance independently.
+  instance_reconstructor_->ProcessFrame(static_scene_->GetView(), *segmentationResult);
+
+  // Perform the tracking after the segmentation, so that we may in the future leverage semantic
+  // information to enhance tracking.
+  static_scene_->Track();
+  static_scene_->Integrate();
+  static_scene_->PrepareNextStep();
 
   ITMSafeCall(cudaThreadSynchronize());
 
@@ -46,7 +72,7 @@ void DynSlam::ProcessFrame() {
 }
 
 const unsigned char* DynSlam::GetObjectPreview(int object_idx) {
-  ITMUChar4Image *preview = itm_static_scene_engine_->GetInstanceReconstructor()->GetInstancePreviewRGB(object_idx);
+  ITMUChar4Image *preview = instance_reconstructor_->GetInstancePreviewRGB(object_idx);
   if (nullptr == preview) {
     // This happens when there's no instances to preview.
     out_image_->Clear();

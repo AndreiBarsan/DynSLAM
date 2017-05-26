@@ -6,10 +6,12 @@
 
 #include "../InfiniTAM/InfiniTAM/InstRecLib/InstanceReconstructor.h"
 #include "InfiniTamDriver.h"
+#include "../InfiniTAM/InfiniTAM/InstRecLib/PrecomputedSegmentationProvider.h"
 
 namespace dynslam {
 
 using namespace InstRecLib::Reconstruction;
+using namespace InstRecLib::Segmentation;
 using namespace dynslam::drivers;
 
 /// \brief The central class of the DynSLAM system.
@@ -41,14 +43,16 @@ public:
   /// \brief Returns an RGBA unsigned char frame containing the preview of the most recent frame's
   /// semantic segmentation.
   const unsigned char* GetSegmentationPreview() {
-    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SEGMENTATION_RESULT);
+    // TODO(andrei): Get this right from our own dude.
+    // Placeholder
+    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_ORIGINAL_DEPTH);
   }
 
   /// \brief Returns an **RGBA** preview of the latest segmented object instance.
   const unsigned char* GetObjectPreview(int object_idx);
 
   InstanceReconstructor* GetInstanceReconstructor() {
-    return itm_static_scene_engine_->GetInstanceReconstructor();
+    return instance_reconstructor_;
   }
 
   int GetInputWidth() {
@@ -71,7 +75,7 @@ private:
   // This is the main reconstruction component. Should split for dynamic+static.
   // In the future, we may need to write our own.
   // For now, this shall only handle reconstructing the static part of a scene.
-  InfiniTamDriver *itm_static_scene_engine_;
+  InfiniTamDriver *static_scene_;
 
   ITMUChar4Image *out_image_;
   ITMUChar4Image *input_rgb_image_;
@@ -83,9 +87,12 @@ private:
 
   // TODO(andrei): Isolate this in a specific itam driver.
   const unsigned char* GetItamData(ITMMainEngine::GetImageType image_type) {
-    itm_static_scene_engine_->GetImage(out_image_, image_type);
+    static_scene_->GetImage(out_image_, image_type);
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
+
+  PrecomputedSegmentationProvider *segmentationProvider;
+  InstanceReconstructor *instance_reconstructor_;
 };
 
 }
