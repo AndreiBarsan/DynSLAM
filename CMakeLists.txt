@@ -21,10 +21,6 @@ find_package(CUDA QUIET)
 CANONIFY_BOOL(CUDA_FOUND)
 message(STATUS "CUDA found: " ${CUDA_FOUND})
 
-# We rely on OpenCV for image IO and manipulation. Moreover, our (future) Caffe
-# dependencies will require it anyway...
-find_package(OpenCV REQUIRED)
-
 # TODO(andrei): Is this optional any more?
 OPTION(WITH_CUDA "Build with CUDA support?" ${CUDA_FOUND})
 
@@ -63,8 +59,12 @@ ENDIF()
 # applications with minimal support for multiple panels, widgets, and live plotting.
 # Note that this part *must* be after the CUDA setup, lest you get errors about hidden symbols
 # referenced by some DSO.
-add_subdirectory(src/Pangolin)
+add_subdirectory(src/Pangolin)   # TODO-LOW(andrei): Enabling this causes strange linker issues.
 find_package(Pangolin REQUIRED)
+
+# We rely on OpenCV for image IO and manipulation. Moreover, our (future) Caffe
+# dependencies will require it anyway...
+find_package(OpenCV REQUIRED)
 
 # TODO(andrei): See pangolin's 'external' folder for neat ways of bringing in dependencies
 # from GitHub and building them if necessary.
