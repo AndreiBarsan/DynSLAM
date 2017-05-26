@@ -46,8 +46,9 @@ ENDIF()
 # Set some additional common compilation flags, like C++11 feature support.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-# TODO(andrei): You may want to have this dependency in src/DynSLAM/CMakeLists.txt.
+# TODO(andrei): You may want to have these dependencies in src/DynSLAM/CMakeLists.txt.
 add_subdirectory(src/InfiniTAM/InfiniTAM)
+add_subdirectory(src/DynSLAM/InstRecLib)
 
 # We use Pangolin for the main GUI. Pangolin is a lightweight GUI library focused on visual
 # applications with minimal support for multiple panels, widgets, and live plotting.
