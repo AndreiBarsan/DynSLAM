@@ -49,18 +49,18 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 # TODO(andrei): You may want to have this dependency in src/DynSLAM/CMakeLists.txt.
 add_subdirectory(src/InfiniTAM/InfiniTAM)
 
-IF(WITH_CUDA)
-  include_directories(${CUDA_INCLUDE_DIRS})
-ELSE()
-  add_definitions(-DCOMPILE_WITHOUT_CUDA)
-ENDIF()
-
 # We use Pangolin for the main GUI. Pangolin is a lightweight GUI library focused on visual
 # applications with minimal support for multiple panels, widgets, and live plotting.
 # Note that this part *must* be after the CUDA setup, lest you get errors about hidden symbols
 # referenced by some DSO.
 add_subdirectory(src/Pangolin)   # TODO-LOW(andrei): Enabling this causes strange linker issues.
 find_package(Pangolin REQUIRED)
+
+IF(WITH_CUDA)
+  include_directories(${CUDA_INCLUDE_DIRS})
+ELSE()
+  add_definitions(-DCOMPILE_WITHOUT_CUDA)
+ENDIF()
 
 # We rely on OpenCV for image IO and manipulation. Moreover, our (future) Caffe
 # dependencies will require it anyway...
