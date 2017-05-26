@@ -75,11 +75,11 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 # TODO(andrei): Make dynslam a library, and link the GUI with it.
 set(DYNSLAM_SOURCES
     src/DynSLAM/ImageSourceEngine.cpp
-    src/DynSLAM/Utils.cpp src/DynSLAM/Utils.h)
+    src/DynSLAM/Utils.cpp
+    src/DynSLAM/DynSlam.cpp)
 set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
-    src/DynSLAM/DynSLAMGUI.cpp
-)
+    src/DynSLAM/DynSLAMGUI.cpp)
 
 add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
 
