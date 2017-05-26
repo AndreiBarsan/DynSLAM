@@ -8,7 +8,7 @@
 #include <backward.hpp>
 #include <GL/glut.h>
 
-#include "../InfiniTAM/InfiniTAM/ORUtils/CUDADefines.h"
+// TODO(andrei): Configure InfiniTAM's includes so we can be less verbose here.
 #include "ImageSourceEngine.h"
 #include "Utils.h"
 
