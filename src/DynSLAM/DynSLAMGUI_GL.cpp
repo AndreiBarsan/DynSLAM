@@ -7,16 +7,12 @@
 
 #include "ImageSourceEngine.h"
 
-// TODO(andrei): Configure InfiniTAM's includes so we can be less verbose here.
 #include "../InfiniTAM/InfiniTAM/ITMLib/Objects/ITMView.h"
 #include "../InfiniTAM/InfiniTAM/ITMLib/Engine/ITMMainEngine.h"
 
 #include <GL/glut.h>
 #include <GL/freeglut.h>
 #include <backward.hpp>
-
-// TODO(andrei): TODO file for code-specific TODOs.
-// TODO(andrei): clang-format.
 
 namespace dynslam {
   using namespace std;
