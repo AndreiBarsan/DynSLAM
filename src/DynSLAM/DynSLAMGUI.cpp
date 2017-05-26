@@ -180,25 +180,15 @@ public:
       // TODO(andrei): Only use Pangolin camera if not PITA. Otherwise, can just base everything off
       // InfiniTAM's raycasting.
       main_view->Activate();
-      glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+      glColor3f(1.0f, 1.0f, 1.0f);
       const unsigned char *slam_frame_data = dyn_slam_->GetRaycastPreview();
-
-      if(dyn_slam_->GetCurrentFrameNo() > 0) {
-        // Hack for inspecting stuff
-        // In CV terms, InfiniTAM produces CV_8UC4 output.
-
-//        cv::Mat mat(height, width, CV_8UC4, (void *) slam_frame_data);
-//
-//        cv::imshow("Frame-Preview", mat);
-//        cv::waitKey(0);
-      }
 
       // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance!
       slam_preview->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
       slam_preview->RenderToViewport(true);
 
       rgb_view.Activate();
-      glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+      glColor3f(1.0f, 1.0f, 1.0f);
       rgb_preview->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
       rgb_preview->RenderToViewport(true);
 
@@ -208,43 +198,45 @@ public:
       depth_preview->RenderToViewport(true);
 //
       segment_view.Activate();
-      glColor3f(0.0, 1.0, 0.0);
+      glColor3f(1.0, 1.0, 1.0);
       segment_preview->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
       segment_preview->RenderToViewport(true);
 
-      // TODO method
-      pangolin::GlFont& font = pangolin::GlFont::I();
-      // Overlay numbers onto the object detections associated through time, for visualization purposes.
-      const auto& instanceTracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
-      for(const auto& track : instanceTracker.GetTracks()) {
-        if (track.GetLastFrame().frame_idx !=  dyn_slam_->GetCurrentFrameNo() - 1) {
-          continue;
+      // TODO method for this
+      {
+        pangolin::GlFont &font = pangolin::GlFont::I();
+        // Overlay numbers onto the object detections associated through time, for visualization purposes.
+        const auto &instanceTracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
+        for (const auto &track : instanceTracker.GetTracks()) {
+          if (track.GetLastFrame().frame_idx != dyn_slam_->GetCurrentFrameNo() - 1) {
+            continue;
+          }
+
+          InstanceDetection latest_detection = track.GetLastFrame().instance_view.GetInstanceDetection();
+          const auto &bbox = latest_detection.mask->GetBoundingBox();
+
+          // Drawing the text requires converting from pixel coordinates to GL coordinates, which
+          // range from (-1.0, -1.0) in the bottom-left, to (+1.0, +1.0) in the top-right.
+          float panel_width = segment_view.GetBounds().w;
+          float panel_height = segment_view.GetBounds().h;
+
+          float bbox_x = bbox.r.x0 - panel_width;
+          float bbox_y = panel_height - bbox.r.y0 + font.Height();
+
+          float bbox_x_scaled = bbox_x / panel_width;
+          float bbox_y_scaled = bbox_y / panel_height;
+
+          float gl_x = bbox_x_scaled;
+          float gl_y = bbox_y_scaled;
+
+          stringstream idMsg;
+          idMsg << latest_detection.GetClassName() << "#" << track.GetId()
+                << "@" << setprecision(2)
+                << latest_detection.class_probability;
+          glColor3f(1.0f, 0.0f, 0.0f);
+
+          font.Text(idMsg.str()).Draw(gl_x, gl_y, 0);
         }
-
-        InstanceDetection latest_detection = track.GetLastFrame().instance_view.GetInstanceDetection();
-        const auto& bbox = latest_detection.mask->GetBoundingBox();
-
-        // Drawing the text requires converting from pixel coordinates to GL coordinates, which
-        // range from (-1.0, -1.0) in the bottom-left, to (+1.0, +1.0) in the top-right.
-        float panel_width = segment_view.GetBounds().w;
-        float panel_height = segment_view.GetBounds().h;
-
-        float bbox_x = bbox.r.x0 - panel_width;
-        float bbox_y = panel_height - bbox.r.y0 + font.Height();
-
-        float bbox_x_scaled = bbox_x / panel_width;
-        float bbox_y_scaled = bbox_y / panel_height;
-
-        float gl_x = bbox_x_scaled;
-        float gl_y = bbox_y_scaled;
-
-        stringstream idMsg;
-        idMsg << latest_detection.GetClassName() << "#" << track.GetId()
-              << "@" << setprecision(2)
-              << latest_detection.class_probability;
-        glColor3f(1.0f, 0.0f, 0.0f);
-
-        font.Text(idMsg.str()).Draw(gl_x, gl_y, 0);
       }
 
       // TODO(andrei): Make this an interactive point cloud/volume visualization.
@@ -252,6 +244,15 @@ public:
       glColor3f(1.0, 1.0, 1.0);
       object_preview->Upload(dyn_slam_->GetObjectPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
       object_preview->RenderToViewport(true);
+
+      if(dyn_slam_->GetCurrentFrameNo() > 5) {
+        // Hack for inspecting stuff
+        // In CV terms, InfiniTAM produces CV_8UC4 output.
+
+//        cv::Mat mat(height, width, CV_8UC4, (void *) dyn_slam_->GetObjectPreview());
+//        cv::imshow("Frame-Preview", mat);
+//        cv::waitKey(500);
+      }
 
 //      plotter.Activate();
 //      float val = static_cast<float>(sin(t));
@@ -331,11 +332,13 @@ protected:
       .AddDisplay(segment_view)
       .AddDisplay(object_view);
 
-    this->slam_preview = new pangolin::GlTexture(width, height, GL_RGBA, false, 0, GL_RGBA, GL_UNSIGNED_BYTE);
-    this->rgb_preview = new pangolin::GlTexture(width, height, GL_RGBA, false, 0, GL_RGBA, GL_UNSIGNED_BYTE);
-    this->depth_preview = new pangolin::GlTexture(width, height, GL_RGBA, false, 0, GL_RGBA, GL_UNSIGNED_BYTE);
-    this->segment_preview = new pangolin::GlTexture(width, height, GL_RGBA, false, 0, GL_RGBA, GL_UNSIGNED_BYTE);
-    this->object_preview = new pangolin::GlTexture(width, height, GL_RGBA, false, 0, GL_RGBA, GL_UNSIGNED_BYTE);
+    // Internally, InfiniTAM stores these as RGBA, but we discard the alpha when we upload the
+    // textures for visualization.
+    this->slam_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+    this->rgb_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+    this->depth_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+    this->segment_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+    this->object_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
 
 
     // Custom: Add a plot to one of the views
