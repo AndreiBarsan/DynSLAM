@@ -20,6 +20,7 @@ void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_, ImageSourceE
   bool allocate_gpu = true;
   Vector2i input_shape = image_source->getDepthImageSize();
   out_image_ = new ITMUChar4Image(input_shape, true, allocate_gpu);
+  out_image_float_ = new ITMFloatImage(input_shape, true, allocate_gpu);
   input_rgb_image_= new ITMUChar4Image(input_shape, true, allocate_gpu);
   input_raw_depth_image_ = new ITMShortImage(input_shape, true, allocate_gpu);
 
@@ -29,7 +30,7 @@ void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_, ImageSourceE
   // TODO(andrei): Pass root path of seg folder.
   const string segFolder = "/home/andrei/datasets/kitti/odometry-dataset/sequences/06/seg_image_2/mnc";
   segmentationProvider = new InstRecLib::Segmentation::PrecomputedSegmentationProvider(segFolder);
-  instance_reconstructor_ = new InstRecLib::Reconstruction::InstanceReconstructor();
+  instance_reconstructor_ = new InstRecLib::Reconstruction::InstanceReconstructor(static_scene_);
 
   cout << "DynSLAM initialization complete." << endl;
 }
@@ -71,16 +72,20 @@ void DynSlam::ProcessFrame() {
   current_frame_no_++;
 }
 
-const unsigned char* DynSlam::GetObjectPreview(int object_idx) {
-  ITMUChar4Image *preview = instance_reconstructor_->GetInstancePreviewRGB(object_idx);
+//const unsigned char* DynSlam::GetObjectPreview(int object_idx) {
+const float* DynSlam::GetObjectPreview(int object_idx) {
+//  ITMUChar4Image *preview = instance_reconstructor_->GetInstancePreviewRGB(object_idx);
+  ITMFloatImage *preview = instance_reconstructor_->GetInstancePreviewDepth(object_idx);
   if (nullptr == preview) {
     // This happens when there's no instances to preview.
-    out_image_->Clear();
+//    out_image_->Clear();
+    out_image_float_->Clear();
   } else {
-    out_image_->SetFrom(preview, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+//    out_image_->SetFrom(preview, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+    out_image_float_->SetFrom(preview, ORUtils::MemoryBlock<float>::CPU_TO_CPU);
   }
 
-  return out_image_->GetData(MemoryDeviceType::MEMORYDEVICE_CPU)->getValues();
+  return out_image_float_->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 }
 
 }

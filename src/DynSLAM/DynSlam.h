@@ -39,6 +39,11 @@ public:
     return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_ORIGINAL_DEPTH);
   }
 
+  const unsigned char* GetObjectRaycastPreview() {
+    instance_reconstructor_->GetInstanceRaycastPreview(out_image_);
+    return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
+  }
+
   /// \brief Returns an RGBA unsigned char frame containing the preview of the most recent frame's
   /// semantic segmentation.
   const unsigned char* GetSegmentationPreview() {
@@ -48,7 +53,8 @@ public:
   }
 
   /// \brief Returns an **RGBA** preview of the latest segmented object instance.
-  const unsigned char* GetObjectPreview(int object_idx);
+  // TODO(andrei): Separate methods for char rgb and float depth.
+  const float* GetObjectPreview(int object_idx);
 
   InstanceReconstructor* GetInstanceReconstructor() {
     return instance_reconstructor_;
@@ -77,6 +83,7 @@ private:
   InfiniTamDriver *static_scene_;
 
   ITMUChar4Image *out_image_;
+  ITMFloatImage *out_image_float_;
   ITMUChar4Image *input_rgb_image_;
   ITMShortImage  *input_raw_depth_image_;
 
