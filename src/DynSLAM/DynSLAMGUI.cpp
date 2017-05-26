@@ -10,6 +10,7 @@
 
 #include "../InfiniTAM/InfiniTAM/ORUtils/CUDADefines.h"
 #include "ImageSourceEngine.h"
+#include "Utils.h"
 
 
 // TODO(andrei): Use [RIP] tags to signal spots where you wasted more than 30 minutes debugging a
@@ -33,7 +34,10 @@ using namespace std;
 using namespace InstRecLib::Reconstruction;
 using namespace InstRecLib::Segmentation;
 
-const int UI_WIDTH = 300;
+using namespace dynslam::utils;
+
+static const int kUiWidth = 300;
+static const float kPlotTimeIncrement = 0.1f;
 
 // TODO(andrei): Move away from here.
 /// \brief Main DynSLAM class interfacing between different submodules.
@@ -100,8 +104,17 @@ public:
   }
 
   /// \brief Returns an **RGBA** preview of the latest segmented object instance.
-  const unsigned char* GetObjectPreview() {
-    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_INSTANCE_PREVIEW);
+  const unsigned char* GetObjectPreview(int object_idx) {
+//    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_INSTANCE_PREVIEW);
+    ITMUChar4Image *preview = itm_static_scene_engine_->GetInstanceReconstructor()->GetInstancePreviewRGB(object_idx);
+    if (nullptr == preview) {
+      // This happens when there's no instances to preview.
+      out_image_->Clear();
+    } else {
+      out_image_->SetFrom(preview, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+    }
+
+    return out_image_->GetData(MemoryDeviceType::MEMORYDEVICE_CPU)->getValues();
   }
 
   InstanceReconstructor * GetInstanceReconstructor() {
@@ -167,7 +180,15 @@ public:
   }
 
   virtual ~PangolinGui() {
+    delete reconstructions;
     delete dummy_image_texture;
+    delete main_view;
+    delete detail_views;
+    delete slam_preview;
+    delete rgb_preview;
+    delete depth_preview;
+    delete segment_preview;
+    delete object_preview;
   }
 
   /// \brief Executes the main Pangolin input and rendering loop.
@@ -201,66 +222,71 @@ public:
       glColor3f(1.0, 1.0, 1.0);
       segment_preview->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
       segment_preview->RenderToViewport(true);
-
-      // TODO method for this
-      {
-        pangolin::GlFont &font = pangolin::GlFont::I();
-        // Overlay numbers onto the object detections associated through time, for visualization purposes.
-        const auto &instanceTracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
-        for (const auto &track : instanceTracker.GetTracks()) {
-          if (track.GetLastFrame().frame_idx != dyn_slam_->GetCurrentFrameNo() - 1) {
-            continue;
-          }
-
-          InstanceDetection latest_detection = track.GetLastFrame().instance_view.GetInstanceDetection();
-          const auto &bbox = latest_detection.mask->GetBoundingBox();
-
-          // Drawing the text requires converting from pixel coordinates to GL coordinates, which
-          // range from (-1.0, -1.0) in the bottom-left, to (+1.0, +1.0) in the top-right.
-          float panel_width = segment_view.GetBounds().w;
-          float panel_height = segment_view.GetBounds().h;
-
-          float bbox_x = bbox.r.x0 - panel_width;
-          float bbox_y = panel_height - bbox.r.y0 + font.Height();
-
-          float bbox_x_scaled = bbox_x / panel_width;
-          float bbox_y_scaled = bbox_y / panel_height;
-
-          float gl_x = bbox_x_scaled;
-          float gl_y = bbox_y_scaled;
-
-          stringstream idMsg;
-          idMsg << latest_detection.GetClassName() << "#" << track.GetId()
-                << "@" << setprecision(2)
-                << latest_detection.class_probability;
-          glColor3f(1.0f, 0.0f, 0.0f);
-
-          font.Text(idMsg.str()).Draw(gl_x, gl_y, 0);
-        }
-      }
+      DrawInstanceLables();
 
       // TODO(andrei): Make this an interactive point cloud/volume visualization.
       object_view.Activate();
       glColor3f(1.0, 1.0, 1.0);
-      object_preview->Upload(dyn_slam_->GetObjectPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      object_preview->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
+                             GL_RGBA, GL_UNSIGNED_BYTE);
       object_preview->RenderToViewport(true);
 
-      if(dyn_slam_->GetCurrentFrameNo() > 5) {
-        // Hack for inspecting stuff
-        // In CV terms, InfiniTAM produces CV_8UC4 output.
+      // dummy
+//      graph_view.Activate();
+//      glColor3f(1.0, 0.0, 0.0);
+//      depth_preview->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+//      depth_preview->RenderToViewport(true);
 
-//        cv::Mat mat(height, width, CV_8UC4, (void *) dyn_slam_->GetObjectPreview());
-//        cv::imshow("Frame-Preview", mat);
-//        cv::waitKey(500);
-      }
+      // dummy
+      extra_view.Activate();
+      glColor3f(1.0, 0.0, 0.0);
+      depth_preview->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      depth_preview->RenderToViewport(true);
 
-//      plotter.Activate();
-//      float val = static_cast<float>(sin(t));
-//      t += tinc;
-//      log.Log(val);
+      plotter->Activate();
+
+      *(reconstructions) = Format(
+        "%d active reconstructions",
+        dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount()
+      );
 
       // Swap frames and Process Events
       pangolin::FinishFrame();
+    }
+  }
+
+  /// \brief Renders informative labels regardin the currently active bounding boxes.
+  /// Meant to be rendered over the segmentation preview window pane.
+  void DrawInstanceLables() const {
+    pangolin::GlFont &font = pangolin::GlFont::I();
+
+    const auto &instanceTracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
+    for (const auto &track : instanceTracker.GetTracks()) {
+      // Nothing to do for tracks with we didn't see this frame.
+      if (track.GetLastFrame().frame_idx != dyn_slam_->GetCurrentFrameNo() - 1) {
+        continue;
+      }
+
+      InstanceDetection latest_detection = track.GetLastFrame().instance_view.GetInstanceDetection();
+      const auto &bbox = latest_detection.mask->GetBoundingBox();
+
+      // Drawing the text requires converting from pixel coordinates to GL coordinates, which
+      // range from (-1.0, -1.0) in the bottom-left, to (+1.0, +1.0) in the top-right.
+      float panel_width = segment_view.GetBounds().w;
+      float panel_height = segment_view.GetBounds().h;
+
+      float bbox_left = bbox.r.x0 - panel_width;
+      float bbox_top = panel_height - bbox.r.y0 + font.Height();
+
+      float gl_x = bbox_left / panel_width;
+      float gl_y = bbox_top / panel_height;
+
+      stringstream info_label;
+      info_label << latest_detection.GetClassName() << "#" << track.GetId()
+                 << "@" << setprecision(2)
+                 << latest_detection.class_probability;
+      glColor3f(1.0f, 0.0f, 0.0f);
+      font.Text(info_label.str()).Draw(gl_x, gl_y, 0);
     }
   }
 
@@ -269,7 +295,11 @@ protected:
   /// \note The layout is biased towards very wide images (~2:1 aspect ratio or more), which is very
   /// common in autonomous driving datasets.
   void CreatePangolinDisplays() {
-    pangolin::CreateWindowAndBind("DynSLAM GUI", UI_WIDTH + width, height * 2);
+    pangolin::CreateWindowAndBind("DynSLAM GUI",
+                                  kUiWidth + width,
+                                  // One full-height pane with the main preview, plus 3 * 0.5
+                                  // height ones for various visualizations.
+                                  static_cast<int>(ceil(height * 2.5)));
 
     // 3D Mouse handler requires depth testing to be enabled
     glEnable(GL_DEPTH_TEST);
@@ -280,7 +310,7 @@ protected:
 
     // GUI stuff
     pangolin::CreatePanel("ui")
-      .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
+      .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(kUiWidth));
 
     pangolin::Var<function<void(void)>> a_button("ui.Some Button", []() {
       cout << "Clicked the button!" << endl;
@@ -288,16 +318,20 @@ protected:
     pangolin::Var<function<void(void)>> quit_button("ui.Quit Button", []() {
       pangolin::QuitAll();
     });
-    pangolin::Var<string> reconstructions("ui.Reconstructions", "<none>");
+    reconstructions = new pangolin::Var<string>("ui.Rec", "");
 
-    pangolin::Var<function<void(void)>> previous_object("ui.Previous Object", []() {
+    pangolin::Var<function<void(void)>> previous_object("ui.Previous Object", [&]() {
       cout << "Will select previous reconstructed object, once available..." << endl;
+      SelectPreviousVisualizedObject();
     });
-    pangolin::Var<function<void(void)>> next_object("ui.Next Object", []() {
+    pangolin::Var<function<void(void)>> next_object("ui.Next Object", [&]() {
       cout << "Will select next reconstructed object, once available..." << endl;
+      SelectNextVisualizedObject();
     });
     pangolin::RegisterKeyPressCallback('n', [&]() {
-      cout << "Next frame should happen now!" << endl;
+      float val = dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount();
+      active_instance_count_log_.Log(val);
+
       dyn_slam_->ProcessFrame();
     });
 
@@ -310,27 +344,32 @@ protected:
     depth_view = pangolin::Display("depth").SetAspect(aspect_ratio);
     segment_view = pangolin::Display("segment").SetAspect(aspect_ratio);
     object_view = pangolin::Display("object").SetAspect(aspect_ratio);
+    extra_view = pangolin::Display("extra").SetAspect(aspect_ratio);
 
     // Storing pointers to these objects prevents a series of strange issues. The objects remain
     // under Pangolin's management, so they don't need to be deleted by the current class.
-    main_view = &(pangolin::Display("main"));
+    main_view = &(pangolin::Display("main").SetAspect(aspect_ratio));
     detail_views = &(pangolin::Display("detail"));
 
-    main_view->SetAspect(aspect_ratio);
-    detail_views->SetAspect(aspect_ratio);
+    // Add labels to our data logs (and automatically to our plots).
+    active_instance_count_log_.SetLabels({"Active tracks"});
+
+    // OpenGL 'view' of data such as the number of actively tracked instances over time.
+    plotter = new pangolin::Plotter(&active_instance_count_log_, 0.0f, 100.0f, -0.1f, 10.0f);
 
     // TODO(andrei): Maybe wrap these guys in another controller, make it an equal layout and
     // automagically support way more aspect ratios?
-    main_view->SetBounds(pangolin::Attach::Pix(height), 1.0,
-                         pangolin::Attach::Pix(UI_WIDTH), 1.0);
-
-    detail_views->SetBounds(0.0, pangolin::Attach::Pix(height),
-                            pangolin::Attach::Pix(UI_WIDTH), 1.0);
+    main_view->SetBounds(pangolin::Attach::Pix(height * 1.5), 1.0,
+                         pangolin::Attach::Pix(kUiWidth), 1.0);
+    detail_views->SetBounds(0.0, pangolin::Attach::Pix(height * 1.5),
+                            pangolin::Attach::Pix(kUiWidth), 1.0);
     detail_views->SetLayout(pangolin::LayoutEqual)
       .AddDisplay(rgb_view)
       .AddDisplay(depth_view)
       .AddDisplay(segment_view)
-      .AddDisplay(object_view);
+      .AddDisplay(object_view)
+      .AddDisplay(*plotter)
+      .AddDisplay(extra_view);
 
     // Internally, InfiniTAM stores these as RGBA, but we discard the alpha when we upload the
     // textures for visualization.
@@ -339,26 +378,6 @@ protected:
     this->depth_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
     this->segment_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
     this->object_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
-
-
-    // Custom: Add a plot to one of the views
-    // Data logger object
-//    pangolin::DataLog log;
-
-    // Optionally add named labels
-//    std::vector<std::string> labels;
-//    labels.push_back(std::string("sin(t)"));
-//    log.SetLabels(labels);
-//
-//    float t = 0.0f;
-//    const float tinc = 0.1f;
-//    // OpenGL 'view' of data. We might have many views of the same data.
-//    pangolin::Plotter plotter(&log,0.0f,4.0f*(float)M_PI/tinc,-2.0f,2.0f,(float)M_PI/(4.0f*tinc),0.5f);
-//    plotter.SetBounds(0.0, 1.0, 0.0, 1.0);
-//    plotter.Track("$i");
-//    plotter.SetBackgroundColour(pangolin::Colour::White());
-//    plotter.SetTickColour(pangolin::Colour::Black());
-//    plotter.SetAxisColour(pangolin::Colour::Black());
   }
 
   void SetupDummyImage() {
@@ -370,7 +389,26 @@ protected:
     const int george_height = dummy_img.rows;
     this->dummy_image_texture = new pangolin::GlTexture(
       george_width, george_height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+  }
 
+  void SelectNextVisualizedObject() {
+    int active_tracks = dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount();
+    if (visualized_object_idx_ < active_tracks - 1) {
+      visualized_object_idx_++;
+    }
+    else {
+      visualized_object_idx_ = 0;
+    }
+  }
+
+  void SelectPreviousVisualizedObject() {
+    int active_tracks = dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount();
+    if (visualized_object_idx_ <= 0) {
+      visualized_object_idx_ = active_tracks - 1;
+    }
+    else {
+      visualized_object_idx_--;
+    }
   }
 
 private:
@@ -385,6 +423,13 @@ private:
   pangolin::View depth_view;
   pangolin::View segment_view;
   pangolin::View object_view;
+//  pangolin::View graph_view;
+  pangolin::View extra_view;  // TBD what we show here
+
+  // Graph plotter and its data logger object
+  pangolin::Plotter *plotter;
+  pangolin::DataLog active_instance_count_log_;
+
 
   pangolin::GlTexture *dummy_image_texture;
   pangolin::GlTexture *slam_preview;
@@ -392,9 +437,13 @@ private:
   pangolin::GlTexture *depth_preview;
   pangolin::GlTexture *segment_preview;
   pangolin::GlTexture *object_preview;
-//  pangolin::OpenGlRenderState main_view_free_cam;
+
+  pangolin::Var<string> *reconstructions;
 
   cv::Mat dummy_img;
+
+  // Indicates which object is currently being visualized in the GUI.
+  int visualized_object_idx_ = 0;
 
 
   void UploadDummyTexture() {
