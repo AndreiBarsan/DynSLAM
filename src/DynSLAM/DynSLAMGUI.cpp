@@ -110,19 +110,9 @@ public:
                              GL_RGBA, GL_UNSIGNED_BYTE);
       object_preview->RenderToViewport(true);
 
-      // dummy
-//      graph_view.Activate();
-//      glColor3f(1.0, 0.0, 0.0);
-//      depth_preview->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-//      depth_preview->RenderToViewport(true);
-
-      // dummy
       extra_view.Activate();
       glColor3f(1.0, 0.0, 0.0);
-      depth_preview->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-      depth_preview->RenderToViewport(true);
-
-      plotter->Activate();
+      // This view is not used at the moment.
 
       *(reconstructions) = Format(
         "%d active reconstructions",
@@ -354,7 +344,7 @@ int main(int argc, char **argv) {
 
   ITMLibSettings *settings = new ITMLibSettings();
 
-  ITMMainEngine *static_scene_engine = new ITMMainEngine(
+  InfiniTamDriver *static_scene_engine = new InfiniTamDriver(
     settings,
     new ITMRGBDCalib(image_source->calib),
     image_source->getRGBImageSize(),
