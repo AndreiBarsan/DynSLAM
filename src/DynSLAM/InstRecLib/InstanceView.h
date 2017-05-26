@@ -21,12 +21,12 @@ namespace InstRecLib {
 
 			virtual ~InstanceView() { }
 
-			ITMLib::Objects::ITMView& GetView() {
-				return *(view_.get());
+			ITMLib::Objects::ITMView* GetView() {
+				return view_.get();
 			}
 
-			const ITMLib::Objects::ITMView& GetView() const {
-				return *(view_.get());
+			const ITMLib::Objects::ITMView* GetView() const {
+				return view_.get();
 			}
 
 			InstRecLib::Segmentation::InstanceDetection& GetInstanceDetection() {

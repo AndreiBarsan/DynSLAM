@@ -112,6 +112,7 @@ namespace InstRecLib {
 			// Moreover, we should have some sort of quality threshold for beginning a reconstruction.
 			// e.g., 6+ tiny frames may be needed for a distant car, but 2-3 ones could already be enough
 			// for a much closer one...
+      this->ProcessReconstructions();
 
 			main_view->rgb->UpdateDeviceFromHost();
 			main_view->depth->UpdateDeviceFromHost();
@@ -135,8 +136,22 @@ namespace InstRecLib {
         idx = tracks.size() - 1;
       }
 
-      return tracks[idx].GetLastFrame().instance_view.GetView().rgb;
+      return tracks[idx].GetLastFrame().instance_view.GetView()->rgb;
     }
+
+	ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) {
+		const auto &tracks = instance_tracker_->GetTracks();
+		if (tracks.empty()) {
+			return nullptr;
+		}
+
+		size_t idx = track_idx;
+		if (idx >= tracks.size()) {
+			idx = tracks.size() - 1;
+		}
+
+		return tracks[idx].GetLastFrame().instance_view.GetView()->depth;
+	}
 	}
 }
 

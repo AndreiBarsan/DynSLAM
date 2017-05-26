@@ -27,6 +27,16 @@ public:
                                   settings->modelSensorNoise);
   }
 
+  // used by the instance reconstruction
+  void SetView(ITMView *view) {
+    if (this->view) {
+      // TODO(andrei): These views should be memory managed by the tracker. Make sure this is right.
+//      delete this->view;
+    }
+
+    this->view = view;
+  }
+
   void Track() {
     this->trackingController->Track(this->trackingState, this->view);
   }
@@ -45,6 +55,10 @@ public:
   void PrepareNextStep() {
     // This may not be necessary if we're using ground truth VO.
     this->trackingController->Prepare(this->trackingState, this->view, this->renderState_live);
+  }
+
+  const ITMLibSettings* GetSettings() const {
+    return settings;
   }
 
 };
