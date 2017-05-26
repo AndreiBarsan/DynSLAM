@@ -196,7 +196,7 @@ public:
       glColor3f(1.0, 0.0, 0.0);
       depth_preview->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
       depth_preview->RenderToViewport(true);
-//
+
       segment_view.Activate();
       glColor3f(1.0, 1.0, 1.0);
       segment_preview->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
