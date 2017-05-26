@@ -1,12 +1,11 @@
 #ifndef DYNSLAM_DYNSLAM_H
 #define DYNSLAM_DYNSLAM_H
 
-
 #include "ImageSourceEngine.h"
 
-#include "../InfiniTAM/InfiniTAM/InstRecLib/InstanceReconstructor.h"
 #include "InfiniTamDriver.h"
-#include "../InfiniTAM/InfiniTAM/InstRecLib/PrecomputedSegmentationProvider.h"
+#include "InstRecLib/InstanceReconstructor.h"
+#include "InstRecLib/PrecomputedSegmentationProvider.h"
 
 namespace dynslam {
 
@@ -91,7 +90,7 @@ private:
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
-  PrecomputedSegmentationProvider *segmentationProvider;
+  SegmentationProvider *segmentationProvider;
   InstanceReconstructor *instance_reconstructor_;
 };
 
