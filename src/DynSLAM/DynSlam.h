@@ -5,10 +5,12 @@
 #include "ImageSourceEngine.h"
 
 #include "../InfiniTAM/InfiniTAM/InstRecLib/InstanceReconstructor.h"
+#include "InfiniTamDriver.h"
 
 namespace dynslam {
 
 using namespace InstRecLib::Reconstruction;
+using namespace dynslam::drivers;
 
 /// \brief The central class of the DynSLAM system.
 /// It processes input stereo frames and generates separate maps for all encountered object
@@ -16,7 +18,7 @@ using namespace InstRecLib::Reconstruction;
 class DynSlam {
 
 public:
-  void Initialize(ITMMainEngine *itm_static_scene_engine_, ImageSourceEngine *image_source);
+  void Initialize(InfiniTamDriver *itm_static_scene_engine_, ImageSourceEngine *image_source);
 
   /// \brief Reads in and processes the next frame from the data source.
   void ProcessFrame();
@@ -69,7 +71,7 @@ private:
   // This is the main reconstruction component. Should split for dynamic+static.
   // In the future, we may need to write our own.
   // For now, this shall only handle reconstructing the static part of a scene.
-  ITMMainEngine *itm_static_scene_engine_;
+  InfiniTamDriver *itm_static_scene_engine_;
 
   ITMUChar4Image *out_image_;
   ITMUChar4Image *input_rgb_image_;

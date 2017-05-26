@@ -4,7 +4,9 @@
 
 namespace dynslam {
 
-void DynSlam::Initialize(ITMMainEngine *itm_static_scene_engine_, ImageSourceEngine *image_source) {
+using namespace InstRecLib::Reconstruction;
+
+void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_, ImageSourceEngine *image_source) {
 
   this->image_source_ = image_source;
 
@@ -37,6 +39,7 @@ void DynSlam::ProcessFrame() {
 
   // Forward them to InfiniTAM for the background reconstruction.
   itm_static_scene_engine_->ProcessFrame(input_rgb_image_, input_raw_depth_image_);
+
   ITMSafeCall(cudaThreadSynchronize());
 
   current_frame_no_++;
