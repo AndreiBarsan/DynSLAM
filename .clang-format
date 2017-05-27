@@ -1,8 +1,8 @@
 ---
-# Base everything on Google's C++ style guide.
+# Base everything on Google's C++ style guide, but with longer lines.
 BasedOnStyle: Google
 ---
 Language: Cpp
-
+ColumnLimit: 100
 ---
 

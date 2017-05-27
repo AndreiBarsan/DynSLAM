@@ -71,25 +71,6 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB, DEPTH_T *sourceDepth,
       }
     }
   }
-
-  //  for (int row = 0; row < frame_height; ++row) {
-  //    for (int col = 0; col < frame_width; ++col) {
-  //      int frame_idx = frame_width * row + col;
-  //
-  //      destRGB[frame_idx].r = sourceRGB[frame_idx].r;
-  //      destRGB[frame_idx].g = sourceRGB[frame_idx].g;
-  //      destRGB[frame_idx].b = sourceRGB[frame_idx].b;
-  //      destRGB[frame_idx].a = sourceRGB[frame_idx].a;
-  ////          sourceRGB[frame_idx].r = 0;
-  ////          sourceRGB[frame_idx].g = 0;
-  ////          sourceRGB[frame_idx].b = 0;
-  ////          sourceRGB[frame_idx].a = 0;
-  //
-  //      destDepth[frame_idx] = sourceDepth[frame_idx];
-  ////          sourceDepth[frame_idx] = 0.0f;
-  //    }
-
-  //  }
 }
 
 void InstanceReconstructor::ProcessFrame(
