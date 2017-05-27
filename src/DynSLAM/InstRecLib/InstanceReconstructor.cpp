@@ -5,11 +5,11 @@
 
 #include <vector>
 
-namespace InstRecLib { namespace Reconstruction {
+namespace instreclib { namespace Reconstruction {
 
 using namespace std;
-using namespace InstRecLib::Segmentation;
-using namespace InstRecLib::Utils;
+using namespace instreclib::segmentation;
+using namespace instreclib::Utils;
 using namespace ITMLib::Objects;
 
 // TODO(andrei): Implement this in CUDA. It should be easy.
@@ -92,7 +92,7 @@ void ProcessSilhouette_CPU(
 
 void InstanceReconstructor::ProcessFrame(
     ITMLib::Objects::ITMView *main_view,
-    const Segmentation::InstanceSegmentationResult &segmentation_result
+    const segmentation::InstanceSegmentationResult &segmentation_result
 ) {
   // TODO(andrei): Perform this slicing 100% on the GPU.
   main_view->rgb->UpdateHostFromDevice();

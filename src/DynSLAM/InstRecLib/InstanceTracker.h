@@ -13,7 +13,7 @@
 #include "InstanceView.h"
 
 // TODO(andrei): Consider splitting this file up into multiple class files.
-namespace InstRecLib {
+namespace instreclib {
 	namespace Reconstruction {
 
 		/// \brief Minimum overlap score required to add a new frame to an existing feature track.

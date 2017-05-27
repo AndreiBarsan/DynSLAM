@@ -5,7 +5,7 @@
 
 namespace dynslam {
 
-using namespace InstRecLib::Reconstruction;
+using namespace instreclib::Reconstruction;
 
 void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_, ImageSourceEngine *image_source) {
 
@@ -29,8 +29,8 @@ void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_, ImageSourceE
 
   // TODO(andrei): Pass root path of seg folder.
   const string segFolder = "/home/andrei/datasets/kitti/odometry-dataset/sequences/06/seg_image_2/mnc";
-  segmentationProvider = new InstRecLib::Segmentation::PrecomputedSegmentationProvider(segFolder);
-  instance_reconstructor_ = new InstRecLib::Reconstruction::InstanceReconstructor(static_scene_);
+  segmentationProvider = new instreclib::segmentation::PrecomputedSegmentationProvider(segFolder);
+  instance_reconstructor_ = new instreclib::Reconstruction::InstanceReconstructor(static_scene_);
 
   cout << "DynSLAM initialization complete." << endl;
 }

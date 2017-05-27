@@ -5,7 +5,7 @@
 
 #include <iostream>
 
-namespace InstRecLib {
+namespace instreclib {
 	namespace Utils {
 
 		/// \brief A rectangular bounding box, with <b>inclusive coordinates</b>.

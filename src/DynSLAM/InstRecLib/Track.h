@@ -8,7 +8,7 @@
 #include "InstanceSegmentationResult.h"
 #include "InstanceView.h"
 
-namespace InstRecLib {
+namespace instreclib {
 	namespace Reconstruction {
 
 		/// \brief One frame of an instance track (InstRecLib::Reconstruction::Track).
