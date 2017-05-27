@@ -5,10 +5,11 @@
 namespace dynslam {
 namespace drivers {
 
-InfiniTamDriver::InfiniTamDriver(const ITMLibSettings *settings,
-                                 const ITMRGBDCalib *calib,
-                                 const Vector2i &imgSize_rgb,
-                                 const Vector2i &imgSize_d)
+InfiniTamDriver::InfiniTamDriver(//const string& dataset_root,
+                                 const ITMLibSettings* settings,
+                                 const ITMRGBDCalib* calib,
+                                 const Vector2i& imgSize_rgb,
+                                 const Vector2i& imgSize_d)
   : ITMMainEngine(settings, calib, imgSize_rgb, imgSize_d) {}
 
 // TODO(andrei): Get rid of these notes.
