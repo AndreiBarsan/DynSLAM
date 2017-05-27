@@ -11,6 +11,6 @@ class VisoSparseSFProvider : public SparseSFProvider {
   // TODO(andrei): Implement these things.
 };
 
-}   // namespace instreclib
+}  // namespace instreclib
 
 #endif  // INSTRECLIB_VISOSSFPROVIDER_H

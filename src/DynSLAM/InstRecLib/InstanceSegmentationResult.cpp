@@ -34,5 +34,5 @@ ostream &operator<<(ostream &out,
   return out;
 }
 
-}   // namespace segmentation
-}   // namespace instreclib
+}  // namespace segmentation
+}  // namespace instreclib

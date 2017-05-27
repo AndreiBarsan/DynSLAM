@@ -43,7 +43,7 @@ class PrecomputedSegmentationProvider : public SegmentationProvider {
   ITMUChar4Image *GetSegResult() override;
 };
 
-}   // namespace segmentation
-}   // namespace instreclib
+}  // namespace segmentation
+}  // namespace instreclib
 
 #endif  // INSTRECLIB_PRECOMPUTEDSEGMENTATIONPROVIDER_H

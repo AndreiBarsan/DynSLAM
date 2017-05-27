@@ -138,7 +138,7 @@ class InstanceReconstructor {
   }
 };
 
-}   // namespace reconstruction
-}   // namespace instreclib
+}  // namespace reconstruction
+}  // namespace instreclib
 
 #endif  // INSTRECLIB_INSTANCERECONSTRUCTOR_H

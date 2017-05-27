@@ -19,6 +19,6 @@ class SparseSFProvider {
   virtual void ComputeSparseSceneFlow(const ITMLib::Objects::ITMView *view) = 0;
 };
 
-}   // namespace instreclib
+}  // namespace instreclib
 
 #endif  // INSTRECLIB_SPARSESCENEFLOWCOMPONENT_H

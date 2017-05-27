@@ -72,7 +72,7 @@ class Track {
   std::string GetAsciiArt() const;
 };
 
-}   // namespace reconstruction
-}   // namespace instreclib
+}  // namespace reconstruction
+}  // namespace instreclib
 
 #endif  // INSTRECLIB_TRACK_H

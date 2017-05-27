@@ -28,7 +28,7 @@ class SegmentationProvider {
   virtual const ITMUChar4Image *GetSegResult() const = 0;
 };
 
-}   // namespace segmentation
-}   // namespace instreclib
+}  // namespace segmentation
+}  // namespace instreclib
 
 #endif  // INSTRECLIB_SEGMENTATIONPROVIDER_H
