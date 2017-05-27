@@ -4,13 +4,36 @@
 #define DYNSLAM_INFINITAMDRIVER_H
 
 #include "../InfiniTAM/InfiniTAM/ITMLib/Engine/ITMMainEngine.h"
+#include "ImageSourceEngine.h"
 
-namespace dynslam { namespace drivers {
+namespace dynslam {
+namespace drivers {
 
-// TODO(andrei): Add common driver interface behind which to possibly
-
+/// \brief Interfaces between DynSLAM and InfiniTAM.
 class InfiniTamDriver : public ITMMainEngine {
 public:
+  // TODO(andrei): We may need to add another layer of abstraction above the drivers to get the best
+  // modularity possible.
+  static InfiniTamDriver* Build(const string &dataset_root, ImageSourceEngine** image_source) {
+    ITMLibSettings *settings = new ITMLibSettings();
+    const string calib_fpath = dataset_root + "calib.txt";
+    const string rgb_image_format = dataset_root + "Frames/%04i.ppm";
+    const string depth_image_format = dataset_root + "Frames/%04i.pgm";
+    *image_source = new ImageFileReader(
+        calib_fpath.c_str(),
+        rgb_image_format.c_str(),
+        depth_image_format.c_str()
+    );
+
+    InfiniTamDriver *driver= new InfiniTamDriver(
+        settings,
+        new ITMRGBDCalib((*image_source)->calib),
+        (*image_source)->getRGBImageSize(),
+        (*image_source)->getDepthImageSize());
+
+    return driver;
+  }
+
   InfiniTamDriver(const ITMLibSettings *settings, const ITMRGBDCalib *calib,
                   const Vector2i &imgSize_rgb, const Vector2i &imgSize_d);
 
@@ -60,10 +83,10 @@ public:
   const ITMLibSettings* GetSettings() const {
     return settings;
   }
-
 };
 
-}}
+} // namespace drivers
+} // namespace dynslam
 
 
 #endif //DYNSLAM_INFINITAMDRIVER_H

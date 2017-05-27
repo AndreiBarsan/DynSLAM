@@ -2,7 +2,8 @@
 
 #include "InfiniTamDriver.h"
 
-namespace dynslam { namespace drivers {
+namespace dynslam {
+namespace drivers {
 
 InfiniTamDriver::InfiniTamDriver(const ITMLibSettings *settings,
                                  const ITMRGBDCalib *calib,
@@ -31,4 +32,5 @@ void InfiniTamDriver::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawD
 }
 
 
-}}
+} // namespace drivers}
+} // namespace dynslam

@@ -63,11 +63,6 @@ public:
     delete main_view;
     delete detail_views_;
     delete pane_texture;
-//    delete slam_preview;
-//    delete rgb_preview;
-//    delete depth_preview;
-//    delete segment_preview;
-//    delete object_preview;
   }
 
   /// \brief Executes the main Pangolin input and rendering loop.
@@ -299,7 +294,6 @@ private:
   pangolin::Plotter *plotter;
   pangolin::DataLog active_instance_count_log_;
 
-
   pangolin::GlTexture *dummy_image_texture;
   pangolin::GlTexture *pane_texture;
 
@@ -309,7 +303,6 @@ private:
 
   // Indicates which object is currently being visualized in the GUI.
   int visualized_object_idx_ = 0;
-
 
   void UploadDummyTexture() {
     // Mess with George's bytes a little bit for OpenGL <-> OpenCV compatibility.
@@ -326,28 +319,13 @@ private:
 
 int main(int argc, char **argv) {
   using namespace dynslam;
+  const string dataset_root = "/home/andrei/work/libelas/cmake-build-debug/odo_seq_06/";
 
   gui::DynSlam *dyn_slam = new gui::DynSlam();
-  const string dataset_root = "/home/andrei/work/libelas/cmake-build-debug/odo_seq_06/";
-  const string calib_fpath = dataset_root + "calib.txt";
-  const string rgb_image_format = dataset_root + "Frames/%04i.ppm";
-  const string depth_image_format = dataset_root + "Frames/%04i.pgm";
-  ImageSourceEngine *image_source = new ImageFileReader(
-    calib_fpath.c_str(),
-    rgb_image_format.c_str(),
-    depth_image_format.c_str()
-  );
+  ImageSourceEngine *image_source;
+  drivers::InfiniTamDriver *driver = InfiniTamDriver::Build(dataset_root, &image_source);
 
-  ITMLibSettings *settings = new ITMLibSettings();
-
-  InfiniTamDriver *static_scene_engine = new InfiniTamDriver(
-    settings,
-    new ITMRGBDCalib(image_source->calib),
-    image_source->getRGBImageSize(),
-    image_source->getDepthImageSize()
-  );
-
-  dyn_slam->Initialize(static_scene_engine, image_source);
+  dyn_slam->Initialize(driver, image_source);
 
   gui::PangolinGui pango_gui(dyn_slam);
   pango_gui.Run();
