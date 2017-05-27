@@ -40,8 +40,7 @@ uint8_t **ReadMask(std::istream &np_txt_in, const int width, const int height) {
   while (getline(np_txt_in, line_buf)) {
     if (lines_read >= height) {
       stringstream error_ss;
-      error_ss << "Image height mismatch. Went over the given limit of "
-               << height << ".";
+      error_ss << "Image height mismatch. Went over the given limit of " << height << ".";
       throw runtime_error(error_ss.str());
     }
 
@@ -51,13 +50,8 @@ uint8_t **ReadMask(std::istream &np_txt_in, const int width, const int height) {
     while (!line_ss.eof()) {
       if (col >= width) {
         stringstream error_ss;
-        error_ss << "Image width mismatch. Went over the given limit of "
-                 << width << ".";
-        cerr << "Line was:" << endl
-             << endl
-             << line_buf << endl
-             << endl
-             << flush;
+        error_ss << "Image width mismatch. Went over the given limit of " << width << ".";
+        cerr << "Line was:" << endl << endl << line_buf << endl << endl << flush;
         throw runtime_error(error_ss.str());
       }
 
@@ -94,12 +88,11 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
   vector<InstanceDetection> detections;
   while (true) {
     stringstream result_fpath;
-    result_fpath << base_img_fpath << "." << setfill('0') << setw(4)
-                 << instance_idx << ".result.txt";
+    result_fpath << base_img_fpath << "." << setfill('0') << setw(4) << instance_idx
+                 << ".result.txt";
 
     stringstream mask_fpath;
-    mask_fpath << base_img_fpath << "." << setfill('0') << setw(4)
-               << instance_idx << ".mask.txt";
+    mask_fpath << base_img_fpath << "." << setfill('0') << setw(4) << instance_idx << ".mask.txt";
 
     ifstream result_in(result_fpath.str());
     ifstream mask_in(mask_fpath.str());
@@ -115,17 +108,14 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
     BoundingBox bounding_box;
     float class_probability;
     int class_id;
-    sscanf(result.c_str(), "[%d %d %d %d %*d], %f, %d", &bounding_box.r.x0,
-           &bounding_box.r.y0, &bounding_box.r.x1, &bounding_box.r.y1,
-           &class_probability, &class_id);
+    sscanf(result.c_str(), "[%d %d %d %d %*d], %f, %d", &bounding_box.r.x0, &bounding_box.r.y0,
+           &bounding_box.r.x1, &bounding_box.r.y1, &class_probability, &class_id);
 
     // Process the mask file. The mask area covers the edges of the bounding
     // box, too.
-    uint8_t **mask_pixels =
-        ReadMask(mask_in, bounding_box.GetWidth(), bounding_box.GetHeight());
+    uint8_t **mask_pixels = ReadMask(mask_in, bounding_box.GetWidth(), bounding_box.GetHeight());
     auto mask = make_shared<Mask>(bounding_box, mask_pixels);
-    detections.emplace_back(class_probability, class_id, mask,
-                            this->dataset_used);
+    detections.emplace_back(class_probability, class_id, mask, this->dataset_used);
 
     instance_idx++;
   }
@@ -133,8 +123,8 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
   return detections;
 }
 
-shared_ptr<InstanceSegmentationResult>
-PrecomputedSegmentationProvider::SegmentFrame(ITMUChar4Image *rgb) {
+shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentFrame(
+    ITMUChar4Image *rgb) {
   stringstream img_ss;
   img_ss << this->segFolder_ << "/"
          << "cls_" << setfill('0') << setw(6) << this->frameIdx_ << ".png";
@@ -142,22 +132,19 @@ PrecomputedSegmentationProvider::SegmentFrame(ITMUChar4Image *rgb) {
   ReadImageFromFile(lastSegPreview_, img_fpath.c_str());
 
   stringstream meta_ss;
-  meta_ss << this->segFolder_ << "/" << setfill('0') << setw(6)
-          << this->frameIdx_ << ".png";
-  vector<InstanceDetection> instance_detections =
-      ReadInstanceInfo(meta_ss.str());
+  meta_ss << this->segFolder_ << "/" << setfill('0') << setw(6) << this->frameIdx_ << ".png";
+  vector<InstanceDetection> instance_detections = ReadInstanceInfo(meta_ss.str());
 
   // We read data off the disk, so we assume this is 0.
   long inference_time_ns = 0L;
 
   this->frameIdx_++;
 
-  return make_shared<InstanceSegmentationResult>(
-      dataset_used, instance_detections, inference_time_ns);
+  return make_shared<InstanceSegmentationResult>(dataset_used, instance_detections,
+                                                 inference_time_ns);
 }
 
-const ORUtils::Image<Vector4u> *PrecomputedSegmentationProvider::GetSegResult()
-    const {
+const ORUtils::Image<Vector4u> *PrecomputedSegmentationProvider::GetSegResult() const {
   return this->lastSegPreview_;
 }
 

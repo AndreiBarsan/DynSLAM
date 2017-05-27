@@ -21,8 +21,7 @@ class PrecomputedSegmentationProvider : public SegmentationProvider {
   const SegmentationDataset *dataset_used;
 
  protected:
-  std::vector<InstanceDetection> ReadInstanceInfo(
-      const std::string &base_img_fpath);
+  std::vector<InstanceDetection> ReadInstanceInfo(const std::string &base_img_fpath);
 
  public:
   PrecomputedSegmentationProvider(const std::string &segFolder)
@@ -35,8 +34,7 @@ class PrecomputedSegmentationProvider : public SegmentationProvider {
 
   ~PrecomputedSegmentationProvider() override { delete lastSegPreview_; }
 
-  std::shared_ptr<InstanceSegmentationResult> SegmentFrame(
-      ITMUChar4Image *view) override;
+  std::shared_ptr<InstanceSegmentationResult> SegmentFrame(ITMUChar4Image *view) override;
 
   const ITMUChar4Image *GetSegResult() const override;
 

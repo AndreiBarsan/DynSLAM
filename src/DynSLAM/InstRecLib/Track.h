@@ -21,10 +21,7 @@ struct TrackFrame {
 
  public:
   TrackFrame(int frame_idx, const InstanceView& instance_view)
-      : frame_idx(frame_idx),
-        instance_view(instance_view),
-        previous(nullptr),
-        next(nullptr) {}
+      : frame_idx(frame_idx), instance_view(instance_view), previous(nullptr), next(nullptr) {}
 };
 
 /// \brief A detected object's track through multiple frames.

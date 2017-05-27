@@ -26,8 +26,7 @@ class InstanceView {
     return instance_detection_;
   }
 
-  const instreclib::segmentation::InstanceDetection& GetInstanceDetection()
-      const {
+  const instreclib::segmentation::InstanceDetection& GetInstanceDetection() const {
     return instance_detection_;
   }
 
