@@ -62,12 +62,13 @@ public:
     delete reconstructions;
     delete dummy_image_texture;
     delete main_view;
-    delete detail_views;
-    delete slam_preview;
-    delete rgb_preview;
-    delete depth_preview;
-    delete segment_preview;
-    delete object_preview;
+    delete detail_views_;
+    delete pane_texture;
+//    delete slam_preview;
+//    delete rgb_preview;
+//    delete depth_preview;
+//    delete segment_preview;
+//    delete object_preview;
   }
 
   /// \brief Executes the main Pangolin input and rendering loop.
@@ -84,39 +85,39 @@ public:
       const unsigned char *slam_frame_data = dyn_slam_->GetRaycastPreview();
 
       // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance!
-      slam_preview->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
-      slam_preview->RenderToViewport(true);
+      pane_texture->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
+      pane_texture->RenderToViewport(true);
 
-      rgb_view.Activate();
+      rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
-      rgb_preview->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-      rgb_preview->RenderToViewport(true);
+      pane_texture->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      pane_texture->RenderToViewport(true);
 
-      depth_view.Activate();
+      depth_view_.Activate();
       glColor3f(1.0, 0.0, 0.0);
-      depth_preview->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-      depth_preview->RenderToViewport(true);
+      pane_texture->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      pane_texture->RenderToViewport(true);
 
-      segment_view.Activate();
+      segment_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
       if (nullptr != dyn_slam_->GetSegmentationPreview()) {
-        segment_preview->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-        segment_preview->RenderToViewport(true);
+        pane_texture->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+        pane_texture->RenderToViewport(true);
         DrawInstanceLables();
       }
 
-      object_view.Activate();
+      object_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
-      object_preview->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
+      pane_texture->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
                              GL_RGBA, GL_UNSIGNED_BYTE);
-      object_preview->RenderToViewport(true);
+      pane_texture->RenderToViewport(true);
 
       // TODO(andrei): wait, do we need all these separate helper buffers?
-      extra_view.Activate();
+      object_reconstruction_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
-      depth_preview->Upload(dyn_slam_->GetObjectRaycastPreview(visualized_object_idx_),
+      pane_texture->Upload(dyn_slam_->GetObjectRaycastPreview(visualized_object_idx_),
                             GL_RGBA, GL_UNSIGNED_BYTE);
-      depth_preview->RenderToViewport(true);
+      pane_texture->RenderToViewport(true);
 
       // Update various elements in the toolbar on the left.
       *(reconstructions) = Format(
@@ -146,8 +147,8 @@ public:
 
       // Drawing the text requires converting from pixel coordinates to GL coordinates, which
       // range from (-1.0, -1.0) in the bottom-left, to (+1.0, +1.0) in the top-right.
-      float panel_width = segment_view.GetBounds().w;
-      float panel_height = segment_view.GetBounds().h;
+      float panel_width = segment_view_.GetBounds().w;
+      float panel_height = segment_view_.GetBounds().h;
 
       float bbox_left = bbox.r.x0 - panel_width;
       float bbox_top = panel_height - bbox.r.y0 + font.Height();
@@ -214,16 +215,16 @@ protected:
       width, height, 420, 420, width / 2, height / 2, 0.1, 1000);
 
     float aspect_ratio = static_cast<float>(width) / height;
-    rgb_view = pangolin::Display("rgb").SetAspect(aspect_ratio);
-    depth_view = pangolin::Display("depth").SetAspect(aspect_ratio);
-    segment_view = pangolin::Display("segment").SetAspect(aspect_ratio);
-    object_view = pangolin::Display("object").SetAspect(aspect_ratio);
-    extra_view = pangolin::Display("extra").SetAspect(aspect_ratio);
+    rgb_view_ = pangolin::Display("rgb").SetAspect(aspect_ratio);
+    depth_view_ = pangolin::Display("depth").SetAspect(aspect_ratio);
+    segment_view_ = pangolin::Display("segment").SetAspect(aspect_ratio);
+    object_view_ = pangolin::Display("object").SetAspect(aspect_ratio);
+    object_reconstruction_view_ = pangolin::Display("extra").SetAspect(aspect_ratio);
 
     // Storing pointers to these objects prevents a series of strange issues. The objects remain
     // under Pangolin's management, so they don't need to be deleted by the current class.
     main_view = &(pangolin::Display("main").SetAspect(aspect_ratio));
-    detail_views = &(pangolin::Display("detail"));
+    detail_views_ = &(pangolin::Display("detail"));
 
     // Add labels to our data logs (and automatically to our plots).
     active_instance_count_log_.SetLabels({"Active tracks"});
@@ -235,23 +236,19 @@ protected:
     // automagically support way more aspect ratios?
     main_view->SetBounds(pangolin::Attach::Pix(height * 1.5), 1.0,
                          pangolin::Attach::Pix(kUiWidth), 1.0);
-    detail_views->SetBounds(0.0, pangolin::Attach::Pix(height * 1.5),
+    detail_views_->SetBounds(0.0, pangolin::Attach::Pix(height * 1.5),
                             pangolin::Attach::Pix(kUiWidth), 1.0);
-    detail_views->SetLayout(pangolin::LayoutEqual)
-      .AddDisplay(rgb_view)
-      .AddDisplay(depth_view)
-      .AddDisplay(segment_view)
-      .AddDisplay(object_view)
+    detail_views_->SetLayout(pangolin::LayoutEqual)
+      .AddDisplay(rgb_view_)
+      .AddDisplay(depth_view_)
+      .AddDisplay(segment_view_)
+      .AddDisplay(object_view_)
       .AddDisplay(*plotter)
-      .AddDisplay(extra_view);
+      .AddDisplay(object_reconstruction_view_);
 
     // Internally, InfiniTAM stores these as RGBA, but we discard the alpha when we upload the
-    // textures for visualization.
-    this->slam_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
-    this->rgb_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
-    this->depth_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
-    this->segment_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
-    this->object_preview = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+    // textures for visualization (hence the 'GL_RGB' specification).
+    this->pane_texture = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
   }
 
   void SetupDummyImage() {
@@ -292,13 +289,12 @@ private:
   int width, height;
 
   pangolin::View *main_view;
-  pangolin::View *detail_views;
-  pangolin::View rgb_view;
-  pangolin::View depth_view;
-  pangolin::View segment_view;
-  pangolin::View object_view;
-//  pangolin::View graph_view;
-  pangolin::View extra_view;  // TBD what we show here
+  pangolin::View *detail_views_;
+  pangolin::View rgb_view_;
+  pangolin::View depth_view_;
+  pangolin::View segment_view_;
+  pangolin::View object_view_;
+  pangolin::View object_reconstruction_view_;
 
   // Graph plotter and its data logger object
   pangolin::Plotter *plotter;
@@ -306,11 +302,7 @@ private:
 
 
   pangolin::GlTexture *dummy_image_texture;
-  pangolin::GlTexture *slam_preview;
-  pangolin::GlTexture *rgb_preview;
-  pangolin::GlTexture *depth_preview;
-  pangolin::GlTexture *segment_preview;
-  pangolin::GlTexture *object_preview;
+  pangolin::GlTexture *pane_texture;
 
   pangolin::Var<string> *reconstructions;
 
