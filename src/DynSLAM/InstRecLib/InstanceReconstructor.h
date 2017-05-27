@@ -6,7 +6,6 @@
 #include <map>
 #include <memory>
 
-#include "ChunkManager.h"
 #include "InstanceSegmentationResult.h"
 #include "InstanceTracker.h"
 
