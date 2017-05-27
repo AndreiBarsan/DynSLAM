@@ -152,6 +152,61 @@ ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) 
 
   return tracks[idx].GetLastFrame().instance_view.GetView()->depth;
 }
+void InstanceReconstructor::ProcessReconstructions() {
+  for (Track &track : instance_tracker_->GetTracks()) {
+    // TODO(andrei): proper heuristic to determine which tracks are worth
+    // reconstructing, e.g.,
+    // based on slice surface, length, gaps, etc.
+
+    // TODO wait until a track is ``good enough,'' then retroactively rebuild it from all
+    // available frames.
+
+    // Since this is very memory-hungry, we restrict creation to the very
+    // first things we see.
+    if (track.GetId() < 3) {
+      if (id_to_reconstruction_.find(track.GetId()) == id_to_reconstruction_.cend()) {
+        cout << endl << endl;
+        cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl;
+        ITMLibSettings *settings = new ITMLibSettings(*driver->GetSettings());
+        // Set a much smaller voxel block number for the reconstruction, since individual
+        // objects occupy a limited amount of space in the scene.
+        settings->sdfLocalBlockNum = 2500;
+
+        id_to_reconstruction_.emplace(make_pair(
+            track.GetId(),
+            new InfiniTamDriver(settings,
+                                driver->GetView()->calib,
+                                driver->GetView()->rgb->noDims,
+                                driver->GetView()->rgb->noDims)));
+      } else {
+        // TODO(andrei): Use some heuristic to avoid cases which are obviously
+        // crappy.
+        cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
+      }
+
+      // This doesn't seem necessary, since we nab the instance view after the
+      // "global"
+      // UpdateView which processes the depth.
+      //          id_to_reconstruction_[track.GetId()]->UpdateView(rgb,
+      //          depth);
+      // This replaces the "UpdateView" call.
+      InfiniTamDriver *instance_driver = id_to_reconstruction_[track.GetId()];
+      instance_driver->SetView(track.GetLastFrame().instance_view.GetView());
+      // TODO(andrei): This seems like the place to shove in e.g., scene flow
+      // data.
+
+      cout << endl << endl << "Start instance integration for #" << track.GetId() << endl;
+      instance_driver->Track();
+      instance_driver->Integrate();
+      instance_driver->PrepareNextStep();
+
+      cout << endl << endl << "Finished instance integration." << endl;
+    } else {
+      cout << "Won't create voxel volume for instance #" << track.GetId() << " in the current"
+           << " experimental mode." << endl;
+    }
+  }
+}
 
 }  // namespace reconstruction
 }  // namespace instreclib
