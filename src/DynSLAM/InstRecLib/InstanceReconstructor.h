@@ -49,11 +49,14 @@ class InstanceReconstructor {
   ITMFloatImage *GetInstancePreviewDepth(size_t track_idx);
 
   void GetInstanceRaycastPreview(ITMUChar4Image *out, int object_idx) {
-    // hacky, for very early preview
-    // TODO use object_idx
-    if (id_to_reconstruction_.cend() != id_to_reconstruction_.find(0)) {
-      id_to_reconstruction_.at(0)->GetImage(
-          out, ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST);
+    int idx = object_idx;
+    if (id_to_reconstruction_.find(idx) == id_to_reconstruction_.cend()) {
+      // If we're not reconstructing that object, then display nothing.
+      out->Clear();
+    }
+    else {
+        id_to_reconstruction_.at(idx)->GetImage(
+            out, ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST);
     }
   }
 
