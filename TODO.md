@@ -28,4 +28,9 @@
  - [ ] Use GT kitti depth as baseline
  - [ ] Experiment with virtual datasets with GT depth and GT geometry, and send
        results to Xinyuan
+ - [ ] Set up include-what-you-use CMake integration
+ - [ ] Set up trivial way to run clang-tidy
+ - [ ] Set up trivial way to run clang-format
+ - [ ] Maybe run clang-format on commit
+ 
 
