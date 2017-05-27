@@ -4,3 +4,6 @@
 [submodule "src/Pangolin"]
 	path = src/Pangolin
 	url = https://github.com/stevenlovegrove/Pangolin
+[submodule "src/gflags"]
+	path = src/gflags
+	url = https://github.com/gflags/gflags
