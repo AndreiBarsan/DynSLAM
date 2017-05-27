@@ -19,7 +19,9 @@ using namespace dynslam::drivers;
 class DynSlam {
 
 public:
-  void Initialize(InfiniTamDriver *itm_static_scene_engine_, ImageSourceEngine *image_source);
+  void Initialize(InfiniTamDriver* itm_static_scene_engine_,
+                    ImageSourceEngine* image_source,
+                    SegmentationProvider* segmentation_provider);
 
   /// \brief Reads in and processes the next frame from the data source.
   void ProcessFrame();
@@ -47,7 +49,7 @@ public:
   /// \brief Returns an RGBA unsigned char frame containing the preview of the most recent frame's
   /// semantic segmentation.
   const unsigned char* GetSegmentationPreview() {
-    return segmentationProvider->GetSegResult()->GetData(MEMORYDEVICE_CPU)->getValues();
+    return segmentation_provider_->GetSegResult()->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
   /// \brief Returns an **RGBA** preview of the latest segmented object instance.
@@ -94,7 +96,7 @@ private:
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
-  SegmentationProvider *segmentationProvider;
+  SegmentationProvider *segmentation_provider_;
   InstanceReconstructor *instance_reconstructor_;
 };
 

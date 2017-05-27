@@ -1,13 +1,14 @@
 
 
 #include "DynSlam.h"
-#include "InstRecLib/PrecomputedSegmentationProvider.h"
 
 namespace dynslam {
 
 using namespace instreclib::reconstruction;
 
-void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_, ImageSourceEngine *image_source) {
+void DynSlam::Initialize(InfiniTamDriver* itm_static_scene_engine_,
+                         ImageSourceEngine* image_source,
+                         SegmentationProvider* segmentation_provider) {
 
   this->image_source_ = image_source;
 
@@ -27,10 +28,8 @@ void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_, ImageSourceE
   // TODO(andrei): Own CUDA safety wrapper. With blackjack. And hookers.
   ITMSafeCall(cudaThreadSynchronize());
 
-  // TODO(andrei): Pass root path of seg folder.
-  const string segFolder = "/home/andrei/datasets/kitti/odometry-dataset/sequences/06/seg_image_2/mnc";
-  segmentationProvider = new instreclib::segmentation::PrecomputedSegmentationProvider(segFolder);
-  instance_reconstructor_ = new instreclib::reconstruction::InstanceReconstructor(static_scene_);
+  this->segmentation_provider_ = segmentation_provider;
+  this->instance_reconstructor_ = new InstanceReconstructor(itm_static_scene_engine_);
 
   cout << "DynSLAM initialization complete." << endl;
 }
@@ -46,7 +45,7 @@ void DynSlam::ProcessFrame() {
   static_scene_->UpdateView(input_rgb_image_, input_raw_depth_image_);
 
   // InstRec: semantic segmentation
-  auto segmentationResult = segmentationProvider->SegmentFrame(input_rgb_image_);
+  auto segmentationResult = segmentation_provider_->SegmentFrame(input_rgb_image_);
   cout << segmentationResult << endl;
 
   // Split the scene up into instances, and fuse each instance independently.

@@ -90,8 +90,10 @@ class InstanceReconstructor {
           // TODO
           id_to_reconstruction_.emplace(make_pair(
               track.GetId(),
-              new InfiniTamDriver(driver->GetSettings(), driver->GetView()->calib,
-                                  driver->GetView()->rgb->noDims, driver->GetView()->rgb->noDims)));
+              new InfiniTamDriver(driver->GetSettings(),
+                                  driver->GetView()->calib,
+                                  driver->GetView()->rgb->noDims,
+                                  driver->GetView()->rgb->noDims)));
         } else {
           // TODO(andrei): Use some heuristic to avoid cases which are obviously
           // crappy.

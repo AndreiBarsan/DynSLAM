@@ -3,14 +3,17 @@
 
 #include <pangolin/pangolin.h>
 
+#include <gflags/gflags.h>
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
 #include <backward.hpp>
-#include <GL/glut.h>
 
 #include "DynSlam.h"
-#include "ImageSourceEngine.h"
 #include "Utils.h"
+
+// Commandline arguments
+DEFINE_string(dataset_root, "", "The root folder of the dataset to use.");
+DEFINE_string(nope_dataset_root, "", "The root folder of the dataset to use.");
 
 
 // TODO(andrei): Use [RIP] tags to signal spots where you wasted more than 30 minutes debugging a
@@ -319,13 +322,24 @@ private:
 
 int main(int argc, char **argv) {
   using namespace dynslam;
-  const string dataset_root = "/home/andrei/work/libelas/cmake-build-debug/odo_seq_06/";
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+//  const string dataset_root = FLAGS_dataset_root;
+  const string dataset_root = FLAGS_nope_dataset_root;
+  if (dataset_root.empty()) {
+    cerr << "Please specify a dataset to work with. The --dataset_root=<path> flag must be set."
+         << endl;
+
+    return -1;
+  }
 
   gui::DynSlam *dyn_slam = new gui::DynSlam();
   ImageSourceEngine *image_source;
   drivers::InfiniTamDriver *driver = InfiniTamDriver::Build(dataset_root, &image_source);
 
-  dyn_slam->Initialize(driver, image_source);
+  const string seg_folder = dataset_root + "/seg_image_2/mnc";
+  auto segmentation_provider = new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder);
+  dyn_slam->Initialize(driver, image_source, segmentation_provider);
 
   gui::PangolinGui pango_gui(dyn_slam);
   pango_gui.Run();
