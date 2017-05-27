@@ -163,14 +163,14 @@ void InstanceReconstructor::ProcessReconstructions() {
 
     // Since this is very memory-hungry, we restrict creation to the very
     // first things we see.
-    if (track.GetId() < 3) {
+    if (track.GetId() < 3 || track.GetId() == 5) {
       if (id_to_reconstruction_.find(track.GetId()) == id_to_reconstruction_.cend()) {
         cout << endl << endl;
         cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl;
         ITMLibSettings *settings = new ITMLibSettings(*driver->GetSettings());
         // Set a much smaller voxel block number for the reconstruction, since individual
         // objects occupy a limited amount of space in the scene.
-        settings->sdfLocalBlockNum = 2500;
+        settings->sdfLocalBlockNum = 1500;
 
         id_to_reconstruction_.emplace(make_pair(
             track.GetId(),

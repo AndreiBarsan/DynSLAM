@@ -109,7 +109,6 @@ public:
                              GL_RGBA, GL_UNSIGNED_BYTE);
       pane_texture->RenderToViewport(true);
 
-      // TODO(andrei): wait, do we need all these separate helper buffers?
       object_reconstruction_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
       pane_texture->Upload(dyn_slam_->GetObjectRaycastPreview(visualized_object_idx_),
