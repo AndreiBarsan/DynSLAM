@@ -1,4 +1,4 @@
-# TODO list for the Instance Reconstruction Library (InstRecLib)
+# TODO list for the DynSLAM
 
 ## Overview
  * The project has started as an extension of InfiniTAM, but the goal is to make it generic enough
@@ -25,4 +25,7 @@
  - [ ] Ensure code formatter also enforces naming conventions.
  - [ ] Maybe rename namespaces to be all-lowercase.
  - [ ] Implement CUDA version of instance masking.
- 
+ - [ ] Use GT kitti depth as baseline
+ - [ ] Experiment with virtual datasets with GT depth and GT geometry, and send
+       results to Xinyuan
+

@@ -35,6 +35,13 @@ public:
       const Segmentation::InstanceSegmentationResult& segmentation_result
   );
 
+  // TODO(andrei): Check this.
+  /// \brief Experimental method since modifying ITMView* leads to weird results.
+  void ProcessRawFrame(
+      ITMUChar4Image *rgb,
+      ITMShortImage *depth,
+      const Segmentation::InstanceSegmentationResult &segmentation_result);
+
   const InstanceTracker& GetInstanceTracker() const {
     return *instance_tracker_;
   }
@@ -83,7 +90,7 @@ private:
       // Since this is very memory-hungry, we restrict creation to the very first thing we see
       if (track.GetId() == 0) {
         if (id_to_reconstruction_.find(track.GetId()) == id_to_reconstruction_.cend()) {
-          // Update reconstruction
+          cout << endl << endl;
           cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl;
           // TODO
           id_to_reconstruction_.emplace(make_pair(

@@ -59,7 +59,8 @@ void DynSlam::ProcessFrame() {
   }
 
   // Split the scene up into instances, and fuse each instance independently.
-  instance_reconstructor_->ProcessFrame(static_scene_->GetView(), *segmentationResult);
+//  instance_reconstructor_->ProcessFrame(static_scene_->GetView(), *segmentationResult);
+  instance_reconstructor_->ProcessRawFrame(input_rgb_image_, input_raw_depth_image_, *segmentationResult);
 
   // Perform the tracking after the segmentation, so that we may in the future leverage semantic
   // information to enhance tracking.
