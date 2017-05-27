@@ -10,10 +10,9 @@ namespace reconstruction {
 using namespace std;
 using namespace instreclib::segmentation;
 
-void InstanceTracker::ProcessInstanceViews(
-    int frame_idx, const vector<InstanceView> &new_views) {
-  cout << "Frame [" << frame_idx << "]. Processing " << new_views.size()
-       << " new detections." << endl;
+void InstanceTracker::ProcessInstanceViews(int frame_idx, const vector<InstanceView> &new_views) {
+  cout << "Frame [" << frame_idx << "]. Processing " << new_views.size() << " new detections."
+       << endl;
 
   list<TrackFrame> new_track_frames;
   for (const InstanceView &view : new_views) {
@@ -32,8 +31,7 @@ void InstanceTracker::ProcessInstanceViews(
     this->active_tracks_.push_back(new_track);
   }
 
-  cout << "We now have " << this->active_tracks_.size() << " active track(s)."
-       << endl;
+  cout << "We now have " << this->active_tracks_.size() << " active track(s)." << endl;
 
   // 3. Iterate through tracks, find ``expired'' ones, and discard them.
   this->PruneTracks(frame_idx);
@@ -53,8 +51,7 @@ void InstanceTracker::PruneTracks(int current_frame_idx) {
   }
 }
 
-std::pair<Track *, float> InstanceTracker::FindBestTrack(
-    const TrackFrame &track_frame) {
+std::pair<Track *, float> InstanceTracker::FindBestTrack(const TrackFrame &track_frame) {
   if (active_tracks_.empty()) {
     return kNoBestTrack;
   }
@@ -83,10 +80,9 @@ void InstanceTracker::AssignToTracks(std::list<TrackFrame> &new_detections) {
     float score = match.second;
 
     if (score > kTrackScoreThreshold) {
-      cout << "Found a match based on overlap with score " << score << "."
+      cout << "Found a match based on overlap with score " << score << "." << endl;
+      cout << "Adding it to track #" << track->GetId() << " of length " << track->GetSize() << "."
            << endl;
-      cout << "Adding it to track #" << track->GetId() << " of length "
-           << track->GetSize() << "." << endl;
 
       track->AddFrame(*it);
       it = new_detections.erase(it);

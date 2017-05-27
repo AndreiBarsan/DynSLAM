@@ -47,8 +47,7 @@ class InstanceTracker {
   int track_count_;
 
  protected:
-  static constexpr std::pair<Track*, float> kNoBestTrack =
-      std::pair<Track*, float>(nullptr, 0.0f);
+  static constexpr std::pair<Track*, float> kNoBestTrack = std::pair<Track*, float>(nullptr, 0.0f);
 
   /// \brief Finds the most likely track for the given frame, if it exists.
   /// \return The best matching track, and the [0-1] match quality score. If no
@@ -73,8 +72,7 @@ class InstanceTracker {
   /// \brief Associates the new detections with existing tracks, or creates new
   /// ones.
   /// \param new_detections The instances detected in the current frame.
-  void ProcessInstanceViews(int frame_idx,
-                            const std::vector<InstanceView>& new_detections);
+  void ProcessInstanceViews(int frame_idx, const std::vector<InstanceView>& new_detections);
 
   std::vector<Track>& GetTracks() { return active_tracks_; }
 
@@ -83,9 +81,7 @@ class InstanceTracker {
   /// \see track_count_
   int GetTotalTrackCount() const { return track_count_; }
 
-  int GetActiveTrackCount() const {
-    return static_cast<int>(active_tracks_.size());
-  }
+  int GetActiveTrackCount() const { return static_cast<int>(active_tracks_.size()); }
 };
 
 }  // namespace segmentation

@@ -31,10 +31,8 @@ float Track::ScoreMatch(const TrackFrame& new_frame) const {
     return 0.0f;
   }
 
-  const InstanceDetection& new_detection =
-      new_frame.instance_view.GetInstanceDetection();
-  const InstanceDetection& latest_detection =
-      latest_frame.instance_view.GetInstanceDetection();
+  const InstanceDetection& new_detection = new_frame.instance_view.GetInstanceDetection();
+  const InstanceDetection& latest_detection = latest_frame.instance_view.GetInstanceDetection();
 
   // We don't want to associate segments from different classes.
   // TODO(andrei): Sometimes the segmentation pipeline may flicker between,
@@ -75,8 +73,7 @@ float Track::ScoreMatch(const TrackFrame& new_frame) const {
   // take the probability into account. Similarly, in a future frame, we prefer
   // adding the
   // new data to the track with the most confident detections.
-  float score = area_score * new_detection.class_probability *
-                latest_detection.class_probability;
+  float score = area_score * new_detection.class_probability * latest_detection.class_probability;
 
   return score;
 }

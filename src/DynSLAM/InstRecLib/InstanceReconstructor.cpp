@@ -15,9 +15,8 @@ using namespace ITMLib::Objects;
 
 // TODO(andrei): Implement this in CUDA. It should be easy.
 template <typename DEPTH_T>
-void ProcessSilhouette_CPU(Vector4u *sourceRGB, DEPTH_T *sourceDepth,
-                           Vector4u *destRGB, DEPTH_T *destDepth,
-                           Vector2i sourceDims,
+void ProcessSilhouette_CPU(Vector4u *sourceRGB, DEPTH_T *sourceDepth, Vector4u *destRGB,
+                           DEPTH_T *destDepth, Vector2i sourceDims,
                            const InstanceDetection &detection) {
   // Blanks out the detection's silhouette in the 'source' frames, and writes
   // its pixels into
@@ -82,12 +81,10 @@ void InstanceReconstructor::ProcessFrame(
 
   ORUtils::Vector4<unsigned char> *rgb_data_h =
       main_view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
-  float *depth_data_h =
-      main_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+  float *depth_data_h = main_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
   vector<InstanceView> new_instance_views;
-  for (const InstanceDetection &instance_detection :
-       segmentation_result.instance_detections) {
+  for (const InstanceDetection &instance_detection : segmentation_result.instance_detections) {
     // At this stage of the project, we only care about cars. In the future,
     // this scheme could
     // be extended to also support other classes, as well as any unknown, but
@@ -98,16 +95,12 @@ void InstanceReconstructor::ProcessFrame(
       // 'MemoryBlock' to
       // check this, since the field is private.
       bool use_gpu = true;
-      auto view = make_shared<ITMView>(main_view->calib, frame_size, frame_size,
-                                       use_gpu);
-      auto rgb_segment_h =
-          view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
-      auto depth_segment_h =
-          view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+      auto view = make_shared<ITMView>(main_view->calib, frame_size, frame_size, use_gpu);
+      auto rgb_segment_h = view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+      auto depth_segment_h = view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
-      ProcessSilhouette_CPU(rgb_data_h, depth_data_h, rgb_segment_h,
-                            depth_segment_h, main_view->rgb->noDims,
-                            instance_detection);
+      ProcessSilhouette_CPU(rgb_data_h, depth_data_h, rgb_segment_h, depth_segment_h,
+                            main_view->rgb->noDims, instance_detection);
 
       view->rgb->UpdateDeviceFromHost();
       view->depth->UpdateDeviceFromHost();
@@ -146,8 +139,7 @@ ITMUChar4Image *InstanceReconstructor::GetInstancePreviewRGB(size_t track_idx) {
   return tracks[idx].GetLastFrame().instance_view.GetView()->rgb;
 }
 
-ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(
-    size_t track_idx) {
+ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) {
   const auto &tracks = instance_tracker_->GetTracks();
   if (tracks.empty()) {
     return nullptr;
