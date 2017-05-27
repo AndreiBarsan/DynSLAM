@@ -4,11 +4,11 @@
 
 #include <cassert>
 
-namespace InstRecLib {
+namespace instreclib {
 	namespace Reconstruction {
 
 		using namespace std;
-		using namespace InstRecLib::Segmentation;
+		using namespace instreclib::segmentation;
 
 		void InstanceTracker::ProcessInstanceViews(int frame_idx, const vector<InstanceView>& new_views) {
 			cout << "Frame [" << frame_idx << "]. Processing " << new_views.size()

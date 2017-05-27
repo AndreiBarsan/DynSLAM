@@ -7,11 +7,11 @@
 #include <iomanip>
 #include <sstream>
 
-namespace InstRecLib {
+namespace instreclib {
 	namespace Reconstruction {
 		using namespace std;
-		using namespace InstRecLib::Segmentation;
-		using namespace InstRecLib::Utils;
+		using namespace instreclib::segmentation;
+		using namespace instreclib::Utils;
 
 		float Track::ScoreMatch(const TrackFrame &new_frame) const {
 			// TODO(andrei): Use fine mask, not just bounding box.

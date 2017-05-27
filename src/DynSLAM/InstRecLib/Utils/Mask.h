@@ -9,7 +9,7 @@
 #include "BoundingBox.h"
 
 
-namespace InstRecLib {
+namespace instreclib {
 	namespace Utils {
 
 		// TODO(andrei): Make this class CUDA-proof.

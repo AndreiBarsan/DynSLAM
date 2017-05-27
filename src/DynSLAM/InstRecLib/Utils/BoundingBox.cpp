@@ -3,7 +3,7 @@
 
 #include <cmath>
 
-namespace InstRecLib {
+namespace instreclib {
 	namespace Utils {
 		using namespace std;
 

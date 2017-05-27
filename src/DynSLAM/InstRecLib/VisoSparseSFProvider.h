@@ -5,7 +5,7 @@
 
 #include "SparseSFProvider.h"
 
-namespace InstRecLib {
+namespace instreclib {
 
 	class VisoSparseSFProvider : public SparseSFProvider {
 		// TODO(andrei): Implement these things.

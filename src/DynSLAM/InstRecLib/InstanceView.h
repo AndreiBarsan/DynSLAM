@@ -9,13 +9,13 @@
 // TODO remove
 #include <iostream>
 
-namespace InstRecLib {
+namespace instreclib {
 	namespace Reconstruction {
 
 		/// \brief Like ITMView, but associated with a particular object instance.
 		class InstanceView {
 		public:
-			InstanceView(const Segmentation::InstanceDetection &instance_detection_,
+			InstanceView(const segmentation::InstanceDetection &instance_detection_,
 									 const std::shared_ptr<ITMLib::Objects::ITMView> &view_)
 					: instance_detection_(instance_detection_), view_(view_) { }
 
@@ -29,17 +29,17 @@ namespace InstRecLib {
 				return view_.get();
 			}
 
-			InstRecLib::Segmentation::InstanceDetection& GetInstanceDetection() {
+			instreclib::segmentation::InstanceDetection& GetInstanceDetection() {
 				return instance_detection_;
 			}
 
-			const InstRecLib::Segmentation::InstanceDetection& GetInstanceDetection() const {
+			const instreclib::segmentation::InstanceDetection& GetInstanceDetection() const {
 				return instance_detection_;
 			}
 
 		private:
 			/// \brief Holds label, mask, and bounding box information.
-			InstRecLib::Segmentation::InstanceDetection instance_detection_;
+			instreclib::segmentation::InstanceDetection instance_detection_;
 
 			/// \brief Holds the depth and RGB information about the object.
 			std::shared_ptr<ITMLib::Objects::ITMView> view_;

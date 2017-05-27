@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-namespace InstRecLib {
-	namespace Segmentation {
+namespace instreclib {
+	namespace segmentation {
 
 		/// \brief Builds a reverse mapping from label names to their indices in the list.
 		std::map<std::string, int> labels_to_id_map(const std::vector<std::string> labels);

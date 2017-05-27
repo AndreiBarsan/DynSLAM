@@ -2,7 +2,7 @@
 
 #include "InstanceView.h"
 
-namespace InstRecLib {
+namespace instreclib {
 	namespace Reconstruction {
 
 	}

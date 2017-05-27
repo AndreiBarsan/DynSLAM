@@ -11,8 +11,8 @@
 #include <memory>
 #include <vector>
 
-namespace InstRecLib {
-	namespace Segmentation {
+namespace instreclib {
+	namespace segmentation {
 
 		class InstanceSegmentationResult;
 
@@ -59,7 +59,7 @@ namespace InstRecLib {
 			int class_id;
 
 			/// \brief 2D mask of this detection in its source image frame.
-			std::shared_ptr<InstRecLib::Utils::Mask> mask;
+			std::shared_ptr<instreclib::Utils::Mask> mask;
 
 			/// \brief The dataset associated with this instance's detection. Contains information such
 			/// as mappings from class IDs to class names.
@@ -67,18 +67,18 @@ namespace InstRecLib {
 
 			std::string GetClassName() const;
 
-			InstRecLib::Utils::BoundingBox& GetBoundingBox() {
+			instreclib::Utils::BoundingBox& GetBoundingBox() {
 				return mask->GetBoundingBox();
 			}
 
-			const InstRecLib::Utils::BoundingBox& GetBoundingBox() const {
+			const instreclib::Utils::BoundingBox& GetBoundingBox() const {
 				return mask->GetBoundingBox();
 			}
 
 			/// \brief Initializes the detection with bounding box, class, and mask information.
 			/// \note This object takes ownership of `mask`.
 			InstanceDetection(float class_probability, int class_id,
-												std::shared_ptr<InstRecLib::Utils::Mask> mask,
+												std::shared_ptr<instreclib::Utils::Mask> mask,
 												const SegmentationDataset* segmentation_dataset)
 					: class_probability(class_probability),
 						class_id(class_id),
