@@ -1,17 +1,16 @@
 
 
-#ifndef INFINITAM_VISOSSFPROVIDER_H
-#define INFINITAM_VISOSSFPROVIDER_H
+#ifndef INSTRECLIB_VISOSSFPROVIDER_H
+#define INSTRECLIB_VISOSSFPROVIDER_H
 
 #include "SparseSFProvider.h"
 
 namespace instreclib {
 
-	class VisoSparseSFProvider : public SparseSFProvider {
-		// TODO(andrei): Implement these things.
+class VisoSparseSFProvider : public SparseSFProvider {
+  // TODO(andrei): Implement these things.
+};
 
-	};
-}
+}   // namespace instreclib
 
-
-#endif //INFINITAM_VISOSSFPROVIDER_H
+#endif  // INSTRECLIB_VISOSSFPROVIDER_H

@@ -3,7 +3,8 @@
 
 #include <iomanip>
 
-namespace instreclib { namespace segmentation {
+namespace instreclib {
+namespace segmentation {
 
 using namespace std;
 
@@ -12,12 +13,15 @@ string InstanceDetection::GetClassName() const {
 }
 
 ostream &operator<<(ostream &out, const InstanceDetection &detection) {
-  out << detection.GetClassName() << " at " << detection.GetBoundingBox() << ". "
-      << "Probability: " << setprecision(4) << setw(6) << detection.class_probability << ".";
+  out << detection.GetClassName() << " at " << detection.GetBoundingBox()
+      << ". "
+      << "Probability: " << setprecision(4) << setw(6)
+      << detection.class_probability << ".";
   return out;
 }
 
-ostream &operator<<(ostream &out, const InstanceSegmentationResult &segmentation_result) {
+ostream &operator<<(ostream &out,
+                    const InstanceSegmentationResult &segmentation_result) {
   if (segmentation_result.instance_detections.size() > 0) {
     out << "Detected " << segmentation_result.instance_detections.size()
         << " objects in the frame." << std::endl;
@@ -30,5 +34,5 @@ ostream &operator<<(ostream &out, const InstanceSegmentationResult &segmentation
   return out;
 }
 
-}}
-
+}   // namespace segmentation
+}   // namespace instreclib

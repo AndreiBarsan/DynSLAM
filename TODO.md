@@ -30,7 +30,8 @@
        results to Xinyuan
  - [ ] Set up include-what-you-use CMake integration
  - [ ] Set up trivial way to run clang-tidy
- - [ ] Set up trivial way to run clang-format
+ - [ ] Set up trivial way to run clang-format; see: https://github.com/kbenzie/git-cmake-format/blob/master/CMakeLists.txt
  - [ ] Maybe run clang-format on commit
+
  
 
