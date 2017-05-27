@@ -31,7 +31,7 @@ namespace dynslam {
 namespace gui {
 
 using namespace std;
-using namespace instreclib::Reconstruction;
+using namespace instreclib::reconstruction;
 using namespace instreclib::segmentation;
 
 using namespace dynslam;

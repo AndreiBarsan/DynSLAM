@@ -9,7 +9,7 @@
 
 namespace dynslam {
 
-using namespace instreclib::Reconstruction;
+using namespace instreclib::reconstruction;
 using namespace instreclib::segmentation;
 using namespace dynslam::drivers;
 
