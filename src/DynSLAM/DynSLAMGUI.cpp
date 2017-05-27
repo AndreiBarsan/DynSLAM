@@ -99,22 +99,23 @@ public:
 
       segment_view.Activate();
       glColor3f(1.0, 1.0, 1.0);
-      segment_preview->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-      segment_preview->RenderToViewport(true);
-      DrawInstanceLables();
+      if (nullptr != dyn_slam_->GetSegmentationPreview()) {
+        segment_preview->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+        segment_preview->RenderToViewport(true);
+        DrawInstanceLables();
+      }
 
-      // TODO(andrei): Make this an interactive point cloud/volume visualization.
       object_view.Activate();
       glColor3f(1.0, 1.0, 1.0);
-//      object_preview->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
-//                             GL_RGBA, GL_UNSIGNED_BYTE);
-      object_preview->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_), GL_RED, GL_FLOAT);
+      object_preview->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
+                             GL_RGBA, GL_UNSIGNED_BYTE);
       object_preview->RenderToViewport(true);
 
       // TODO(andrei): wait, do we need all these separate helper buffers?
       extra_view.Activate();
-      glColor3f(1.0, 0.0, 0.0);
-      depth_preview->Upload(dyn_slam_->GetObjectRaycastPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      glColor3f(1.0, 1.0, 1.0);
+      depth_preview->Upload(dyn_slam_->GetObjectRaycastPreview(visualized_object_idx_),
+                            GL_RGBA, GL_UNSIGNED_BYTE);
       depth_preview->RenderToViewport(true);
 
       // Update various elements in the toolbar on the left.

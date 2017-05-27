@@ -47,20 +47,10 @@ void DynSlam::ProcessFrame() {
 
   // InstRec: semantic segmentation
   auto segmentationResult = segmentationProvider->SegmentFrame(input_rgb_image_);
-  if (segmentationResult->instance_detections.size() > 0) {
-    std::cout << "Detected " << segmentationResult->instance_detections.size()
-              << " objects in the frame." << std::endl;
-    for(const auto& instance : segmentationResult->instance_detections) {
-      std::cout << "\t " << instance << std::endl;
-    }
-  }
-  else {
-    std::cout << "Nothing detected in the frame." << std::endl;
-  }
+  cout << segmentationResult << endl;
 
   // Split the scene up into instances, and fuse each instance independently.
-//  instance_reconstructor_->ProcessFrame(static_scene_->GetView(), *segmentationResult);
-  instance_reconstructor_->ProcessRawFrame(input_rgb_image_, input_raw_depth_image_, *segmentationResult);
+  instance_reconstructor_->ProcessFrame(static_scene_->GetView(), *segmentationResult);
 
   // Perform the tracking after the segmentation, so that we may in the future leverage semantic
   // information to enhance tracking.
@@ -73,20 +63,19 @@ void DynSlam::ProcessFrame() {
   current_frame_no_++;
 }
 
-//const unsigned char* DynSlam::GetObjectPreview(int object_idx) {
-const float* DynSlam::GetObjectPreview(int object_idx) {
-//  ITMUChar4Image *preview = instance_reconstructor_->GetInstancePreviewRGB(object_idx);
-  ITMFloatImage *preview = instance_reconstructor_->GetInstancePreviewDepth(object_idx);
+const unsigned char* DynSlam::GetObjectPreview(int object_idx) {
+  ITMUChar4Image *preview = instance_reconstructor_->GetInstancePreviewRGB(object_idx);
   if (nullptr == preview) {
     // This happens when there's no instances to preview.
-//    out_image_->Clear();
-    out_image_float_->Clear();
+    out_image_->Clear();
+//    out_image_float_->Clear();
   } else {
-//    out_image_->SetFrom(preview, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
-    out_image_float_->SetFrom(preview, ORUtils::MemoryBlock<float>::CPU_TO_CPU);
+    out_image_->SetFrom(preview, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
+//    out_image_float_->SetFrom(preview, ORUtils::MemoryBlock<float>::CPU_TO_CPU);
   }
 
-  return out_image_float_->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+//  return out_image_float_->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+  return out_image_->GetData(MemoryDeviceType::MEMORYDEVICE_CPU)->getValues();
 }
 
 }

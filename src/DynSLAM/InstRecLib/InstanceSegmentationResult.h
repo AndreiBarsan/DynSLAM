@@ -111,6 +111,9 @@ namespace InstRecLib {
 			    inference_time_ns(inference_time_ns)
 			{ }
 		};
+
+		/// \brief Pretty prints the result of a semantic segmentation.
+		std::ostream& operator<<(std::ostream& out, const InstanceSegmentationResult& segmentation_result);
 	}
 }
 
