@@ -165,5 +165,5 @@ ORUtils::Image<Vector4u> *PrecomputedSegmentationProvider::GetSegResult() {
   return this->lastSegPreview_;
 }
 
-}   // namespace segmentation
-}   // namespace instreclib
+}  // namespace segmentation
+}  // namespace instreclib

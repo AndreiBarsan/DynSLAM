@@ -3,7 +3,7 @@
 #include "InstanceView.h"
 
 namespace instreclib {
-	namespace Reconstruction {
+namespace reconstruction {
 
-	}
-}
+}   // namespace reconstruction
+}   // namespace instreclib

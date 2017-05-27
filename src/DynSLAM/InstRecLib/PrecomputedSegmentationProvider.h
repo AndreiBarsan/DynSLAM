@@ -1,7 +1,7 @@
 
 
-#ifndef INFINITAM_PRECOMPUTEDSEGMENTATIONPROVIDER_H
-#define INFINITAM_PRECOMPUTEDSEGMENTATIONPROVIDER_H
+#ifndef INSTRECLIB_PRECOMPUTEDSEGMENTATIONPROVIDER_H
+#define INSTRECLIB_PRECOMPUTEDSEGMENTATIONPROVIDER_H
 
 #include <memory>
 
@@ -42,7 +42,8 @@ class PrecomputedSegmentationProvider : public SegmentationProvider {
 
   ITMUChar4Image *GetSegResult() override;
 };
-}
-}
 
-#endif  // INFINITAM_PRECOMPUTEDSEGMENTATIONPROVIDER_H
+}   // namespace segmentation
+}   // namespace instreclib
+
+#endif  // INSTRECLIB_PRECOMPUTEDSEGMENTATIONPROVIDER_H
