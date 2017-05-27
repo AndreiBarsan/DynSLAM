@@ -84,13 +84,9 @@ class InstanceDetection {
 
   std::string GetClassName() const;
 
-  instreclib::utils::BoundingBox& GetBoundingBox() {
-    return mask->GetBoundingBox();
-  }
+  instreclib::utils::BoundingBox& GetBoundingBox() { return mask->GetBoundingBox(); }
 
-  const instreclib::utils::BoundingBox& GetBoundingBox() const {
-    return mask->GetBoundingBox();
-  }
+  const instreclib::utils::BoundingBox& GetBoundingBox() const { return mask->GetBoundingBox(); }
 
   /// \brief Initializes the detection with bounding box, class, and mask
   /// information.
@@ -122,18 +118,16 @@ struct InstanceSegmentationResult {
   /// \brief The total time it took to produce this result.
   long inference_time_ns;
 
-  InstanceSegmentationResult(
-      const SegmentationDataset* segmentation_dataset,
-      const std::vector<InstanceDetection>& instance_detections,
-      long inference_time_ns)
+  InstanceSegmentationResult(const SegmentationDataset* segmentation_dataset,
+                             const std::vector<InstanceDetection>& instance_detections,
+                             long inference_time_ns)
       : segmentation_dataset(segmentation_dataset),
         instance_detections(instance_detections),
         inference_time_ns(inference_time_ns) {}
 };
 
 /// \brief Pretty prints the result of a semantic segmentation.
-std::ostream& operator<<(std::ostream& out,
-                         const InstanceSegmentationResult& segmentation_result);
+std::ostream& operator<<(std::ostream& out, const InstanceSegmentationResult& segmentation_result);
 
 }  // namespace segmentation
 }  // namespace instreclib
