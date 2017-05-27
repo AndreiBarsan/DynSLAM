@@ -14,5 +14,5 @@ map<string, int> labels_to_id_map(const vector<string> labels) {
   return result;
 };
 
-}   // namespace segmentation
-}   // namespace instreclib
+}  // namespace segmentation
+}  // namespace instreclib

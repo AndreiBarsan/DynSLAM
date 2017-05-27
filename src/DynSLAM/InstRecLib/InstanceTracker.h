@@ -88,7 +88,7 @@ class InstanceTracker {
   }
 };
 
-}   // namespace segmentation
-}   // namespace instreclib
+}  // namespace segmentation
+}  // namespace instreclib
 
 #endif  // INSTRECLIB_INSTANCETRACKER_H

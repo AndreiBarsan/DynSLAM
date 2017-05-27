@@ -96,5 +96,5 @@ void InstanceTracker::AssignToTracks(std::list<TrackFrame> &new_detections) {
   }
 }
 
-}   // namespace segmentation
-}   // namespace instreclib
+}  // namespace segmentation
+}  // namespace instreclib

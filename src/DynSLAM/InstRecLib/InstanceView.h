@@ -39,7 +39,7 @@ class InstanceView {
   std::shared_ptr<ITMLib::Objects::ITMView> view_;
 };
 
-}   // namespace reconstruction
-}   // namespace instreclib
+}  // namespace reconstruction
+}  // namespace instreclib
 
 #endif  // INSTRECLIB_INSTANCEVIEW_H

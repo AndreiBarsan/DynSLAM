@@ -135,7 +135,7 @@ struct InstanceSegmentationResult {
 std::ostream& operator<<(std::ostream& out,
                          const InstanceSegmentationResult& segmentation_result);
 
-}   // namespace segmentation
-}   // namespace instreclib
+}  // namespace segmentation
+}  // namespace instreclib
 
 #endif  // INSTRECLIB_SEGMENTATIONRESULT_H
