@@ -14,9 +14,9 @@ using namespace std;
 bool EndsWith(const string &value, const string &ending){
   if (ending.size() > value.size()) {
     return false;
-  } else {
-    return equal(ending.rbegin(), ending.rend(), value.rbegin());
   }
+
+  return equal(ending.rbegin(), ending.rend(), value.rbegin());
 }
 
 string Format(const string& fmt, ...) {
