@@ -39,7 +39,7 @@ const std::vector<std::string> kPascalVoc2012Classes = {
 const SegmentationDataset kPascalVoc2012("Pascal VOC 2012",
                                          kPascalVoc2012Classes);
 
-}   // namespace segmentation
-}   // namespace instreclib
+}  // namespace segmentation
+}  // namespace instreclib
 
 #endif  // INSTRECLIB_SEGMENTATIONDATASET_H

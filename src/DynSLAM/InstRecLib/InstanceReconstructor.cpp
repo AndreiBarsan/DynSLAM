@@ -180,5 +180,5 @@ ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(
   return tracks[idx].GetLastFrame().instance_view.GetView()->depth;
 }
 
-}   // namespace reconstruction
-}   // namespace instreclib
+}  // namespace reconstruction
+}  // namespace instreclib

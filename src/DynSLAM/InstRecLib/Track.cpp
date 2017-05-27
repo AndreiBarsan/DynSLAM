@@ -98,5 +98,5 @@ string Track::GetAsciiArt() const {
   return out.str();
 }
 
-}   // namespace reconstruction
-}   // namespace instreclib
+}  // namespace reconstruction
+}  // namespace instreclib
