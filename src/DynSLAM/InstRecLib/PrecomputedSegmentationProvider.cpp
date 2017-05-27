@@ -15,7 +15,7 @@ namespace instreclib {
 namespace segmentation {
 
 using namespace std;
-using namespace instreclib::Utils;
+using namespace instreclib::utils;
 
 /// \brief Reads a numpy text dump of an object's 2D binary segmentation mask.
 ///

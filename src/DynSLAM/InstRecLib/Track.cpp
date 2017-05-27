@@ -11,7 +11,7 @@ namespace instreclib {
 	namespace Reconstruction {
 		using namespace std;
 		using namespace instreclib::segmentation;
-		using namespace instreclib::Utils;
+		using namespace instreclib::utils;
 
 		float Track::ScoreMatch(const TrackFrame &new_frame) const {
 			// TODO(andrei): Use fine mask, not just bounding box.

@@ -9,7 +9,7 @@ namespace instreclib { namespace Reconstruction {
 
 using namespace std;
 using namespace instreclib::segmentation;
-using namespace instreclib::Utils;
+using namespace instreclib::utils;
 using namespace ITMLib::Objects;
 
 // TODO(andrei): Implement this in CUDA. It should be easy.
