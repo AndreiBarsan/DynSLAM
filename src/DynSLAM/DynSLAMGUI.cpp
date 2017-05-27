@@ -8,7 +8,6 @@
 #include <backward.hpp>
 #include <GL/glut.h>
 
-// TODO(andrei): Configure InfiniTAM's includes so we can be less verbose here.
 #include "DynSlam.h"
 #include "ImageSourceEngine.h"
 #include "Utils.h"
