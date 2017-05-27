@@ -42,29 +42,48 @@ namespace InstRecLib {
 			memset(destRGB, 0, frame_width * frame_height * sizeof(Vector4u));
 			memset(destDepth, 0, frame_width * frame_height * sizeof(float));
 
-			for(int row = 0; row < box_height; ++row) {
-				for(int col = 0; col < box_width; ++col) {
-					int frame_row = row + bbox.r.y0;
-					int frame_col = col + bbox.r.x0;
-					// TODO(andrei): Are the CPU-specific InfiniTAM functions doing this in a nicer way?
+//			for(int row = 0; row < box_height; ++row) {
+//				for(int col = 0; col < box_width; ++col) {
+//					int frame_row = row + bbox.r.y0;
+//					int frame_col = col + bbox.r.x0;
+//					// TODO(andrei): Are the CPU-specific InfiniTAM functions doing this in a nicer way?
+//
+//					int frame_idx = frame_row * frame_width + frame_col;
+//
+//					int mask = detection.mask->GetMask()[row][col];
+//					if (mask == 1) {
+//						destRGB[frame_idx].r = sourceRGB[frame_idx].r;
+//						destRGB[frame_idx].g = sourceRGB[frame_idx].g;
+//						destRGB[frame_idx].b = sourceRGB[frame_idx].b;
+//						destRGB[frame_idx].a = sourceRGB[frame_idx].a;
+//						sourceRGB[frame_idx].r = 0;
+//						sourceRGB[frame_idx].g = 0;
+//						sourceRGB[frame_idx].b = 0;
+//						sourceRGB[frame_idx].a = 0;
+//
+//						destDepth[frame_idx] = sourceDepth[frame_idx];
+//						sourceDepth[frame_idx] = 0.0f;
+//					}
+//				}
+//			}
 
-					int frame_idx = frame_row * frame_width + frame_col;
+			for(int row = 0; row < frame_height; ++row) {
+				for(int col = 0; col < frame_width; ++col) {
+					int frame_idx = frame_width * row + col;
 
-					int mask = detection.mask->GetMask()[row][col];
-					if (mask == 1) {
-						destRGB[frame_idx].r = sourceRGB[frame_idx].r;
-						destRGB[frame_idx].g = sourceRGB[frame_idx].g;
-						destRGB[frame_idx].b = sourceRGB[frame_idx].b;
-						destRGB[frame_idx].a = sourceRGB[frame_idx].a;
-						sourceRGB[frame_idx].r = 0;
-						sourceRGB[frame_idx].g = 0;
-						sourceRGB[frame_idx].b = 0;
-						sourceRGB[frame_idx].a = 0;
+          destRGB[frame_idx].r = sourceRGB[frame_idx].r;
+          destRGB[frame_idx].g = sourceRGB[frame_idx].g;
+          destRGB[frame_idx].b = sourceRGB[frame_idx].b;
+          destRGB[frame_idx].a = sourceRGB[frame_idx].a;
+//          sourceRGB[frame_idx].r = 0;
+//          sourceRGB[frame_idx].g = 0;
+//          sourceRGB[frame_idx].b = 0;
+//          sourceRGB[frame_idx].a = 0;
 
-						destDepth[frame_idx] = sourceDepth[frame_idx];
-						sourceDepth[frame_idx] = 0.0f;
-					}
+          destDepth[frame_idx] = sourceDepth[frame_idx];
+//          sourceDepth[frame_idx] = 0.0f;
 				}
+
 			}
 		}
 
@@ -124,6 +143,14 @@ namespace InstRecLib {
 
 			frame_idx_++;
 		}
+
+	void InstanceReconstructor::ProcessRawFrame(ITMUChar4Image *rgb,
+												ITMShortImage *depth,
+												const Segmentation::InstanceSegmentationResult &segmentation_result) {
+
+		cout << "TODO process raw shit" << endl;
+
+	}
 
     ITMUChar4Image *InstanceReconstructor::GetInstancePreviewRGB(size_t track_idx) {
       const auto &tracks = instance_tracker_->GetTracks();
