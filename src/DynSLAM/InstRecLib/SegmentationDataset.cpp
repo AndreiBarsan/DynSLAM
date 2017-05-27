@@ -2,8 +2,8 @@
 #include "SegmentationDataset.h"
 
 
-namespace InstRecLib {
-	namespace Segmentation {
+namespace instreclib {
+	namespace segmentation {
 
 		using namespace std;
 

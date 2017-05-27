@@ -3,7 +3,7 @@
 
 #include <iomanip>
 
-namespace InstRecLib { namespace Segmentation {
+namespace instreclib { namespace segmentation {
 
 using namespace std;
 

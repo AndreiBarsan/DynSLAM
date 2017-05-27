@@ -12,7 +12,7 @@
 #include "../InfiniTamDriver.h"
 
 
-namespace InstRecLib { namespace Reconstruction {
+namespace instreclib { namespace Reconstruction {
 
 using namespace dynslam::drivers;
 
@@ -31,7 +31,7 @@ public:
   /// \param segmentation_result The output of the view's semantic segmentation.
   void ProcessFrame(
       ITMLib::Objects::ITMView* main_view,
-      const Segmentation::InstanceSegmentationResult& segmentation_result
+      const segmentation::InstanceSegmentationResult& segmentation_result
   );
 
   const InstanceTracker& GetInstanceTracker() const {

@@ -6,7 +6,7 @@
 
 #include "../../InfiniTAM/InfiniTAM/ITMLib/Objects/ITMView.h"
 
-namespace InstRecLib {
+namespace instreclib {
 
 	/// \brief Interface for components which can compute sparse scene flow from a scene view.
 	class SparseSFProvider {

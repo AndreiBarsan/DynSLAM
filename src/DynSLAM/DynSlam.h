@@ -9,8 +9,8 @@
 
 namespace dynslam {
 
-using namespace InstRecLib::Reconstruction;
-using namespace InstRecLib::Segmentation;
+using namespace instreclib::Reconstruction;
+using namespace instreclib::segmentation;
 using namespace dynslam::drivers;
 
 /// \brief The central class of the DynSLAM system.
