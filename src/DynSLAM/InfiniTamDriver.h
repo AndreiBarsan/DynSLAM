@@ -16,26 +16,28 @@ public:
   // modularity possible.
   static InfiniTamDriver* Build(const string &dataset_root, ImageSourceEngine** image_source) {
     ITMLibSettings *settings = new ITMLibSettings();
-    const string calib_fpath = dataset_root + "calib.txt";
-    const string rgb_image_format = dataset_root + "Frames/%04i.ppm";
-    const string depth_image_format = dataset_root + "Frames/%04i.pgm";
+    const string calib_fpath = dataset_root + "/itm-calib.txt";
+    const string rgb_image_format = dataset_root + "/precomputed-depth/Frames/%04i.ppm";
+    const string depth_image_format = dataset_root + "/precomputed-depth/Frames/%04i.pgm";
+
     *image_source = new ImageFileReader(
         calib_fpath.c_str(),
         rgb_image_format.c_str(),
         depth_image_format.c_str()
     );
 
-    InfiniTamDriver *driver= new InfiniTamDriver(
-        settings,
-        new ITMRGBDCalib((*image_source)->calib),
-        (*image_source)->getRGBImageSize(),
-        (*image_source)->getDepthImageSize());
+    InfiniTamDriver *driver = new InfiniTamDriver(settings,
+                                                  new ITMRGBDCalib((*image_source)->calib),
+                                                  (*image_source)->getRGBImageSize(),
+                                                  (*image_source)->getDepthImageSize());
 
     return driver;
   }
 
-  InfiniTamDriver(const ITMLibSettings *settings, const ITMRGBDCalib *calib,
-                  const Vector2i &imgSize_rgb, const Vector2i &imgSize_d);
+  InfiniTamDriver(const ITMLibSettings* settings,
+                  const ITMRGBDCalib* calib,
+                  const Vector2i& imgSize_rgb,
+                  const Vector2i& imgSize_d);
 
   void ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage,
                     ITMIMUMeasurement *imuMeasurement = nullptr) override;
@@ -83,6 +85,13 @@ public:
   const ITMLibSettings* GetSettings() const {
     return settings;
   }
+
+//  const string& GetDatasetRoot() const {
+//    return dataset_root_;
+//  }
+
+ private:
+//  string dataset_root_;
 };
 
 } // namespace drivers

@@ -57,6 +57,9 @@ add_subdirectory(src/DynSLAM/InstRecLib)
 add_subdirectory(src/Pangolin)   # TODO-LOW(andrei): Enabling this causes strange linker issues.
 find_package(Pangolin REQUIRED)
 
+# Use the Google flag library for sane handling of command-line flags.
+add_subdirectory(src/gflags)
+
 IF(WITH_CUDA)
   include_directories(${CUDA_INCLUDE_DIRS})
 ELSE()
@@ -99,4 +102,4 @@ target_link_libraries(DynSLAMGUI ORUtils)
 target_link_libraries(DynSLAMGUI InstRecLib)
 target_link_libraries(DynSLAMGUI ${Pangolin_LIBRARIES})
 target_link_libraries(DynSLAMGUI ${OpenCV_LIBS})
-
+target_link_libraries(DynSLAMGUI gflags)

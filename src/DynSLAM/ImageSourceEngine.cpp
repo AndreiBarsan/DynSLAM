@@ -3,6 +3,7 @@
 #include "ImageSourceEngine.h"
 
 #include "../InfiniTAM/InfiniTAM/Utils/FileUtils.h"
+#include "Utils.h"
 
 #include <stdio.h>
 
@@ -10,7 +11,10 @@ using namespace dynslam;
 
 ImageSourceEngine::ImageSourceEngine(const char *calibFilename)
 {
-	readRGBDCalib(calibFilename, calib);
+	if (! readRGBDCalib(calibFilename, calib)) {
+		throw runtime_error(dynslam::utils::Format(
+				"Could not read calibration file: [%s]\n", calibFilename));
+	}
 }
 
 ImageFileReader::ImageFileReader(const char *calibFilename, const char *rgbImageMask, const char *depthImageMask)
