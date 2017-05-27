@@ -30,6 +30,7 @@ namespace InstRecLib {
 				printf("Initializing pre-computed segmentation provider.\n");
 
 				lastSegPreview_ = new ITMUChar4Image(true, false);
+              lastSegPreview_->Clear();
 			}
 
 			~PrecomputedSegmentationProvider() override {

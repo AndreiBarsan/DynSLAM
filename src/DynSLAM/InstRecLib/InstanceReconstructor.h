@@ -35,13 +35,6 @@ public:
       const Segmentation::InstanceSegmentationResult& segmentation_result
   );
 
-  // TODO(andrei): Check this.
-  /// \brief Experimental method since modifying ITMView* leads to weird results.
-  void ProcessRawFrame(
-      ITMUChar4Image *rgb,
-      ITMShortImage *depth,
-      const Segmentation::InstanceSegmentationResult &segmentation_result);
-
   const InstanceTracker& GetInstanceTracker() const {
     return *instance_tracker_;
   }
@@ -60,8 +53,9 @@ public:
 
   ITMFloatImage *GetInstancePreviewDepth(size_t track_idx);
 
-  void GetInstanceRaycastPreview(ITMUChar4Image *out) {
+  void GetInstanceRaycastPreview(ITMUChar4Image *out, int object_idx) {
     // hacky, for very early preview
+    // TODO use object_idx
     if (id_to_reconstruction_.cend() != id_to_reconstruction_.find(0)) {
       id_to_reconstruction_.at(0)->GetImage(out, ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST);
     }

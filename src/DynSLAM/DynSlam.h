@@ -39,22 +39,19 @@ public:
     return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_ORIGINAL_DEPTH);
   }
 
-  const unsigned char* GetObjectRaycastPreview() {
-    instance_reconstructor_->GetInstanceRaycastPreview(out_image_);
+  const unsigned char* GetObjectRaycastPreview(int object_idx) {
+    instance_reconstructor_->GetInstanceRaycastPreview(out_image_, object_idx);
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
   /// \brief Returns an RGBA unsigned char frame containing the preview of the most recent frame's
   /// semantic segmentation.
   const unsigned char* GetSegmentationPreview() {
-    // TODO(andrei): Get this right from our own dude.
-    // Placeholder
-    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_ORIGINAL_DEPTH);
+    return segmentationProvider->GetSegResult()->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
   /// \brief Returns an **RGBA** preview of the latest segmented object instance.
-  // TODO(andrei): Separate methods for char rgb and float depth.
-  const float* GetObjectPreview(int object_idx);
+  const unsigned char* GetObjectPreview(int object_idx);
 
   InstanceReconstructor* GetInstanceReconstructor() {
     return instance_reconstructor_;
