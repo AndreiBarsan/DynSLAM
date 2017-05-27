@@ -18,7 +18,8 @@ course of the next few months.
 Note that the system is under *heavy* development at the moment, so that these
 instructions could quickly go out of date. Generally speaking, this project is
 built using CMake, and it depends on several submodules. As such, make sure you
-don't forget the `--recursive` flag when cloning the repository.
+don't forget the `--recursive` flag when cloning the repository. If you did
+forget it, just run `git submodule update --init --recursive`.
 
  1. Clone the repository if you haven't already:
  ```bash
