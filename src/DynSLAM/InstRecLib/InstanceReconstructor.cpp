@@ -53,8 +53,7 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB, DEPTH_T *sourceDepth, Vector4u *
       // nicer way?
 
       int frame_idx = frame_row * frame_width + frame_col;
-
-      u_char mask_val = detection.mask->GetMask()->at<u_char>(row, col);
+      u_char mask_val = detection.mask->GetMaskData()->at<u_char>(row, col);
       if (mask_val == 1) {
         destRGB[frame_idx].r = sourceRGB[frame_idx].r;
         destRGB[frame_idx].g = sourceRGB[frame_idx].g;
