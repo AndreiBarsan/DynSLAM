@@ -168,7 +168,7 @@ void InstanceReconstructor::ProcessReconstructions() {
     // Since this is very memory-hungry, we restrict creation to the very
     // first things we see.
 //    if (track.GetId() < 3 || track.GetId() == 5) {
-    if (track.GetId() < 0) {
+    if (track.GetId() == 0) {
       if (id_to_reconstruction_.find(track.GetId()) == id_to_reconstruction_.cend()) {
         cout << endl << endl;
         cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl;
@@ -176,7 +176,7 @@ void InstanceReconstructor::ProcessReconstructions() {
 
         // Set a much smaller voxel block number for the reconstruction, since individual
         // objects occupy a limited amount of space in the scene.
-        settings->sdfLocalBlockNum = 1500;
+        settings->sdfLocalBlockNum = 1200;
         // We don't want to create an (expensive) meshing engine for every instance.
         settings->createMeshingEngine = false;
 
@@ -192,16 +192,10 @@ void InstanceReconstructor::ProcessReconstructions() {
         cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
       }
 
-      // This doesn't seem necessary, since we nab the instance view after the
-      // "global"
-      // UpdateView which processes the depth.
-      //          id_to_reconstruction_[track.GetId()]->UpdateView(rgb,
-      //          depth);
-      // This replaces the "UpdateView" call.
       InfiniTamDriver *instance_driver = id_to_reconstruction_[track.GetId()];
       instance_driver->SetView(track.GetLastFrame().instance_view.GetView());
-      // TODO(andrei): This seems like the place to shove in e.g., scene flow
-      // data.
+
+      // TODO(andrei): This seems like the place to shove in the scene flow data.
 
       cout << endl << endl << "Start instance integration for #" << track.GetId() << endl;
       instance_driver->Track();
