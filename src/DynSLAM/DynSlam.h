@@ -1,6 +1,7 @@
 #ifndef DYNSLAM_DYNSLAM_H
 #define DYNSLAM_DYNSLAM_H
 
+#include <pangolin/display/opengl_render_state.h>
 #include "ImageSourceEngine.h"
 
 #include "InfiniTamDriver.h"
@@ -43,6 +44,33 @@ public:
 
   const unsigned char* GetObjectRaycastPreview(int object_idx) {
     instance_reconstructor_->GetInstanceRaycastPreview(out_image_, object_idx);
+    return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
+  }
+
+  const unsigned char* GetObjectRaycastFreeViewPreview(
+      int object_idx,
+      const pangolin::OpenGlMatrix &model_view
+   ) {
+
+    // TODO helper function for this
+    Matrix4f M;
+    for(int i = 0; i < 16; ++i) {
+      M.m[i] = static_cast<float>(model_view.m[i]);
+    }
+
+    // TODO move to driver!
+    ITMPose itm_freeview_pose;
+//    itm_freeview_pose.SetInvM(M);
+    itm_freeview_pose.SetM(M);
+
+    // TODO(andrei): Finish implementing for actual objects. This now just works for static bg.
+
+    static_scene_->GetImage(
+        out_image_,
+        ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
+        &itm_freeview_pose,
+        &image_source_->calib.intrinsics_d);
+
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 

@@ -13,8 +13,6 @@
 
 // Commandline arguments
 DEFINE_string(dataset_root, "", "The root folder of the dataset to use.");
-DEFINE_string(nope_dataset_root, "", "The root folder of the dataset to use.");
-
 
 // TODO(andrei): Use [RIP] tags to signal spots where you wasted more than 30 minutes debugging a
 // small, silly issue.
@@ -91,8 +89,14 @@ public:
       pane_texture->RenderToViewport(true);
 
       depth_view_.Activate();
-      glColor3f(1.0, 0.0, 0.0);
-      pane_texture->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      glColor3f(1.0, 1.0, 1.0);
+//      pane_texture->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      pane_texture->Upload(
+          dyn_slam_->GetObjectRaycastFreeViewPreview(
+              visualized_object_idx_,
+              pane_cam_->GetModelViewMatrix()),
+          GL_RGBA,
+          GL_UNSIGNED_BYTE);
       pane_texture->RenderToViewport(true);
 
       segment_view_.Activate();
@@ -123,6 +127,8 @@ public:
 
       // Swap frames and Process Events
       pangolin::FinishFrame();
+
+      pangolin::OpenGlMatrix &mx = pane_cam_->GetModelViewMatrix();
     }
   }
 
@@ -209,12 +215,22 @@ protected:
     });
 
     // Define Camera Render Object (for view / scene browsing)
-    pangolin::OpenGlMatrix proj = pangolin::ProjectionMatrix(
-      width, height, 420, 420, width / 2, height / 2, 0.1, 1000);
+    proj_ = pangolin::ProjectionMatrix(width, height,
+                                      420, 420,
+                                      width / 2, height / 2,
+                                      0.1, 1000);
+
+    pangolin::OpenGlMatrix id = pangolin::OpenGlMatrix();
+    id.SetIdentity();
+    pane_cam_ = new pangolin::OpenGlRenderState(
+        proj_,
+        id);
 
     float aspect_ratio = static_cast<float>(width) / height;
     rgb_view_ = pangolin::Display("rgb").SetAspect(aspect_ratio);
-    depth_view_ = pangolin::Display("depth").SetAspect(aspect_ratio);
+    depth_view_ = pangolin::Display("depth").SetAspect(aspect_ratio)
+      .SetHandler(new pangolin::Handler3D(*pane_cam_));
+
     segment_view_ = pangolin::Display("segment").SetAspect(aspect_ratio);
     object_view_ = pangolin::Display("object").SetAspect(aspect_ratio);
     object_reconstruction_view_ = pangolin::Display("extra").SetAspect(aspect_ratio);
@@ -228,7 +244,7 @@ protected:
     active_instance_count_log_.SetLabels({"Active tracks"});
 
     // OpenGL 'view' of data such as the number of actively tracked instances over time.
-    plotter = new pangolin::Plotter(&active_instance_count_log_, 0.0f, 100.0f, -0.1f, 10.0f);
+    plotter_ = new pangolin::Plotter(&active_instance_count_log_, 0.0f, 100.0f, -0.1f, 10.0f);
 
     // TODO(andrei): Maybe wrap these guys in another controller, make it an equal layout and
     // automagically support way more aspect ratios?
@@ -241,7 +257,7 @@ protected:
       .AddDisplay(depth_view_)
       .AddDisplay(segment_view_)
       .AddDisplay(object_view_)
-      .AddDisplay(*plotter)
+      .AddDisplay(*plotter_)
       .AddDisplay(object_reconstruction_view_);
 
     // Internally, InfiniTAM stores these as RGBA, but we discard the alpha when we upload the
@@ -294,8 +310,11 @@ private:
   pangolin::View object_view_;
   pangolin::View object_reconstruction_view_;
 
+  pangolin::OpenGlMatrix proj_;
+  pangolin::OpenGlRenderState *pane_cam_;
+
   // Graph plotter and its data logger object
-  pangolin::Plotter *plotter;
+  pangolin::Plotter *plotter_;
   pangolin::DataLog active_instance_count_log_;
 
   pangolin::GlTexture *dummy_image_texture;
@@ -325,8 +344,7 @@ int main(int argc, char **argv) {
   using namespace dynslam;
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-//  const string dataset_root = FLAGS_dataset_root;
-  const string dataset_root = FLAGS_nope_dataset_root;
+  const string dataset_root = FLAGS_dataset_root;
   if (dataset_root.empty()) {
     cerr << "Please specify a dataset to work with. The --dataset_root=<path> flag must be set."
          << endl;
