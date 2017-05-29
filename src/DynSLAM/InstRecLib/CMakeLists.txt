@@ -7,6 +7,9 @@ FILE(GLOB INSTRECLIB_HEADERS *.h)
 FILE(GLOB INSTRECLIB_UTILS_SOURCES Utils/*.cpp)
 FILE(GLOB INSTRECLIB_UTILS_HEADERS Utils/*.h)
 
+find_package(Pangolin REQUIRED)
+include_directories(${Pangolin_INCLUDE_DIRS})
+
 IF(WITH_CUDA)
   include_directories(${CUDA_INCLUDE_DIRS})
 ELSE()

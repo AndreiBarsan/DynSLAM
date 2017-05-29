@@ -48,7 +48,12 @@ class InstanceReconstructor {
 
   ITMFloatImage *GetInstancePreviewDepth(size_t track_idx);
 
-  void GetInstanceRaycastPreview(ITMUChar4Image *out, int object_idx) {
+  // TODO(andrei): Operate with Eigen matrices everywhere for consistency.
+  void GetInstanceRaycastPreview(
+      ITMUChar4Image *out,
+      int object_idx,
+      const pangolin::OpenGlMatrix &model_view = pangolin::IdentityMatrix()
+  ) {
     int idx = object_idx;
     if (id_to_reconstruction_.find(idx) == id_to_reconstruction_.cend()) {
       // If we're not reconstructing that object, then display nothing.
@@ -56,7 +61,10 @@ class InstanceReconstructor {
     }
     else {
         id_to_reconstruction_.at(idx)->GetImage(
-            out, ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST);
+            out,
+//            ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST,
+            ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
+            model_view);
     }
   }
 
