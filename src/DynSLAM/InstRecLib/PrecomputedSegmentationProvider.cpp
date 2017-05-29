@@ -128,13 +128,9 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
         (void*) mask_pixels
     );
     auto mask = make_shared<Mask>(bounding_box, mask_cv_mat);
-    float mask_rescale_factor = 1.15f;
+    float mask_rescale_factor = 1.075f;
     mask->Rescale(mask_rescale_factor);
     detections.emplace_back(class_probability, class_id, mask, this->dataset_used);
-
-    // Experimental code
-//    cv::Size mask_size(bounding_box.GetWidth(), bounding_box.GetHeight());
-//    cv::Mat foo(bounding_box.GetHeight(), bounding_box.GetWidth(), CV_8UC1, (void*) mask_pixels);
 
     instance_idx++;
   }

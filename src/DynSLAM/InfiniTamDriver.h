@@ -3,6 +3,7 @@
 #ifndef DYNSLAM_INFINITAMDRIVER_H
 #define DYNSLAM_INFINITAMDRIVER_H
 
+#include <pangolin/pangolin.h>
 #include "../InfiniTAM/InfiniTAM/ITMLib/Engine/ITMMainEngine.h"
 #include "ImageSourceEngine.h"
 
@@ -69,12 +70,10 @@ public:
 
   void Integrate() {
     this->denseMapper->ProcessFrame(
-      // For separate integrations we'd need to compute the tracking state appropriately.
-      // We'd also prolly need a custom scene, and a custom renderState_live for each object.
-      // The scene actually holds the voxel hash. It's almost a POD.
-      // The render state is used for things like raycasting
-
       // We already generate our new view when splitting the input based on the segmentation.
+      // The tracking state is kept up-to-date by the tracker.
+      // The scene actually holds the voxel hash. It's almost a vanilla struct.
+      // The render state is used for things like raycasting
       this->view, this->trackingState, this->scene, this->renderState_live);
   }
 
@@ -87,12 +86,31 @@ public:
     return settings;
   }
 
-//  const string& GetDatasetRoot() const {
-//    return dataset_root_;
-//  }
+  void GetImage(
+      ITMUChar4Image *out,
+      GetImageType get_image_type,
+      const pangolin::OpenGlMatrix &model_view = pangolin::IdentityMatrix()
+  ) {
+    // TODO helper function for this
+    Matrix4f M;
+    for(int i = 0; i < 16; ++i) {
+      M.m[i] = static_cast<float>(model_view.m[i]);
+    }
 
- private:
-//  string dataset_root_;
+    ITMPose itm_freeview_pose;
+    itm_freeview_pose.SetM(M);
+    if (nullptr != this->view) {
+      ITMMainEngine::GetImage(
+          out,
+          get_image_type,
+          &itm_freeview_pose,
+          &this->view->calib->intrinsics_d);
+    }
+    else {
+      std::cerr << "Warning: no raycast available yet." << endl;
+    }
+  }
+
 };
 
 } // namespace drivers

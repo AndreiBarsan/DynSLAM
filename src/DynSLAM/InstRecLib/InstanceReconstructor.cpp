@@ -195,6 +195,8 @@ void InstanceReconstructor::ProcessReconstructions() {
       InfiniTamDriver *instance_driver = id_to_reconstruction_[track.GetId()];
       instance_driver->SetView(track.GetLastFrame().instance_view.GetView());
 
+      // TODO(andrei): Figure out a good estimate for the coord frame for the object.
+
       // TODO(andrei): This seems like the place to shove in the scene flow data.
 
       cout << endl << endl << "Start instance integration for #" << track.GetId() << endl;

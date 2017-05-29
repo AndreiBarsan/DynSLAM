@@ -127,8 +127,6 @@ public:
 
       // Swap frames and Process Events
       pangolin::FinishFrame();
-
-      pangolin::OpenGlMatrix &mx = pane_cam_->GetModelViewMatrix();
     }
   }
 
