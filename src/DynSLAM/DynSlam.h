@@ -71,6 +71,11 @@ public:
     return current_frame_no_;
   }
 
+  void SaveStaticMap() {
+    // TODO(andrei): Custom name, etc.
+    static_scene_->SaveSceneToMesh("mesh_out.stl");
+  }
+
 private:
   ITMLibSettings itm_lib_settings_;
   // TODO(andrei): Write custom image source.

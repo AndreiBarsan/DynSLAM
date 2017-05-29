@@ -183,8 +183,10 @@ protected:
     pangolin::CreatePanel("ui")
       .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(kUiWidth));
 
-    pangolin::Var<function<void(void)>> a_button("ui.Some Button", []() {
-      cout << "Clicked the button!" << endl;
+    pangolin::Var<function<void(void)>> a_button("ui.Save Static Map", [&]() {
+      cout << "Saving static map..." << endl;
+      dyn_slam_->SaveStaticMap();
+      cout << "Done saving map." << endl;
     });
     pangolin::Var<function<void(void)>> quit_button("ui.Quit Button", []() {
       pangolin::QuitAll();
