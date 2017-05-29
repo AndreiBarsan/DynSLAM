@@ -54,8 +54,8 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB, DEPTH_T *sourceDepth, Vector4u *
 
       int frame_idx = frame_row * frame_width + frame_col;
 
-      int mask = detection.mask->GetMask()[row][col];
-      if (mask == 1) {
+      u_char mask_val = detection.mask->GetMask()->at<u_char>(row, col);
+      if (mask_val == 1) {
         destRGB[frame_idx].r = sourceRGB[frame_idx].r;
         destRGB[frame_idx].g = sourceRGB[frame_idx].g;
         destRGB[frame_idx].b = sourceRGB[frame_idx].b;
@@ -168,6 +168,7 @@ void InstanceReconstructor::ProcessReconstructions() {
         cout << endl << endl;
         cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl;
         ITMLibSettings *settings = new ITMLibSettings(*driver->GetSettings());
+
         // Set a much smaller voxel block number for the reconstruction, since individual
         // objects occupy a limited amount of space in the scene.
         settings->sdfLocalBlockNum = 1500;
