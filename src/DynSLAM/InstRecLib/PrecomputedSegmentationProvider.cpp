@@ -128,6 +128,7 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
         (void*) mask_pixels
     );
     auto mask = make_shared<Mask>(bounding_box, mask_cv_mat);
+    mask->Rescale(1.2f);
     detections.emplace_back(class_probability, class_id, mask, this->dataset_used);
 
     // Experimental code
@@ -150,13 +151,8 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
 
   cv::Mat img = cv::imread(img_fpath);
 
-//  Vector2i newSize(img.cols, img.rows);
-//  last_seg_preview_->ChangeDims(newSize);
-//  Vector4u *data_h = last_seg_preview_->GetData(MEMORYDEVICE_CPU);
-
   // TODO(andrei): Utility to marshal between opencv images and cuda-style ones. Prefer working
   // directly in the ITM-preferred format, if possible with the opencv utilities.
-//  memcpy(data_h, img.data, img.total() * img.elemSize());
 
   stringstream meta_img_ss;
   meta_img_ss << this->segFolder_ << "/" << setfill('0') << setw(6) << this->frameIdx_ << ".png";
