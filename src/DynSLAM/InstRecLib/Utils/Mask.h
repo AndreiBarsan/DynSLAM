@@ -73,6 +73,8 @@ class Mask {
     cv::resize(*mask_data_, *tmp, tmp->size());
 
     bounding_box_ = BoundingBox(new_x0, new_y0, new_x1, new_y1);
+    assert(bounding_box_.GetWidth() == new_width);
+    assert(bounding_box_.GetHeight() == new_height);
 
     delete mask_data_;
     mask_data_ = tmp;

@@ -16,6 +16,7 @@ public:
   // modularity possible.
   static InfiniTamDriver* Build(const string &dataset_root, ImageSourceEngine** image_source) {
     ITMLibSettings *settings = new ITMLibSettings();
+
     const string calib_fpath = dataset_root + "/itm-calib.txt";
     const string rgb_image_format = dataset_root + "/precomputed-depth/Frames/%04i.ppm";
     const string depth_image_format = dataset_root + "/precomputed-depth/Frames/%04i.pgm";
