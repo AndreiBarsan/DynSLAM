@@ -52,6 +52,11 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB, DEPTH_T *sourceDepth, Vector4u *
       // TODO(andrei): Are the CPU-specific InfiniTAM functions doing this in a
       // nicer way?
 
+      if (frame_row < 0 || frame_row >= frame_height ||
+          frame_col < 0 || frame_col >= frame_width) {
+        continue;
+      }
+
       int frame_idx = frame_row * frame_width + frame_col;
       u_char mask_val = detection.mask->GetMaskData()->at<u_char>(row, col);
       if (mask_val == 1) {
@@ -162,7 +167,8 @@ void InstanceReconstructor::ProcessReconstructions() {
 
     // Since this is very memory-hungry, we restrict creation to the very
     // first things we see.
-    if (track.GetId() < 3 || track.GetId() == 5) {
+//    if (track.GetId() < 3 || track.GetId() == 5) {
+    if (track.GetId() < 0) {
       if (id_to_reconstruction_.find(track.GetId()) == id_to_reconstruction_.cend()) {
         cout << endl << endl;
         cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl;
@@ -171,6 +177,8 @@ void InstanceReconstructor::ProcessReconstructions() {
         // Set a much smaller voxel block number for the reconstruction, since individual
         // objects occupy a limited amount of space in the scene.
         settings->sdfLocalBlockNum = 1500;
+        // We don't want to create an (expensive) meshing engine for every instance.
+        settings->createMeshingEngine = false;
 
         id_to_reconstruction_.emplace(make_pair(
             track.GetId(),

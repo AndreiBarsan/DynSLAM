@@ -128,7 +128,8 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
         (void*) mask_pixels
     );
     auto mask = make_shared<Mask>(bounding_box, mask_cv_mat);
-    mask->Rescale(1.2f);
+    float mask_rescale_factor = 1.15f;
+    mask->Rescale(mask_rescale_factor);
     detections.emplace_back(class_probability, class_id, mask, this->dataset_used);
 
     // Experimental code
