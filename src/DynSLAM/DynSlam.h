@@ -52,24 +52,12 @@ public:
       const pangolin::OpenGlMatrix &model_view
    ) {
 
-    // TODO helper function for this
-    Matrix4f M;
-    for(int i = 0; i < 16; ++i) {
-      M.m[i] = static_cast<float>(model_view.m[i]);
-    }
-
-    // TODO move to driver!
-    ITMPose itm_freeview_pose;
-//    itm_freeview_pose.SetInvM(M);
-    itm_freeview_pose.SetM(M);
-
     // TODO(andrei): Finish implementing for actual objects. This now just works for static bg.
 
     static_scene_->GetImage(
         out_image_,
         ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
-        &itm_freeview_pose,
-        &image_source_->calib.intrinsics_d);
+        model_view);
 
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
