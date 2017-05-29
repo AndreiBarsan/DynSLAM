@@ -17,7 +17,7 @@ class PrecomputedSegmentationProvider : public SegmentationProvider {
  private:
   std::string segFolder_;
   int frameIdx_ = 0;
-  ITMUChar4Image *lastSegPreview_;
+  ITMUChar4Image *last_seg_preview_;
   const SegmentationDataset *dataset_used;
 
  protected:
@@ -28,11 +28,11 @@ class PrecomputedSegmentationProvider : public SegmentationProvider {
       : segFolder_(segFolder), dataset_used(&kPascalVoc2012) {
     printf("Initializing pre-computed segmentation provider.\n");
 
-    lastSegPreview_ = new ITMUChar4Image(true, false);
-    lastSegPreview_->Clear();
+    last_seg_preview_ = new ITMUChar4Image(true, false);
+    last_seg_preview_->Clear();
   }
 
-  ~PrecomputedSegmentationProvider() override { delete lastSegPreview_; }
+  ~PrecomputedSegmentationProvider() override { delete last_seg_preview_; }
 
   std::shared_ptr<InstanceSegmentationResult> SegmentFrame(ITMUChar4Image *view) override;
 
