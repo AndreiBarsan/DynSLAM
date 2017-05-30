@@ -155,7 +155,7 @@ public:
     pangolin::GlFont &font = pangolin::GlFont::I();
 
     auto &instanceTracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
-    for (const auto &pair: instanceTracker.GetTracks()) {
+    for (const auto &pair: instanceTracker.GetActiveTracks()) {
       Track &track = instanceTracker.GetTrack(pair.first);
       // Nothing to do for tracks with we didn't see this frame.
       if (track.GetLastFrame().frame_idx != dyn_slam_->GetCurrentFrameNo() - 1) {
