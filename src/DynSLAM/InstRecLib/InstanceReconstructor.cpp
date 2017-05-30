@@ -126,7 +126,6 @@ void InstanceReconstructor::ProcessFrame(
 }
 
 ITMUChar4Image *InstanceReconstructor::GetInstancePreviewRGB(size_t track_idx) {
-  const auto &tracks = instance_tracker_->GetActiveTracks();
   if (! instance_tracker_->HasTrack(track_idx)) {
     return nullptr;
   }
@@ -152,8 +151,8 @@ void InstanceReconstructor::ProcessReconstructions() {
   for (auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
 
-//    if (track.GetId() < 3 || track.GetId() == 5) {
-    if (track.GetId() != 0) {
+    if (track.GetId() > 5) {
+//    if (track.GetId() != 0) {
       // Since this is very memory-hungry, we (hackily) restrict creation to the very first things
       // we see.
 //      cout << "Won't create voxel volume for instance #" << track.GetId() << " in the current"
@@ -192,13 +191,13 @@ void InstanceReconstructor::ProcessReconstructions() {
           driver->GetView()->rgb->noDims,
           driver->GetView()->rgb->noDims);
 
-      // TODO(andrei): Get the tracking to work correctly!
       // If we already have some frames, integrate them into the new volume.
       for(int i = 0; i < static_cast<int>(track.GetSize()) - 1; ++i) {
         TrackFrame &frame = track.GetFrame(i);
         InfiniTamDriver &reconstruction = *(track.GetReconstruction());
 
         reconstruction.SetView(frame.instance_view.GetView());
+        // TODO account for gaps in the track!
         reconstruction.Track();
         reconstruction.Integrate();
         reconstruction.PrepareNextStep();

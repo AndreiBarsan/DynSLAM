@@ -142,6 +142,8 @@ public:
           ),
           GL_RGBA,
           GL_UNSIGNED_BYTE);
+      pangolin::GlFont &font = pangolin::GlFont::I();
+      font.Text("Instance #%d", visualized_object_idx_).Draw(-1.0, 0.9);
       pane_texture->RenderToViewport(true);
 
       // Update various elements in the toolbar on the left.
@@ -243,10 +245,11 @@ protected:
                                        1000, 1000,
                                        width / 2, height / 2,
                                        0.1, 1000);
-
     pane_cam_ = new pangolin::OpenGlRenderState(
         proj_,
-        pangolin::ModelViewLookAt(0, 0, 0, 0, 0, -1, pangolin::AxisY));
+        pangolin::ModelViewLookAt(0, 0, 0,
+                                  0, 0, -1,
+                                  pangolin::AxisY));
 
     // TODO(andrei): Set dynamically based on where instances are detected.
     instance_cam_ = new pangolin::OpenGlRenderState(
@@ -312,13 +315,27 @@ protected:
   }
 
   void SelectNextVisualizedObject() {
-    int active_tracks = dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount();
-    if (visualized_object_idx_ < active_tracks - 1) {
-      visualized_object_idx_++;
-    }
-    else {
+    // We pick the closest next object (by ID). We need to do this because some tracks may no
+    // longer be available.
+    InstanceTracker &tracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
+    int closest_next_id = -1;
+    int closest_next_delta = std::numeric_limits<int>::max();
+
+    if (tracker.GetActiveTrackCount() == 0) {
       visualized_object_idx_ = 0;
+      return;
     }
+
+    for(const auto &pair : tracker.GetActiveTracks()) {
+      int id = pair.first;
+      int delta = id - visualized_object_idx_;
+      if (delta < closest_next_delta && delta != 0) {
+        closest_next_delta = delta;
+        closest_next_id = id;
+      }
+    }
+
+    visualized_object_idx_ = closest_next_id;
   }
 
   void SelectPreviousVisualizedObject() {
@@ -341,8 +358,6 @@ protected:
 
     const double kBytesToGb = 1.0 / 1024.0 / 1024.0 / 1024.0;
     double free_gpu_gb = static_cast<float>(free_gpu_memory_bytes) * kBytesToGb;
-    cout << "Free GPU memory:" << free_gpu_gb << endl;
-    cout << active_object_count_ << endl;
     data_log_.Log(
         active_object_count_,
         static_cast<float>(free_gpu_gb) * 10.0f    // Mini-hack to make the scales better
