@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <list>
+#include <map>
 #include <vector>
 
 #include "InstanceSegmentationResult.h"
@@ -35,7 +36,9 @@ const int kDefaultInactiveFrameThreshold = 3;
 class InstanceTracker {
  private:
   /// \brief The tracks of the objects being currently tracked.
-  std::vector<Track> active_tracks_;
+//  std::vector<Track> active_tracks_;
+  // TODO(andrei): Rename to reflect that these are ACTIVE tracks.
+  std::map<int, Track> id_to_track_;
 
   /// \brief The maximum age of the latest frame in a track, before it is
   /// discarded.
@@ -47,6 +50,7 @@ class InstanceTracker {
   int track_count_;
 
  protected:
+  /// \brief Constant meant to be returned by track matching code when no match is found.
   static constexpr std::pair<Track*, float> kNoBestTrack = std::pair<Track*, float>(nullptr, 0.0f);
 
   /// \brief Finds the most likely track for the given frame, if it exists.
@@ -65,23 +69,39 @@ class InstanceTracker {
 
  public:
   InstanceTracker()
-      : active_tracks_(std::vector<Track>()),
+//      : active_tracks_(std::vector<Track>()),
+        : id_to_track_(std::map<int, Track>()),
         inactive_frame_threshold_(kDefaultInactiveFrameThreshold),
         track_count_(0) {}
 
-  /// \brief Associates the new detections with existing tracks, or creates new
-  /// ones.
+  /// \brief Associates the new detections with existing tracks, or creates new ones.
   /// \param new_detections The instances detected in the current frame.
   void ProcessInstanceViews(int frame_idx, const std::vector<InstanceView>& new_detections);
 
-  std::vector<Track>& GetTracks() { return active_tracks_; }
-
-  const std::vector<Track>& GetTracks() const { return active_tracks_; }
+//  const std::vector<Track>& GetTracks() const { return active_tracks_; }
 
   /// \see track_count_
   int GetTotalTrackCount() const { return track_count_; }
 
-  int GetActiveTrackCount() const { return static_cast<int>(active_tracks_.size()); }
+//  int GetActiveTrackCount() const { return static_cast<int>(active_tracks_.size()); }
+  int GetActiveTrackCount() const { return static_cast<int>(id_to_track_.size()); }
+
+  /// \brief Checks whether a track for the specified object ID is available as an active track.
+  bool HasTrack(int id) const {
+    return id_to_track_.find(id) != id_to_track_.cend();
+  }
+
+  const Track& GetTrack(int id) const {
+    return id_to_track_.at(id);
+  }
+
+  Track& GetTrack(int id) {
+    return id_to_track_.at(id);
+  }
+
+  const std::map<int, Track>& GetTracks() const {
+    return id_to_track_;
+  };
 };
 
 }  // namespace segmentation

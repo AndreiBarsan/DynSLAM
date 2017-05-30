@@ -16,7 +16,7 @@ class InstanceView {
                const std::shared_ptr<ITMLib::Objects::ITMView>& view_)
       : instance_detection_(instance_detection_), view_(view_) {}
 
-  virtual ~InstanceView() {}
+  virtual ~InstanceView() { }
 
   ITMLib::Objects::ITMView* GetView() { return view_.get(); }
 

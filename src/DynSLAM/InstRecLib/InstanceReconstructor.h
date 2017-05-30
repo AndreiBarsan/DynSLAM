@@ -55,17 +55,24 @@ class InstanceReconstructor {
       const pangolin::OpenGlMatrix &model_view = pangolin::IdentityMatrix()
   ) {
     int idx = object_idx;
-    if (id_to_reconstruction_.find(idx) == id_to_reconstruction_.cend()) {
+    if (instance_tracker_->HasTrack(object_idx)) {
+      instance_tracker_->GetTrack(object_idx).GetReconstruction()->GetImage(
+
+//      id_to_reconstruction_.at(idx)->GetImage(
+          out,
+//            ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST,
+          ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
+          model_view);
+    }
+    else {
       // If we're not reconstructing that object, then display nothing.
       out->Clear();
     }
-    else {
-        id_to_reconstruction_.at(idx)->GetImage(
-            out,
-//            ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST,
-            ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
-            model_view);
-    }
+  }
+
+  template<typename T>
+  bool Contains(const std::vector<T>& v, const T& el) {
+    return std::find(std::begin(v), std::end(v), el) != std::end(v);
   }
 
  private:
