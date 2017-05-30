@@ -42,8 +42,8 @@ public:
     return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_ORIGINAL_DEPTH);
   }
 
-  const unsigned char* GetObjectRaycastPreview(int object_idx) {
-    instance_reconstructor_->GetInstanceRaycastPreview(out_image_, object_idx);
+  const unsigned char* GetObjectRaycastPreview(int object_idx, const pangolin::OpenGlMatrix &model_view) {
+    instance_reconstructor_->GetInstanceRaycastPreview(out_image_, object_idx, model_view);
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 

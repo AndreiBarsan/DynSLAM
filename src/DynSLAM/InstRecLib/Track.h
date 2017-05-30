@@ -62,6 +62,9 @@ class Track {
 
   const std::vector<TrackFrame>& GetFrames() const { return frames_; }
 
+  const TrackFrame& GetFrame(int i) const { return frames_[i]; }
+  TrackFrame& GetFrame(int i) { return frames_[i]; }
+
   int GetId() const { return id_; }
 
   /// \brief Draws a visual representation of this feature track.
@@ -79,6 +82,14 @@ class Track {
 
   const std::shared_ptr<dynslam::drivers::InfiniTamDriver>& GetReconstruction() const {
     return reconstruction;
+  }
+
+  /// \brief Uses a series of ``goodness heuristics'' to establish whether the information
+  /// contained in this track's frames is good enough for a 3D reconstruction.
+  /// TODO(andrei): Consider delegating this task to a separate (highly configurable) class.
+  bool EligibleForReconstruction() const {
+    // For now, use this simple heuristic.
+    return GetSize() > 5;
   }
 };
 

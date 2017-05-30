@@ -152,49 +152,77 @@ void InstanceReconstructor::ProcessReconstructions() {
   for (auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
 
-    // Since this is very memory-hungry, we (hackily) restrict creation to the very first things
-    // we see.
 //    if (track.GetId() < 3 || track.GetId() == 5) {
-    if (track.GetId() == 0) {
-      if (! track.HasReconstruction()) {
-        // No reconstruction yet, let's initialize one.
-        cout << endl << endl;
-        cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl;
-        ITMLibSettings *settings = new ITMLibSettings(*driver->GetSettings());
+    if (track.GetId() != 0) {
+      // Since this is very memory-hungry, we (hackily) restrict creation to the very first things
+      // we see.
+//      cout << "Won't create voxel volume for instance #" << track.GetId() << " in the current"
+//           << " experimental mode." << endl;
+      continue;
+    }
 
-        // Set a much smaller voxel block number for the reconstruction, since individual objects
-        // occupy a limited amount of space in the scene.
-        settings->sdfLocalBlockNum = 1200;
-        // We don't want to create an (expensive) meshing engine for every instance.
-        settings->createMeshingEngine = false;
+    if (! track.HasReconstruction()) {
+      bool eligible = track.EligibleForReconstruction();
 
-        track.GetReconstruction() = make_shared<InfiniTamDriver>(
-            settings,
-            driver->GetView()->calib,
-            driver->GetView()->rgb->noDims,
-            driver->GetView()->rgb->noDims);
-      } else {
-        // TODO(andrei): Use some heuristic to avoid cases which are obviously
-        // crappy.
-        cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
+      if (! eligible) {
+        // The frame data we have is insufficient, so we won't try to reconstruct the object
+        // (yet).
+        continue;
       }
 
-      InfiniTamDriver &instance_driver = *track.GetReconstruction();
-      instance_driver.SetView(track.GetLastFrame().instance_view.GetView());
+      // No reconstruction yet, let's initialize one.
+      cout << endl << endl;
+      cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl << endl;
+      ITMLibSettings *settings = new ITMLibSettings(*driver->GetSettings());
 
-      // TODO(andrei): Figure out a good estimate for the coord frame for the object.
-      // TODO(andrei): This seems like the place to shove in the scene flow data.
+      // Set a much smaller voxel block number for the reconstruction, since individual objects
+      // occupy a limited amount of space in the scene.
+      settings->sdfLocalBlockNum = 1200;
+      // We don't want to create an (expensive) meshing engine for every instance.
+      settings->createMeshingEngine = false;
+      // Make the ground truth tracker start from the current frame, and not from the default
+      // 0th frame.
+      settings->groundTruthPoseOffset = 0;
+      // TODO(andrei): Do the same once you support proper tracking, since you will need to
+      // initialize the instance's "tracker" with some pose, or change the tracker used, etc.
 
-      cout << endl << endl << "Start instance integration for #" << track.GetId() << endl;
-      instance_driver.Track();
-      instance_driver.Integrate();
-      instance_driver.PrepareNextStep();
+      track.GetReconstruction() = make_shared<InfiniTamDriver>(
+          settings,
+          driver->GetView()->calib,
+          driver->GetView()->rgb->noDims,
+          driver->GetView()->rgb->noDims);
 
-      cout << endl << endl << "Finished instance integration." << endl;
+      // TODO(andrei): Get the tracking to work correctly!
+      // If we already have some frames, integrate them into the new volume.
+      for(int i = 0; i < static_cast<int>(track.GetSize()) - 1; ++i) {
+        TrackFrame &frame = track.GetFrame(i);
+        InfiniTamDriver &reconstruction = *(track.GetReconstruction());
+
+        reconstruction.SetView(frame.instance_view.GetView());
+        reconstruction.Track();
+        reconstruction.Integrate();
+        reconstruction.PrepareNextStep();
+      }
+
+
     } else {
-      cout << "Won't create voxel volume for instance #" << track.GetId() << " in the current"
-           << " experimental mode." << endl;
+      // TODO(andrei): Use some heuristic to avoid cases which are obviously
+      // crappy.
+      cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
     }
+
+    InfiniTamDriver &instance_driver = *track.GetReconstruction();
+    instance_driver.SetView(track.GetLastFrame().instance_view.GetView());
+
+    // TODO(andrei): Figure out a good estimate for the coord frame for the object.
+    // TODO(andrei): This seems like the place to shove in the scene flow data.
+
+    cout << endl << endl << "Start instance integration for #" << track.GetId() << endl;
+    instance_driver.Track();
+    instance_driver.Integrate();
+    instance_driver.PrepareNextStep();
+
+    cout << endl << endl << "Finished instance integration." << endl;
   }
 }
 
