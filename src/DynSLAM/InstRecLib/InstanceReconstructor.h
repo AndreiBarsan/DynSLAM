@@ -50,7 +50,6 @@ class InstanceReconstructor {
       int object_idx,
       const pangolin::OpenGlMatrix &model_view = pangolin::IdentityMatrix()
   ) {
-    int idx = object_idx;
     if (instance_tracker_->HasTrack(object_idx)) {
       Track& track = instance_tracker_->GetTrack(object_idx);
       if (track.HasReconstruction()) {
