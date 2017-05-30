@@ -29,24 +29,18 @@ const float kTrackScoreThreshold = 0.15f;
 /// object reconstructions into multiple volumes.
 const int kDefaultInactiveFrameThreshold = 3;
 
-/// \brief Tracks instances over time by associating multiple isolated
-/// detections.
-// TODO(andrei): Once complete, refactor this into an interface +
-// MaxOverlapTracker.
+/// \brief Tracks instances over time by associating multiple isolated detections.
+/// Currently implemented by best-overlap using the bounding boxes.
+// TODO(andrei): Once complete, refactor this into an interface + MaxOverlapTracker.
 class InstanceTracker {
  private:
-  /// \brief The tracks of the objects being currently tracked.
-//  std::vector<Track> active_tracks_;
-  // TODO(andrei): Rename to reflect that these are ACTIVE tracks.
-  std::map<int, Track> id_to_track_;
+  std::map<int, Track> id_to_active_track_;
 
-  /// \brief The maximum age of the latest frame in a track, before it is
-  /// discarded.
+  /// \brief The maximum age of the latest frame in a track, before it is discarded.
   /// The higher this is, the more tracks are held in memory.
   int inactive_frame_threshold_;
 
-  /// \brief The total number of tracks seen, including both active and pruned
-  /// tracks.
+  /// \brief The total number of tracks seen, including both active and pruned tracks.
   int track_count_;
 
  protected:
@@ -69,8 +63,7 @@ class InstanceTracker {
 
  public:
   InstanceTracker()
-//      : active_tracks_(std::vector<Track>()),
-        : id_to_track_(std::map<int, Track>()),
+      : id_to_active_track_(std::map<int, Track>()),
         inactive_frame_threshold_(kDefaultInactiveFrameThreshold),
         track_count_(0) {}
 
@@ -78,29 +71,26 @@ class InstanceTracker {
   /// \param new_detections The instances detected in the current frame.
   void ProcessInstanceViews(int frame_idx, const std::vector<InstanceView>& new_detections);
 
-//  const std::vector<Track>& GetTracks() const { return active_tracks_; }
-
   /// \see track_count_
   int GetTotalTrackCount() const { return track_count_; }
 
-//  int GetActiveTrackCount() const { return static_cast<int>(active_tracks_.size()); }
-  int GetActiveTrackCount() const { return static_cast<int>(id_to_track_.size()); }
+  int GetActiveTrackCount() const { return static_cast<int>(id_to_active_track_.size()); }
 
   /// \brief Checks whether a track for the specified object ID is available as an active track.
   bool HasTrack(int id) const {
-    return id_to_track_.find(id) != id_to_track_.cend();
+    return id_to_active_track_.find(id) != id_to_active_track_.cend();
   }
 
   const Track& GetTrack(int id) const {
-    return id_to_track_.at(id);
+    return id_to_active_track_.at(id);
   }
 
   Track& GetTrack(int id) {
-    return id_to_track_.at(id);
+    return id_to_active_track_.at(id);
   }
 
-  const std::map<int, Track>& GetTracks() const {
-    return id_to_track_;
+  const std::map<int, Track>& GetActiveTracks() const {
+    return id_to_active_track_;
   };
 };
 

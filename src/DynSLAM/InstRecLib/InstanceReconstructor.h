@@ -16,17 +16,14 @@ namespace reconstruction {
 
 using namespace dynslam::drivers;
 
-/// \brief Pipeline component responsible for reconstructing the individual
-/// object instances.
+/// \brief Pipeline component responsible for reconstructing the individual object instances.
 class InstanceReconstructor {
  public:
   InstanceReconstructor(InfiniTamDriver *driver)
       : instance_tracker_(new InstanceTracker()), frame_idx_(0), driver(driver) {}
 
-  /// \brief Uses the segmentation result to remove dynamic objects from the
-  /// main view and save
-  /// them to separate buffers, which are then used for individual object
-  /// reconstruction.
+  /// \brief Uses the segmentation result to remove dynamic objects from the main view and save
+  /// them to separate buffers, which are then used for individual object reconstruction.
   ///
   /// This is the ``meat'' of the reconstruction engine.
   ///
@@ -41,8 +38,7 @@ class InstanceReconstructor {
 
   int GetActiveTrackCount() const { return instance_tracker_->GetActiveTrackCount(); }
 
-  /// \brief Returns a snapshot of one of the stored instance segments, if
-  /// available.
+  /// \brief Returns a snapshot of one of the stored instance segments, if available.
   /// This method is primarily designed for visualization purposes.
   ITMUChar4Image *GetInstancePreviewRGB(size_t track_idx);
 
@@ -57,10 +53,7 @@ class InstanceReconstructor {
     int idx = object_idx;
     if (instance_tracker_->HasTrack(object_idx)) {
       instance_tracker_->GetTrack(object_idx).GetReconstruction()->GetImage(
-
-//      id_to_reconstruction_.at(idx)->GetImage(
           out,
-//            ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST,
           ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
           model_view);
     }
@@ -78,17 +71,14 @@ class InstanceReconstructor {
  private:
   std::shared_ptr<InstanceTracker> instance_tracker_;
 
-  // TODO(andrei): Consider keeping track of this in centralized manner and not
-  // just in UIEngine.
+  // TODO(andrei): Consider keeping track of this in centralized manner in DynSLAM.
   /// \brief The current input frame number.
-  /// Useful for, e.g., keeping track of when we last saw a car, so we can
-  /// better associate
+  /// Useful for, e.g., keeping track of when we last saw a car, so we can better associate
   /// detections through time, and dump old-enough reconstructions to the disk.
   int frame_idx_;
 
   std::map<int, InfiniTamDriver *> id_to_reconstruction_;
-  // A bit hacky, but used as a "template" when allocating new reconstructors
-  // for objects.
+  // A bit hacky, but used as a "template" when allocating new reconstructors for objects.
   InfiniTamDriver *driver;
 
   void ProcessReconstructions();

@@ -23,13 +23,11 @@ void InstanceTracker::ProcessInstanceViews(int frame_idx, const vector<InstanceV
   // 2. For leftover detections, put them into new, single-frame, tracks.
   cout << new_track_frames.size() << " new unassigned frames." << endl;
   for (const TrackFrame &track_frame : new_track_frames) {
-//    cout << "New track created. ID = " << track_count_ << "." << endl;
     int track_id = track_count_;
     track_count_++;
     Track new_track(track_id);
     new_track.AddFrame(track_frame);
-//    this->active_tracks_.push_back(new_track);
-    this->id_to_track_.emplace(make_pair(track_id, new_track));
+    this->id_to_active_track_.emplace(make_pair(track_id, new_track));
   }
 
   // 3. Iterate through existing tracks, find ``expired'' ones, and discard them.
@@ -37,24 +35,13 @@ void InstanceTracker::ProcessInstanceViews(int frame_idx, const vector<InstanceV
 }
 
 void InstanceTracker::PruneTracks(int current_frame_idx) {
-//  auto it = active_tracks_.begin();
-//  while (it != active_tracks_.end()) {
-//    int last_active = it->GetEndTime();
-//    int frame_delta = current_frame_idx - last_active;
-//
-//    if (frame_delta > inactive_frame_threshold_) {
-//      it = active_tracks_.erase(it);
-//    } else {
-//      ++it;
-//    }
-//  }
-  auto it = id_to_track_.begin();
-  while (it != id_to_track_.end()) {
+  auto it = id_to_active_track_.begin();
+  while (it != id_to_active_track_.end()) {
     int last_active = it->second.GetEndTime();
     int frame_delta = current_frame_idx - last_active;
 
     if (frame_delta > inactive_frame_threshold_) {
-      it = id_to_track_.erase(it);
+      it = id_to_active_track_.erase(it);
     } else {
       ++it;
     }
@@ -62,18 +49,14 @@ void InstanceTracker::PruneTracks(int current_frame_idx) {
 }
 
 std::pair<Track *, float> InstanceTracker::FindBestTrack(const TrackFrame &track_frame) {
-//  if (active_tracks_.empty()) {
-//    return kNoBestTrack;
-//  }
-  if (id_to_track_.empty()) {
+  if (id_to_active_track_.empty()) {
     return kNoBestTrack;
   }
 
   float best_score = -1.0f;
   Track *best_track = nullptr;
 
-//  for (Track &track : active_tracks_) {
-  for (auto &entry : id_to_track_) {
+  for (auto &entry : id_to_active_track_) {
     const Track& track = entry.second;
     float score = track.ScoreMatch(track_frame);
     if (score > best_score) {

@@ -18,22 +18,16 @@ template <typename DEPTH_T>
 void ProcessSilhouette_CPU(Vector4u *sourceRGB, DEPTH_T *sourceDepth, Vector4u *destRGB,
                            DEPTH_T *destDepth, Vector2i sourceDims,
                            const InstanceDetection &detection) {
-  // Blanks out the detection's silhouette in the 'source' frames, and writes
-  // its pixels into
-  // the output frames.
-  // Initially, the dest frames will be the same size as the source ones, but
-  // this is wasteful
-  // in terms of memory: we should use bbox+1-sized buffers in the future, since
-  // most
+  // Blanks out the detection's silhouette in the 'source' frames, and writes its pixels into the
+  // output frames. Initially, the dest frames will be the same size as the source ones, but this
+  // is wasteful in terms of memory: we should use bbox+1-sized buffers in the future, since most
   // silhouettes are relatively small wrt the size of the whole frame.
   //
-  // Moreover, we should be able to pass in several output buffer addresses and
-  // a list of
-  // detections to the CUDA kernel, and do all the ``splitting up'' work in one
-  // kernel call. We
-  // may need to add support for the adaptive-size output buffers, since
-  // otherwise writing to
-  // e.g., 5-6 output buffers may end up using up way too much GPU memory.
+  // Moreover, we should be able to pass in several output buffer addresses and a list of
+  // detections to the CUDA kernel, and do all the ``splitting up'' work in one kernel call. We
+  // may need to add support for the adaptive-size output buffers, since otherwise writing to
+  // e.g., 5-6 full-size output buffers from the same kernel may end up using up way too much GPU
+  // memory.
 
   int frame_width = sourceDims[0];
   int frame_height = sourceDims[1];
@@ -89,14 +83,11 @@ void InstanceReconstructor::ProcessFrame(
 
   vector<InstanceView> new_instance_views;
   for (const InstanceDetection &instance_detection : segmentation_result.instance_detections) {
-    // At this stage of the project, we only care about cars. In the future,
-    // this scheme could
-    // be extended to also support other classes, as well as any unknown, but
-    // moving, objects.
+    // At this stage of the project, we only care about cars. In the future, this scheme could be
+    // extended to also support other classes, as well as any unknown, but moving, objects.
     if (instance_detection.class_id == kPascalVoc2012.label_to_id.at("car")) {
       Vector2i frame_size = main_view->rgb->noDims;
-      // bool use_gpu = main_view->rgb->isAllocated_CUDA; // May need to modify
-      // 'MemoryBlock' to
+      // bool use_gpu = main_view->rgb->isAllocated_CUDA; // May need to modify 'MemoryBlock' to
       // check this, since the field is private.
       bool use_gpu = true;
 
@@ -127,7 +118,7 @@ void InstanceReconstructor::ProcessFrame(
   main_view->depth->UpdateDeviceFromHost();
 
   // ``Graphically'' display the object tracks for debugging.
-  for (const auto &pair: this->instance_tracker_->GetTracks()) {
+  for (const auto &pair: this->instance_tracker_->GetActiveTracks()) {
     cout << "Track: " << pair.second.GetAsciiArt() << endl;
   }
 
@@ -135,21 +126,16 @@ void InstanceReconstructor::ProcessFrame(
 }
 
 ITMUChar4Image *InstanceReconstructor::GetInstancePreviewRGB(size_t track_idx) {
-  const auto &tracks = instance_tracker_->GetTracks();
-  if (tracks.empty()) {
+  const auto &tracks = instance_tracker_->GetActiveTracks();
+  if (! instance_tracker_->HasTrack(track_idx)) {
     return nullptr;
   }
 
-  size_t idx = track_idx;
-  if (idx >= tracks.size()) {
-    idx = tracks.size() - 1;
-  }
-
-  return tracks.at(idx).GetLastFrame().instance_view.GetView()->rgb;
+  return instance_tracker_->GetTrack(track_idx).GetLastFrame().instance_view.GetView()->rgb;
 }
 
 ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) {
-  const auto &tracks = instance_tracker_->GetTracks();
+  const auto &tracks = instance_tracker_->GetActiveTracks();
   if (tracks.empty()) {
     return nullptr;
   }
@@ -163,11 +149,11 @@ ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) 
 }
 void InstanceReconstructor::ProcessReconstructions() {
   // TODO loop through keys only since we want to do all track accesses through the instance tracker for constness reasons
-  for (auto &pair : instance_tracker_->GetTracks()) {
+  for (auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
 
-    // Since this is very memory-hungry, we (hackily) restrict creation to the very first
-    // things we see.
+    // Since this is very memory-hungry, we (hackily) restrict creation to the very first things
+    // we see.
 //    if (track.GetId() < 3 || track.GetId() == 5) {
     if (track.GetId() == 0) {
       if (! track.HasReconstruction()) {
@@ -176,8 +162,8 @@ void InstanceReconstructor::ProcessReconstructions() {
         cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl;
         ITMLibSettings *settings = new ITMLibSettings(*driver->GetSettings());
 
-        // Set a much smaller voxel block number for the reconstruction, since individual
-        // objects occupy a limited amount of space in the scene.
+        // Set a much smaller voxel block number for the reconstruction, since individual objects
+        // occupy a limited amount of space in the scene.
         settings->sdfLocalBlockNum = 1200;
         // We don't want to create an (expensive) meshing engine for every instance.
         settings->createMeshingEngine = false;
