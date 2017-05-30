@@ -52,15 +52,20 @@ class InstanceReconstructor {
   ) {
     int idx = object_idx;
     if (instance_tracker_->HasTrack(object_idx)) {
-      instance_tracker_->GetTrack(object_idx).GetReconstruction()->GetImage(
-          out,
-          ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
-          model_view);
+      Track& track = instance_tracker_->GetTrack(object_idx);
+      if (track.HasReconstruction()) {
+        track.GetReconstruction()->GetImage(
+            out,
+            ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
+            model_view);
+
+        return;
+      }
     }
-    else {
-      // If we're not reconstructing that object, then display nothing.
-      out->Clear();
-    }
+
+    // If we're not tracking the object, or if it has no reconstruction available, then there's
+    // nothing to display.
+    out->Clear();
   }
 
   template<typename T>

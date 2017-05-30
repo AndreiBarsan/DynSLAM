@@ -3,6 +3,8 @@
 #ifndef DYNSLAM_INFINITAMDRIVER_H
 #define DYNSLAM_INFINITAMDRIVER_H
 
+#include <iostream>
+
 #include <pangolin/pangolin.h>
 #include "../InfiniTAM/InfiniTAM/ITMLib/Engine/ITMMainEngine.h"
 #include "ImageSourceEngine.h"
@@ -102,6 +104,12 @@ public:
 
     ITMPose itm_freeview_pose;
     itm_freeview_pose.SetM(M);
+
+//    using namespace std;
+//    std::cout << endl << "M:" << endl << itm_freeview_pose.GetM() << std::endl;
+//    itm_freeview_pose.Coerce();
+//    std::cout << itm_freeview_pose.GetM().
+
     if (nullptr != this->view) {
       if(nullptr == this->view->calib) {
         // TODO(andrei): Check this out.. it seems to happen when a car's trail gets collected, but
