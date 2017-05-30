@@ -1,12 +1,14 @@
 
+#include <atomic>
+#include <chrono>
 #include <iostream>
+#include <sys/time.h>
 
-#include <pangolin/pangolin.h>
-
+#include <backward.hpp>
 #include <gflags/gflags.h>
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
-#include <backward.hpp>
+#include <pangolin/pangolin.h>
 
 #include "DynSlam.h"
 #include "Utils.h"
@@ -73,13 +75,12 @@ public:
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       glColor3f(1.0, 1.0, 1.0);
 
-      // TODO(andrei): Only use Pangolin camera if not PITA. Otherwise, can just base everything off
-      // InfiniTAM's raycasting.
       main_view->Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
       const unsigned char *slam_frame_data = dyn_slam_->GetRaycastPreview();
 
-      // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance!
+      // Render the real-time graph(s)
+      // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance, so you get dark, uncolored images.
       pane_texture->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
       pane_texture->RenderToViewport(true);
 
@@ -91,6 +92,24 @@ public:
       depth_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
 //      pane_texture->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+
+      struct timeval tp;
+      gettimeofday(&tp, NULL);
+      double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+      double time_scale = 500.0;
+      double r = 0.5;
+      double cx = cos(time_ms / time_scale) * r;
+
+      double cy = sin(time_ms / time_scale) * r - r;
+
+      double cz = sin(time_ms / time_scale) * r;
+      pane_cam_->SetModelViewMatrix(
+          pangolin::ModelViewLookAt(
+              0,  0.0, 1.0,
+              0,  0.5 + cy,  -1.0,
+              pangolin::AxisY)
+      );
+
       pane_texture->Upload(
           dyn_slam_->GetObjectRaycastFreeViewPreview(
               visualized_object_idx_,
@@ -135,8 +154,9 @@ public:
   void DrawInstanceLables() const {
     pangolin::GlFont &font = pangolin::GlFont::I();
 
-    const auto &instanceTracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
-    for (const auto &track : instanceTracker.GetTracks()) {
+    auto &instanceTracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
+    for (const auto &pair: instanceTracker.GetTracks()) {
+      Track &track = instanceTracker.GetTrack(pair.first);
       // Nothing to do for tracks with we didn't see this frame.
       if (track.GetLastFrame().frame_idx != dyn_slam_->GetCurrentFrameNo() - 1) {
         continue;
@@ -183,7 +203,7 @@ protected:
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // GUI stuff
+    // GUI components
     pangolin::CreatePanel("ui")
       .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(kUiWidth));
 
@@ -191,9 +211,6 @@ protected:
       cout << "Saving static map..." << endl;
       dyn_slam_->SaveStaticMap();
       cout << "Done saving map." << endl;
-    });
-    pangolin::Var<function<void(void)>> quit_button("ui.Quit Button", []() {
-      pangolin::QuitAll();
     });
     reconstructions = new pangolin::Var<string>("ui.Rec", "");
 
@@ -206,28 +223,26 @@ protected:
       SelectNextVisualizedObject();
     });
     pangolin::RegisterKeyPressCallback('n', [&]() {
-      float val = dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount();
-      active_instance_count_log_.Log(val);
-
-      dyn_slam_->ProcessFrame();
+      this->ProcessFrame();
+    });
+    pangolin::Var<function<void(void)>> quit_button("ui.Quit", []() {
+      pangolin::QuitAll();
     });
 
-    // Define Camera Render Object (for view / scene browsing)
+    // This is used for the free view camera.
     proj_ = pangolin::ProjectionMatrix(width, height,
-                                      420, 420,
+                                      0.1, 0.1,
                                       width / 2, height / 2,
                                       0.1, 1000);
 
-    pangolin::OpenGlMatrix id = pangolin::OpenGlMatrix();
-    id.SetIdentity();
     pane_cam_ = new pangolin::OpenGlRenderState(
         proj_,
-        id);
+        pangolin::ModelViewLookAt(0, 0, 2, 0, 0, -3, pangolin::AxisY));
 
     float aspect_ratio = static_cast<float>(width) / height;
     rgb_view_ = pangolin::Display("rgb").SetAspect(aspect_ratio);
-    depth_view_ = pangolin::Display("depth").SetAspect(aspect_ratio)
-      .SetHandler(new pangolin::Handler3D(*pane_cam_));
+    depth_view_ = pangolin::Display("depth").SetAspect(aspect_ratio);
+//      .SetHandler(new pangolin::Handler3D(*pane_cam_));
 
     segment_view_ = pangolin::Display("segment").SetAspect(aspect_ratio);
     object_view_ = pangolin::Display("object").SetAspect(aspect_ratio);
@@ -239,10 +254,12 @@ protected:
     detail_views_ = &(pangolin::Display("detail"));
 
     // Add labels to our data logs (and automatically to our plots).
-    active_instance_count_log_.SetLabels({"Active tracks"});
+    data_log_.SetLabels({"Active tracks", "Free GPU Memory (100s of MiB)"});
 
     // OpenGL 'view' of data such as the number of actively tracked instances over time.
-    plotter_ = new pangolin::Plotter(&active_instance_count_log_, 0.0f, 100.0f, -0.1f, 10.0f);
+    float tick_x = 1.0f;
+    float tick_y = 1.0f;
+    plotter_ = new pangolin::Plotter(&data_log_, 0.0f, 100.0f, -0.1f, 25.0f, tick_x, tick_y);
 
     // TODO(andrei): Maybe wrap these guys in another controller, make it an equal layout and
     // automagically support way more aspect ratios?
@@ -294,6 +311,27 @@ protected:
     }
   }
 
+  /// \brief Advances to the next input frame, and integrates it into the map.
+  void ProcessFrame() {
+    active_object_count = dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount();
+
+    size_t free_gpu_memory_bytes;
+    size_t total_gpu_memory_bytes;
+    cudaMemGetInfo(&free_gpu_memory_bytes, &total_gpu_memory_bytes);
+
+    const double kBytesToGb = 1.0 / 1024.0 / 1024.0 / 1024.0;
+    double free_gpu_gb = static_cast<float>(free_gpu_memory_bytes) * kBytesToGb;
+    cout << "Free GPU memory:" << free_gpu_gb << endl;
+    cout << active_object_count << endl;
+    data_log_.Log(
+        active_object_count,
+        static_cast<float>(free_gpu_gb) * 10.0f    // Mini-hack to make the scales better
+    );
+
+    // Main workhorse function of the underlying SLAM system.
+    dyn_slam_->ProcessFrame();
+  }
+
 private:
   DynSlam *dyn_slam_;
 
@@ -313,7 +351,7 @@ private:
 
   // Graph plotter and its data logger object
   pangolin::Plotter *plotter_;
-  pangolin::DataLog active_instance_count_log_;
+  pangolin::DataLog data_log_;
 
   pangolin::GlTexture *dummy_image_texture;
   pangolin::GlTexture *pane_texture;
@@ -321,6 +359,10 @@ private:
   pangolin::Var<string> *reconstructions;
 
   cv::Mat dummy_img;
+
+  // Atomic because it gets set from a UI callback. Technically, Pangolin shouldn't invoke callbacks
+  // from a different thread, but using atomics for this is generally a good practice anyway.
+  atomic<int> active_object_count;
 
   // Indicates which object is currently being visualized in the GUI.
   int visualized_object_idx_ = 0;

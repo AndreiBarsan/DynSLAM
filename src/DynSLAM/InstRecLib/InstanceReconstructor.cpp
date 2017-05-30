@@ -99,7 +99,12 @@ void InstanceReconstructor::ProcessFrame(
       // 'MemoryBlock' to
       // check this, since the field is private.
       bool use_gpu = true;
-      auto view = make_shared<ITMView>(main_view->calib, frame_size, frame_size, use_gpu);
+
+      // TODO(andrei): Release these objects! They leak now.
+      ITMRGBDCalib *calibration = new ITMRGBDCalib;
+      *calibration = *main_view->calib;
+
+      auto view = make_shared<ITMView>(calibration, frame_size, frame_size, use_gpu);
       auto rgb_segment_h = view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
       auto depth_segment_h = view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
@@ -122,8 +127,8 @@ void InstanceReconstructor::ProcessFrame(
   main_view->depth->UpdateDeviceFromHost();
 
   // ``Graphically'' display the object tracks for debugging.
-  for (const Track &track : this->instance_tracker_->GetTracks()) {
-    cout << "Track: " << track.GetAsciiArt() << endl;
+  for (const auto &pair: this->instance_tracker_->GetTracks()) {
+    cout << "Track: " << pair.second.GetAsciiArt() << endl;
   }
 
   frame_idx_++;
@@ -140,7 +145,7 @@ ITMUChar4Image *InstanceReconstructor::GetInstancePreviewRGB(size_t track_idx) {
     idx = tracks.size() - 1;
   }
 
-  return tracks[idx].GetLastFrame().instance_view.GetView()->rgb;
+  return tracks.at(idx).GetLastFrame().instance_view.GetView()->rgb;
 }
 
 ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) {
@@ -154,22 +159,19 @@ ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) 
     idx = tracks.size() - 1;
   }
 
-  return tracks[idx].GetLastFrame().instance_view.GetView()->depth;
+  return tracks.at(idx).GetLastFrame().instance_view.GetView()->depth;
 }
 void InstanceReconstructor::ProcessReconstructions() {
-  for (Track &track : instance_tracker_->GetTracks()) {
-    // TODO(andrei): proper heuristic to determine which tracks are worth
-    // reconstructing, e.g.,
-    // based on slice surface, length, gaps, etc.
+  // TODO loop through keys only since we want to do all track accesses through the instance tracker for constness reasons
+  for (auto &pair : instance_tracker_->GetTracks()) {
+    Track& track = instance_tracker_->GetTrack(pair.first);
 
-    // TODO wait until a track is ``good enough,'' then retroactively rebuild it from all
-    // available frames.
-
-    // Since this is very memory-hungry, we restrict creation to the very
-    // first things we see.
+    // Since this is very memory-hungry, we (hackily) restrict creation to the very first
+    // things we see.
 //    if (track.GetId() < 3 || track.GetId() == 5) {
     if (track.GetId() == 0) {
-      if (id_to_reconstruction_.find(track.GetId()) == id_to_reconstruction_.cend()) {
+      if (! track.HasReconstruction()) {
+        // No reconstruction yet, let's initialize one.
         cout << endl << endl;
         cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl;
         ITMLibSettings *settings = new ITMLibSettings(*driver->GetSettings());
@@ -180,29 +182,27 @@ void InstanceReconstructor::ProcessReconstructions() {
         // We don't want to create an (expensive) meshing engine for every instance.
         settings->createMeshingEngine = false;
 
-        id_to_reconstruction_.emplace(make_pair(
-            track.GetId(),
-            new InfiniTamDriver(settings,
-                                driver->GetView()->calib,
-                                driver->GetView()->rgb->noDims,
-                                driver->GetView()->rgb->noDims)));
+        track.GetReconstruction() = make_shared<InfiniTamDriver>(
+            settings,
+            driver->GetView()->calib,
+            driver->GetView()->rgb->noDims,
+            driver->GetView()->rgb->noDims);
       } else {
         // TODO(andrei): Use some heuristic to avoid cases which are obviously
         // crappy.
         cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
       }
 
-      InfiniTamDriver *instance_driver = id_to_reconstruction_[track.GetId()];
-      instance_driver->SetView(track.GetLastFrame().instance_view.GetView());
+      InfiniTamDriver &instance_driver = *track.GetReconstruction();
+      instance_driver.SetView(track.GetLastFrame().instance_view.GetView());
 
       // TODO(andrei): Figure out a good estimate for the coord frame for the object.
-
       // TODO(andrei): This seems like the place to shove in the scene flow data.
 
       cout << endl << endl << "Start instance integration for #" << track.GetId() << endl;
-      instance_driver->Track();
-      instance_driver->Integrate();
-      instance_driver->PrepareNextStep();
+      instance_driver.Track();
+      instance_driver.Integrate();
+      instance_driver.PrepareNextStep();
 
       cout << endl << endl << "Finished instance integration." << endl;
     } else {
