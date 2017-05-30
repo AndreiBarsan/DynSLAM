@@ -6,6 +6,7 @@
 #include <vector>
 #include "InstanceSegmentationResult.h"
 #include "InstanceView.h"
+#include "../InfiniTamDriver.h"
 
 namespace instreclib {
 namespace reconstruction {
@@ -25,19 +26,21 @@ struct TrackFrame {
 };
 
 /// \brief A detected object's track through multiple frames.
-/// Modeled as a series of detections, contained in the 'frames' field. Note
-/// that there can
-/// be gaps in this list, due to frames where this particular object was not
-/// detected.
+/// Modeled as a series of detections, contained in the 'frames' field. Note that there can be
+/// gaps in this list, due to frames where this particular object was not detected.
 class Track {
  private:
   /// \brief A unique identifier for this particular track.
   int id_;
   std::vector<TrackFrame> frames_;
 
+  /// \brief A pointer to a 3D reconstruction of the object in this track.
+  /// Is set to `nullptr` if no reconstruction is available.
+  std::shared_ptr<dynslam::drivers::InfiniTamDriver> reconstruction;
+
  public:
-  Track(int id) : id_(id) {}
-  virtual ~Track() {}
+  Track(int id) : id_(id), reconstruction(nullptr) {}
+  virtual ~Track() { }
 
   /// \brief Evaluates how well this new frame would fit the existing track.
   /// \returns A goodness score between 0 and 1, where 0 means the new frame
@@ -67,6 +70,16 @@ class Track {
   /// representation would look as follows:
   ///    [                                 11 12 13      16]
   std::string GetAsciiArt() const;
+
+  bool HasReconstruction() const { return reconstruction.get() != nullptr; }
+
+  std::shared_ptr<dynslam::drivers::InfiniTamDriver>& GetReconstruction() {
+    return reconstruction;
+  }
+
+  const std::shared_ptr<dynslam::drivers::InfiniTamDriver>& GetReconstruction() const {
+    return reconstruction;
+  }
 };
 
 }  // namespace reconstruction
