@@ -41,6 +41,13 @@ void InstanceTracker::PruneTracks(int current_frame_idx) {
     int frame_delta = current_frame_idx - last_active;
 
     if (frame_delta > inactive_frame_threshold_) {
+      if (it->second.HasReconstruction()) {
+        // Before deallocating the track's instance reconstructor, we delete its reference to the
+        // latest view in that track, since that view object is managed by the track object, and
+        // shouldn't be deleted by InfiniTAM's destructor (not doing this leads to a double free
+        // error).
+        it->second.GetReconstruction()->SetView(nullptr);
+      }
       it = id_to_active_track_.erase(it);
     } else {
       ++it;
