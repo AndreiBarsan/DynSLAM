@@ -68,7 +68,6 @@ public:
 
   void Track() {
     // Consider leveraging sparse scene flow here, for dynamic instances, maybe?
-
     this->trackingController->Track(this->trackingState, this->view);
   }
 
@@ -105,20 +104,7 @@ public:
     ITMPose itm_freeview_pose;
     itm_freeview_pose.SetM(M);
 
-//    using namespace std;
-//    std::cout << endl << "M:" << endl << itm_freeview_pose.GetM() << std::endl;
-//    itm_freeview_pose.Coerce();
-//    std::cout << itm_freeview_pose.GetM().
-
     if (nullptr != this->view) {
-      if(nullptr == this->view->calib) {
-        // TODO(andrei): Check this out.. it seems to happen when a car's trail gets collected, but
-        // its reconstruction stays in memory. I think the view gets deallocated and this->view
-        // becomes stale.
-        cout << "Unexpected for view to be OK but calib nil. " << endl;
-        return;
-      }
-
       ITMIntrinsics intrinsics = this->view->calib->intrinsics_d;
       ITMMainEngine::GetImage(
           out,
@@ -127,7 +113,8 @@ public:
           &intrinsics);
     }
     else {
-      std::cerr << "Warning: no raycast available yet." << endl;
+      // We're before the very first frame, so no raycast is available yet.
+//      std::cerr << "Warning: no raycast available yet." << endl;
     }
   }
 

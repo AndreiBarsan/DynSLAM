@@ -89,7 +89,7 @@ class Track {
   /// TODO(andrei): Consider delegating this task to a separate (highly configurable) class.
   bool EligibleForReconstruction() const {
     // For now, use this simple heuristic.
-    return GetSize() > 5;
+    return GetSize() >= 7;
   }
 };
 
