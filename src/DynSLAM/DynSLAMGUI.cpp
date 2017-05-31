@@ -3,6 +3,7 @@
 #include <chrono>
 #include <iostream>
 #include <sys/time.h>
+#include <thread>
 
 #include <backward.hpp>
 #include <gflags/gflags.h>
@@ -152,6 +153,8 @@ public:
         dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount()
       );
 
+      cout << "Main loop thread: " << std::this_thread::get_id() << endl;
+
       // Swap frames and Process Events
       pangolin::FinishFrame();
     }
@@ -217,6 +220,7 @@ protected:
 
     pangolin::Var<function<void(void)>> a_button("ui.Save Static Map", [&]() {
       cout << "Saving static map..." << endl;
+      cout << "Static map save button callback thread: " << std::this_thread::get_id() << endl;
       dyn_slam_->SaveStaticMap();
       cout << "Done saving map." << endl;
     });
