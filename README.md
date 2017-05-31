@@ -25,22 +25,25 @@ forget it, just run `git submodule update --init --recursive`.
  ```bash
  git clone --recursive https://github.com/AndreiBarsan/DynSLAM
  ```
+ 2. Install OpenCV 2.4.9 and CUDA (no special version requirements at the moment).
  
- 1. Install OpenCV 2.4.9 and CUDA (no special version requirements at the moment).
+ 3. Install the remaining prerequisites (Ubuntu example):
+ ```bash
+ sudo apt-get install libxmu-dev libxi-dev freeglut3 freeglut3-dev glew-utils libglew-dev libglew-dbg
+ ```
  
- 2. Build the project in the standard CMake fashion:
+ 4. Build the project in the standard CMake fashion:
  ```bash
  mkdir build && cd build && cmake .. && make -j
  ```
- 
- 3. Grab any raw KITTI data sequence [from the official website](http://www.cvlibs.net/datasets/kitti/raw_data.php). Make sure it's a synced+rectified
+ 5. Grab any raw KITTI data sequence [from the official website](http://www.cvlibs.net/datasets/kitti/raw_data.php). Make sure it's a synced+rectified
  sequence.
  
- 3. Use the [MNC pre-trained neural network](http://github.com/AndreiBarsan/MNC)
+ 6. Use the [MNC pre-trained neural network](http://github.com/AndreiBarsan/MNC)
     to process the KITTI sequence. In the future, this will be integrated into
     the main pipeline but right now Caffe is a bit capricious.
     
- 3. (TODO; right now many things are hard-coded, sorry :( ) Run the pipeline on
+ 7. (TODO; right now many things are hard-coded, sorry :( ) Run the pipeline on
  the KITTI sequence you downloaded.
  ```bash
  ./DynSLAM path/to/kitti/sequence
