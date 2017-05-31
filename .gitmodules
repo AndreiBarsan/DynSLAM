@@ -7,3 +7,6 @@
 [submodule "src/gflags"]
 	path = src/gflags
 	url = https://github.com/gflags/gflags
+[submodule "src/pfmLib"]
+	path = src/pfmLib
+	url = https://github.com/dscharstein/pfmLib

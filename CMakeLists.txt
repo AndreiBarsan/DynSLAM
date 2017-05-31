@@ -80,7 +80,10 @@ add_subdirectory(src/DynSLAM/InstRecLib)
 set(DYNSLAM_SOURCES
     src/DynSLAM/ImageSourceEngine.cpp
     src/DynSLAM/Utils.cpp
-    src/DynSLAM/DynSlam.cpp src/DynSLAM/InfiniTamDriver.cpp src/DynSLAM/InfiniTamDriver.h)
+    src/DynSLAM/DynSlam.cpp
+    src/DynSLAM/InfiniTamDriver.cpp
+    # A tiny library for working with portable float map (PFM) files.
+    src/pfmLib/ImageIOpfm.cpp)
 set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
     src/DynSLAM/DynSLAMGUI.cpp)
