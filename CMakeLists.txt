@@ -46,15 +46,11 @@ ENDIF()
 # Set some additional common compilation flags, like C++11 feature support.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-# TODO(andrei): You may want to have these dependencies in src/DynSLAM/CMakeLists.txt.
-add_subdirectory(src/InfiniTAM/InfiniTAM)
-add_subdirectory(src/DynSLAM/InstRecLib)
-
 # We use Pangolin for the main GUI. Pangolin is a lightweight GUI library focused on visual
 # applications with minimal support for multiple panels, widgets, and live plotting.
 # Note that this part *must* be after the CUDA setup, lest you get errors about hidden symbols
 # referenced by some DSO.
-add_subdirectory(src/Pangolin)   # TODO-LOW(andrei): Enabling this causes strange linker issues.
+#add_subdirectory(src/Pangolin)   # TODO-LOW(andrei): Enabling this causes strange linker issues.
 find_package(Pangolin REQUIRED)
 
 # Use the Google flag library for sane handling of command-line flags.
@@ -76,6 +72,10 @@ find_package(OpenCV REQUIRED)
 include_directories(${Pangolin_INCLUDE_DIRS})
 include_directories(${OpenCV_INCLUDE_DIRS})
 
+# TODO(andrei): You may want to have these dependencies in src/DynSLAM/CMakeLists.txt.
+add_subdirectory(src/InfiniTAM/InfiniTAM)
+add_subdirectory(src/DynSLAM/InstRecLib)
+
 # TODO(andrei): Make dynslam a library, and link the GUI with it.
 set(DYNSLAM_SOURCES
     src/DynSLAM/ImageSourceEngine.cpp
@@ -87,17 +87,18 @@ set(DYNSLAM_GUI_SOURCES
 
 add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
 
-target_link_libraries(DynSLAM ${OpenCV_LIBS})
-# TODO(andrei): Rename this to ITMEngine or something for clarity.
-target_link_libraries(DynSLAM Engine)
-# TODO(andrei): Ditto. These are the InfiniTAM utilities!
-target_link_libraries(DynSLAM Utils)
-target_link_libraries(DynSLAM ORUtils)
-target_link_libraries(DynSLAM InstRecLib)
+#target_link_libraries(DynSLAM ${OpenCV_LIBS})
+## TODO(andrei): Rename this to ITMEngine or something for clarity.
+#target_link_libraries(DynSLAM Engine)
+## TODO(andrei): Ditto. These are the InfiniTAM utilities!
+#target_link_libraries(DynSLAM Utils)
+#target_link_libraries(DynSLAM ORUtils)
+#target_link_libraries(DynSLAM InstRecLib)
 
 add_executable(DynSLAMGUI ${DYNSLAM_GUI_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
 target_link_libraries(DynSLAMGUI Engine)
 target_link_libraries(DynSLAMGUI Utils)
+target_link_libraries(DynSLAMGUI ITMLib)
 target_link_libraries(DynSLAMGUI ORUtils)
 target_link_libraries(DynSLAMGUI InstRecLib)
 target_link_libraries(DynSLAMGUI ${Pangolin_LIBRARIES})
