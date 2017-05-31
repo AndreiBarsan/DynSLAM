@@ -18,7 +18,7 @@
  - [ ] View (ITMView) adapter class.
  - [ ] Image adapter class.
  - [ ] Custom MemoryBlock class?
- - [ ] Custom Matrix classes?
+ - [ ] Custom Matrix classes? (Eigen, maybe?)
  - [ ] Custom Vector classes?
  - [ ] Ensure headers are lean.
  - [ ] clang-format or equivalent IDE-agnostic code formatter
@@ -32,6 +32,7 @@
  - [ ] Set up trivial way to run clang-tidy
  - [ ] Set up trivial way to run clang-format; see: https://github.com/kbenzie/git-cmake-format/blob/master/CMakeLists.txt
  - [ ] Maybe run clang-format on commit
+ - [ ] [VERY LOW] Set up pfmLib as CMake project
 
  
 

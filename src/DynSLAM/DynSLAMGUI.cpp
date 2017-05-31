@@ -3,7 +3,6 @@
 #include <chrono>
 #include <iostream>
 #include <sys/time.h>
-#include <thread>
 
 #include <backward.hpp>
 #include <gflags/gflags.h>
@@ -13,6 +12,8 @@
 
 #include "DynSlam.h"
 #include "Utils.h"
+
+#include "../pfmLib/ImageIOpfm.h"
 
 // Commandline arguments
 DEFINE_string(dataset_root, "", "The root folder of the dataset to use.");
@@ -153,8 +154,6 @@ public:
         dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount()
       );
 
-      cout << "Main loop thread: " << std::this_thread::get_id() << endl;
-
       // Swap frames and Process Events
       pangolin::FinishFrame();
     }
@@ -220,7 +219,6 @@ protected:
 
     pangolin::Var<function<void(void)>> a_button("ui.Save Static Map", [&]() {
       cout << "Saving static map..." << endl;
-      cout << "Static map save button callback thread: " << std::this_thread::get_id() << endl;
       dyn_slam_->SaveStaticMap();
       cout << "Done saving map." << endl;
     });
@@ -305,11 +303,28 @@ protected:
     // Internally, InfiniTAM stores these as RGBA, but we discard the alpha when we upload the
     // textures for visualization (hence the 'GL_RGB' specification).
     this->pane_texture = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+
+    // DispNet outputs depth maps as 32-bit float single-channel HDR images. Yes, not a lot of
+    // programs can load them natively for manual inspection. Photoshop can,
+    cv::Mat im(370, 1226, CV_32FC1);
+    cv::Mat preview(370, 1226, CV_8UC1);
+
+    // FWIW it takes DispNet about 50 seconds to chew through a 1101 image kitti sequence at full
+    // resolution (this includes the network initialization overhead AND dumping the images to the
+    // disk). This means ~0.05s/frame, or 20 FPS.
+    const string pfm_path = "/home/barsana/datasets/kitti/odometry-dataset/sequences/06/precomputed-depth-dispnet/000000.pfm";
+    ReadFilePFM(im, pfm_path);
+
+    im.convertTo(preview, CV_8UC1, 1.0);
+
+    cv::imshow("PFM depth map preview", preview);
+    cv::waitKey(0);
   }
 
   void SetupDummyImage() {
     cout << "Loading George..." << endl;
     dummy_img = cv::imread("/home/andrei/Pictures/george.jpg");
+
 
     cv::flip(dummy_img, dummy_img, kCvFlipVertical);
     const int george_width = dummy_img.cols;
