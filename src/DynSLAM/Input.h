@@ -73,43 +73,53 @@ class Input {
     memcpy(data_ptr, mat.data, mat.rows * mat.cols * sizeof(short));
   }
 
-  // TODO get rid of this and use other format
-  void GetITMImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
+  // TODO get rid of this and use some other format
+  /// \brief Reads from the input folders into the specified InfiniTAM buffers.
+  /// \return True if the images could be loaded and processed appropriately.
+  bool GetITMImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
     std::string left_folder = dataset_folder_ + "/image_2";
     std::string right_folder = dataset_folder_ + "/image_3";
     std::string rgb_frame_fname_format = "%06d.png";
     std::string left_frame_fpath = GetRgbFrameName(left_folder, rgb_frame_fname_format, frame_idx_);
     std::string right_frame_fpath = GetRgbFrameName(right_folder, rgb_frame_fname_format, frame_idx_);
-//    cv::Mat left_frame_buf_ = cv::imread(left_frame_fpath);
-//    cv::Mat right_frame_buf_ = cv::imread(right_frame_fpath);
+    left_frame_buf_ = cv::imread(left_frame_fpath);
+    right_frame_buf_ = cv::imread(right_frame_fpath);
 
-    // The left frame is our RGB.
-//    CvToItm(left_frame_buf_, rgb);
-    std::string rgb_hack_fpath = utils::Format(
-        "%s/%s/%s/%04d.ppm", dataset_folder_.c_str(), "precomputed-depth", "Frames", frame_idx_);
+    // Sanity checks to ensure the dimensions from the calibration file and the actual image
+    // dimensions correspond.
+    const auto &rgb_size = GetRgbSize();
+    if (left_frame_buf_.rows != rgb_size.height || left_frame_buf_.cols != rgb_size.width) {
+      std::cerr << "Unexpected left RGB frame size. Got " << left_frame_buf_.size() << ", but "
+                << "the calibration file specified " << rgb_size << ".";
+      return false;
+    }
 
-    if(! ReadImageFromFile(rgb, rgb_hack_fpath.c_str())) {
-      throw std::runtime_error(rgb_hack_fpath.c_str());
+    if (right_frame_buf_.rows != rgb_size.height || right_frame_buf_.cols != rgb_size.width) {
+      std::cerr << "Unexpected right RGB frame size. Got " << right_frame_buf_.size() << ", but "
+                << "the calibration file specified " << rgb_size << ".";
+      return false;
+    }
+
+    // The left frame is the RGB input to our system.
+    CvToItm(left_frame_buf_, rgb);
+
+    depth_engine_->DisparityMapFromStereo(left_frame_buf_, right_frame_buf_, depth_buf_);
+
+    const auto &depth_size = GetDepthSize();
+    if (depth_buf_.rows != depth_size.height || depth_buf_.cols != depth_size.width) {
+      std::cerr << "Unexpected depth map size. Got [" << depth_buf_.size() << "], but the "
+                << "calibration file specified [" << depth_size << "].";
+      return false;
     }
 
     // TODO(andrei): Make sure you actually use this. ATM, libelas-tooling's kitti2klg does the
     // depth from disparity calculation!
 //    StereoCalibration stereo_calibration(0, 0);
-
-//    cv::Mat depth_buf_;
-//    depth_engine_->DisparityMapFromStereo(left_frame_buf_, right_frame_buf_, depth_buf_);
 //    depth_engine_->DepthFromDisparityMap(disparity, stereo_calibration, depth);
-
-//    CvToItm(depth_buf_, raw_depth);
-
-    std::string depth_hack_fpath = utils::Format(
-        "%s/%s/%s/%04d.pgm", dataset_folder_.c_str(), "precomputed-depth", "Frames", frame_idx_
-    );
-    if(! ReadImageFromFile(raw_depth, depth_hack_fpath.c_str())) {
-      throw std::runtime_error(utils::Format("Nope: %s", depth_hack_fpath));
-    }
+    CvToItm(depth_buf_, raw_depth);
 
     frame_idx_++;
+    return true;
   }
 
   ITMLib::Objects::ITMRGBDCalib GetITMCalibration() {
@@ -117,13 +127,18 @@ class Input {
     return calibration_;
   };
 
-//  cv::Vec2i GetRgbSize() {
-//    return cv::Vec2i(left_frame_buf_.cols, left_frame_buf_.rows);
-//  }
-//
-//  cv::Vec2i GetDepthSize() {
-//    return cv::Vec2i(depth_buf_.cols, depth_buf_.rows);
-//  }
+  cv::Size2i GetRgbSize() {
+    return cv::Size2i(static_cast<int>(calibration_.intrinsics_rgb.sizeX),
+                     static_cast<int>(calibration_.intrinsics_rgb.sizeY));
+  }
+
+  /// \note The ordering of the coordinates, in accordance with the OpenCV conventions.
+  // TODO remove this comment
+
+  cv::Size2i GetDepthSize() {
+    return cv::Size2i(static_cast<int>(calibration_.intrinsics_d.sizeX),
+                      static_cast<int>(calibration_.intrinsics_d.sizeY));
+  }
 
  private:
   DepthEngine *depth_engine_;
@@ -131,10 +146,10 @@ class Input {
   std::string dataset_folder_;
   int frame_idx_;
 
-//  cv::Mat left_frame_buf_;
-//  cv::Mat right_frame_buf_;
-//  cv::Mat depth_buf_;
-//  cv::Mat disparity_buf_;
+  cv::Mat left_frame_buf_;
+  cv::Mat right_frame_buf_;
+  cv::Mat depth_buf_;
+  cv::Mat disparity_buf_;
 
   // TODO get rid of this
   ITMLib::Objects::ITMRGBDCalib calibration_;
