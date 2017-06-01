@@ -315,6 +315,7 @@ protected:
     const string pfm_path = "/home/barsana/datasets/kitti/odometry-dataset/sequences/06/precomputed-depth-dispnet/000000.pfm";
     ReadFilePFM(im, pfm_path);
 
+    // Convert the 32-bit "HDR" depth into something we can display.
     im.convertTo(preview, CV_8UC1, 1.0);
 
     cv::imshow("PFM depth map preview", preview);
