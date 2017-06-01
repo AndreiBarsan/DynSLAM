@@ -20,6 +20,8 @@ struct StereoCalibration {
 /// return their results into pre-allocated out parameters.
 class DepthEngine {
  public:
+  virtual ~DepthEngine() {}
+
   /// \brief Computes a disparity map from
   virtual void DisparityMapFromStereo(const cv::Mat &left,
                                       const cv::Mat &right,
@@ -39,11 +41,16 @@ class DepthEngine {
                                      cv::Mat &out_depth) {
     for(int i = 0; i < disparity.rows; ++i) {
       for(int j = 0; j < disparity.cols; ++j) {
-        out_depth.at<float>(i, j) = DepthFromDisparity(disparity.at<float>(i, j), calibration);
+        using namespace std;
+        cout << i << ", " << j << " " << disparity.cols << " x " << disparity.cols << endl;
+        out_depth.at<short>(i, j) = DepthFromDisparity(disparity.at<short>(i, j), calibration);
       }
     }
 
   }
+
+ protected:
+  DepthEngine() {}
 };
 
 } // namespace dynslam

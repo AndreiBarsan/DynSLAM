@@ -151,15 +151,6 @@ void InstanceReconstructor::ProcessReconstructions() {
   for (auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
 
-//    if (track.GetId() > 5) {
-//    if (track.GetId() != 0) {
-      // Since this is very memory-hungry, we (hackily) restrict creation to the very first things
-      // we see.
-//      cout << "Won't create voxel volume for instance #" << track.GetId() << " in the current"
-//           << " experimental mode." << endl;
-//      continue;
-//    }
-
     if (! track.HasReconstruction()) {
       bool eligible = track.EligibleForReconstruction();
 
@@ -169,14 +160,16 @@ void InstanceReconstructor::ProcessReconstructions() {
         continue;
       }
 
-      // No reconstruction yet, let's initialize one.
+      // No reconstruction allocated yet; let's initialize one.
       cout << endl << endl;
       cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl << endl;
       ITMLibSettings *settings = new ITMLibSettings(*driver->GetSettings());
 
       // Set a much smaller voxel block number for the reconstruction, since individual objects
       // occupy a limited amount of space in the scene.
-      settings->sdfLocalBlockNum = 1200;
+      // TODO(andrei): Set this limit based on some physical specification, such as 10m x 10m x
+      // 10m.
+      settings->sdfLocalBlockNum = 5000;
       // We don't want to create an (expensive) meshing engine for every instance.
       settings->createMeshingEngine = false;
       // Make the ground truth tracker start from the current frame, and not from the default
@@ -199,17 +192,27 @@ void InstanceReconstructor::ProcessReconstructions() {
         reconstruction.SetView(frame.instance_view.GetView());
         // TODO account for gaps in the track!
         reconstruction.Track();
-        reconstruction.Integrate();
+        try {
+          reconstruction.Integrate();
+        }
+        catch(std::runtime_error &error) {
+          // TODO(andrei): Custom dynslam allocation exception we can catch here to avoid fatal
+          // errors.
+          // This happens when we run out of memory on the GPU for this volume. We should prolly
+          // have a custom exception/error code for this.
+          cerr << "Caught runtime error while integrating new data into an instance volume: "
+               << error.what() << endl << "Will continue regular operation." << endl;
+        }
+
         reconstruction.PrepareNextStep();
       }
 
 
     } else {
-      // TODO(andrei): Use some heuristic to avoid cases which are obviously
-      // crappy.
       cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
     }
 
+    // We now fuse the current frame into the reconstruction volume.
     InfiniTamDriver &instance_driver = *track.GetReconstruction();
     instance_driver.SetView(track.GetLastFrame().instance_view.GetView());
 
@@ -218,10 +221,18 @@ void InstanceReconstructor::ProcessReconstructions() {
 
     cout << endl << endl << "Start instance integration for #" << track.GetId() << endl;
     instance_driver.Track();
-    instance_driver.Integrate();
+    try {
+      // TODO(andrei): See above and also fix here.
+      instance_driver.Integrate();
+    }
+    catch(std::runtime_error &error) {
+      cerr << "Caught runtime error while integrating new data into an instance volume: "
+           << error.what() << endl << "Will continue regular operation." << endl;
+    }
+
     instance_driver.PrepareNextStep();
 
-    cout << endl << endl << "Finished instance integration." << endl;
+    cout << "Finished instance integration." << endl << endl;
   }
 }
 
