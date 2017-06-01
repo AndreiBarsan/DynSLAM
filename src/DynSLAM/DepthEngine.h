@@ -10,6 +10,9 @@ namespace dynslam {
 struct StereoCalibration {
   float baseline_meters;
   float focal_length_px;
+
+  StereoCalibration(float baseline_meters, float focal_length_px)
+      : baseline_meters(baseline_meters), focal_length_px(focal_length_px) {}
 };
 
 /// \brief Interface for components computing depth from stereo image pairs.
@@ -36,7 +39,7 @@ class DepthEngine {
                                      cv::Mat &out_depth) {
     for(int i = 0; i < disparity.rows; ++i) {
       for(int j = 0; j < disparity.cols; ++j) {
-        out_depth.at(i, j) = DepthFromDisparity(disparity.at(i, j), calibration);
+        out_depth.at<float>(i, j) = DepthFromDisparity(disparity.at<float>(i, j), calibration);
       }
     }
 
