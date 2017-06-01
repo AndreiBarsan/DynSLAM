@@ -23,12 +23,11 @@ class DynSlam {
 public:
   // TODO(andrei): If possible, get rid of the initialize method.
   // TODO(andrei): Use as much dependency injection as you can.
-  void Initialize(InfiniTamDriver* itm_static_scene_engine_,
-                  ImageSourceEngine* image_source,
-                  SegmentationProvider* segmentation_provider);
+  void Initialize(InfiniTamDriver *itm_static_scene_engine_,
+                  SegmentationProvider *segmentation_provider);
 
   /// \brief Reads in and processes the next frame from the data source.
-  void ProcessFrame();
+  void ProcessFrame(Input *input);
 
   const unsigned char* GetRaycastPreview() {
     // TODO(andrei): Get rid of reliance on itam enums via a driver abstraction.
@@ -79,11 +78,11 @@ public:
   }
 
   int GetInputWidth() {
-    return image_source_->getDepthImageSize().width;
+    return input_width;
   }
 
   int GetInputHeight() {
-    return image_source_->getDepthImageSize().height;
+    return input_height;
   }
 
   int GetCurrentFrameNo() {
@@ -96,15 +95,15 @@ public:
   }
 
 private:
-  ITMLibSettings itm_lib_settings_;
-  // TODO(andrei): Write custom image source.
-  ImageSourceEngine *image_source_;
-  Input *input_;
+//  ITMLibSettings itm_lib_settings_;
+//  Input *input_;
 
   // This is the main reconstruction component. Should split for dynamic+static.
   // In the future, we may need to write our own.
   // For now, this shall only handle reconstructing the static part of a scene.
   InfiniTamDriver *static_scene_;
+  SegmentationProvider *segmentation_provider_;
+  InstanceReconstructor *instance_reconstructor_;
 
   ITMUChar4Image *out_image_;
   ITMFloatImage *out_image_float_;
@@ -112,8 +111,8 @@ private:
   ITMShortImage  *input_raw_depth_image_;
 
   int current_frame_no_;
-
-  Vector2i window_size_;
+  int input_width;
+  int input_height;
 
   // TODO(andrei): Isolate this in a specific itam driver.
   const unsigned char* GetItamData(ITMMainEngine::GetImageType image_type) {
@@ -121,8 +120,6 @@ private:
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
-  SegmentationProvider *segmentation_provider_;
-  InstanceReconstructor *instance_reconstructor_;
 };
 
 }

@@ -21,14 +21,7 @@ inline bool file_exists(const std::string& name) {
 }
 
 // TODO do not depend on infinitam objects
-//ITMLib::Objects::ITMRGBDCalib ReadCalibration(const std::string& fpath) {
-//  ITMLib::Objects::ITMRGBDCalib out_calib;
-//  if (! ITMLib::Objects::readRGBDCalib(fpath.c_str(), out_calib)) {
-//    throw std::runtime_error(dynslam::utils::Format(
-//        "Could not read calibration file: [%s]\n", fpath));
-//  }
-//  return out_calib;
-//}
+ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const std::string& fpath);
 
 // TODO(andrei): Better name and docs for this once the interface is fleshed out.
 // TODO(andrei): Move code to cpp.
@@ -81,27 +74,24 @@ class Input {
 
   // TODO get rid of this and use other format
   void GetITMImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
-    // TODO reuse buffers
     std::string left_folder = dataset_folder_ + "/image_2";
     std::string right_folder = dataset_folder_ + "/image_3";
-    std::string stereo_frame_format = "%06d.png";
-    cv::Mat rgb_left = cv::imread(GetRgbFrameName(left_folder, stereo_frame_format, frame_idx_));
-    cv::Mat rgb_right = cv::imread(GetRgbFrameName(right_folder, stereo_frame_format, frame_idx_));
+    std::string rgb_frame_fname_format = "%06d.png";
+    cv::Mat left_frame_buf_ = cv::imread(GetRgbFrameName(left_folder, rgb_frame_fname_format, frame_idx_));
+    cv::Mat right_frame_buf_ = cv::imread(GetRgbFrameName(right_folder, rgb_frame_fname_format, frame_idx_));
 
     // The left frame is our RGB.
-    CvToItm(rgb_left, rgb);
+    CvToItm(left_frame_buf_, rgb);
 
     // TODO(andrei): Make sure you actually use this. ATM, libelas-tooling's kitti2klg does the
     // depth from disparity calculation!
-    StereoCalibration stereo_calibration(0, 0);
-    using namespace std;
+//    StereoCalibration stereo_calibration(0, 0);
 
-    cv::Mat disparity;
-    cv::Mat depth;
-    depth_engine_->DisparityMapFromStereo(rgb_left, rgb_right, depth);
+    cv::Mat depth_buf_;
+    depth_engine_->DisparityMapFromStereo(left_frame_buf_, right_frame_buf_, depth_buf_);
 //    depth_engine_->DepthFromDisparityMap(disparity, stereo_calibration, depth);
 
-    CvToItm(depth, raw_depth);
+    CvToItm(depth_buf_, raw_depth);
 
     frame_idx_++;
   }
@@ -111,20 +101,32 @@ class Input {
     return calibration_;
   };
 
+//  cv::Vec2i GetRgbSize() {
+//    return cv::Vec2i(left_frame_buf_.cols, left_frame_buf_.rows);
+//  }
+//
+//  cv::Vec2i GetDepthSize() {
+//    return cv::Vec2i(depth_buf_.cols, depth_buf_.rows);
+//  }
+
  private:
   DepthEngine *depth_engine_;
 
   std::string dataset_folder_;
   int frame_idx_;
 
+//  cv::Mat left_frame_buf_;
+//  cv::Mat right_frame_buf_;
+//  cv::Mat depth_buf_;
+//  cv::Mat disparity_buf_;
+
   // TODO get rid of this
   ITMLib::Objects::ITMRGBDCalib calibration_;
 
-  // TODO separate class for reading (stereo) input
-  std::string GetRgbFrameName(std::string folder, std::string fname_format, int frame_idx) {
+  // TODO dedicated subclass for reading stereo input
+  std::string GetRgbFrameName(std::string folder, std::string fname_format, int frame_idx) const {
     return folder + "/" + utils::Format(fname_format, frame_idx);
   }
-
 
 };
 

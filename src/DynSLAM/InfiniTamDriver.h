@@ -3,6 +3,7 @@
 #ifndef DYNSLAM_INFINITAMDRIVER_H
 #define DYNSLAM_INFINITAMDRIVER_H
 
+#include <opencv/cv.h>
 #include <iostream>
 
 #include <pangolin/pangolin.h>
@@ -12,29 +13,43 @@
 namespace dynslam {
 namespace drivers {
 
+template<typename T>
+ORUtils::Vector2<T> ToItmVec(const cv::Vec<T, 2> in) {
+  return ORUtils::Vector2<T>(in[0], in[1]);
+}
+
+template<typename T>
+ORUtils::Vector3<T> ToItmVec(const cv::Vec<T, 3> in) {
+  return ORUtils::Vector3<T>(in[0], in[1], in[2]);
+}
+
+template<typename T>
+ORUtils::Vector4<T> ToItmVec(const cv::Vec<T, 4> in) {
+  return ORUtils::Vector4<T>(in[0], in[1], in[2], in[3]);
+}
+
 /// \brief Interfaces between DynSLAM and InfiniTAM.
 class InfiniTamDriver : public ITMMainEngine {
 public:
   // TODO(andrei): We may need to add another layer of abstraction above the drivers to get the best
   // modularity possible.
-  static InfiniTamDriver* Build(const string &dataset_root, ImageSourceEngine** image_source) {
+  static InfiniTamDriver* Build(
+      const string &dataset_root,
+      const ITMRGBDCalib& calib,
+      const cv::Vec2i& rgb_image_size,
+      const cv::Vec2i& depth_image_size
+  ) {
     ITMLibSettings *settings = new ITMLibSettings();
 
     const string calib_fpath = dataset_root + "/itm-calib.txt";
     const string rgb_image_format = dataset_root + "/precomputed-depth/Frames/%04i.ppm";
     const string depth_image_format = dataset_root + "/precomputed-depth/Frames/%04i.pgm";
 
-    *image_source = new ImageFileReader(
-        calib_fpath.c_str(),
-        rgb_image_format.c_str(),
-        depth_image_format.c_str()
-    );
-
-    InfiniTamDriver *driver = new InfiniTamDriver(settings,
-                                                  new ITMRGBDCalib((*image_source)->calib),
-                                                  (*image_source)->getRGBImageSize(),
-                                                  (*image_source)->getDepthImageSize());
-
+    InfiniTamDriver *driver = new InfiniTamDriver(
+        settings,
+        new ITMRGBDCalib(calib),
+        ToItmVec(rgb_image_size),
+        ToItmVec(depth_image_size));
     return driver;
   }
 
@@ -89,7 +104,7 @@ public:
     return settings;
   }
 
-  // Not const because 'ITMMainEngine' is not const either.
+  // Not const because 'ITMMainEngine's implementation is not const either.
   void GetImage(
       ITMUChar4Image *out,
       GetImageType get_image_type,

@@ -144,7 +144,10 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
   img_fpath_ss << this->segFolder_ << "/"
                << "cls_" << setfill('0') << setw(6) << this->frameIdx_ << ".png";
   const string img_fpath = img_fpath_ss.str();
-  ReadImageFromFile(last_seg_preview_, img_fpath.c_str());
+  bool result = ReadImageFromFile(last_seg_preview_, img_fpath.c_str());
+  if (! result) {
+    throw std::runtime_error("Could not read segmentation preview OK.");
+  }
 
   cv::Mat img = cv::imread(img_fpath);
 

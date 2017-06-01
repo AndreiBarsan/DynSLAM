@@ -14,6 +14,7 @@
 #include "Utils.h"
 
 #include "../pfmLib/ImageIOpfm.h"
+#include "PrecomputedDepthEngine.h"
 
 // Commandline arguments
 DEFINE_string(dataset_root, "", "The root folder of the dataset to use.");
@@ -51,7 +52,10 @@ static const float kPlotTimeIncrement = 0.1f;
 /// there isn't that much time...
 class PangolinGui {
 public:
-  PangolinGui(DynSlam *dyn_slam) : dyn_slam_(dyn_slam) {
+  PangolinGui(DynSlam *dyn_slam, Input *input)
+      : dyn_slam_(dyn_slam),
+        dyn_slam_input_(input)
+  {
     cout << "Pangolin GUI initialized." << endl;
 
     // TODO(andrei): Proper scaling to save space and memory.
@@ -84,6 +88,7 @@ public:
       // Render the real-time graph(s)
       // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance, so you get dark, uncolored images.
 //      pane_texture->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
+//      pane_texture->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
 
       // Some experimental code for getting the camera to move on its own.
       if (wiggle_mode_->Get()) {
@@ -103,6 +108,9 @@ public:
         );
       }
 
+//      UploadDummyTexture();
+//      dummy_image_texture->RenderToViewport(true);
+
       pane_texture->Upload(
           dyn_slam_->GetObjectRaycastFreeViewPreview(
               visualized_object_idx_,
@@ -114,6 +122,13 @@ public:
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
       pane_texture->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+
+//      if (dyn_slam_->GetCurrentFrameNo() > 0) {
+//        cv::Mat foo(cv::Size(1242, 375), CV_8UC4, (void *) dyn_slam_->GetRgbPreview());
+//        cv::imshow("", foo);
+//        cv::waitKey(0);
+//      }
+
       pane_texture->RenderToViewport(true);
 
       depth_view_.Activate();
@@ -125,7 +140,7 @@ public:
       glColor3f(1.0, 1.0, 1.0);
       if (nullptr != dyn_slam_->GetSegmentationPreview()) {
         pane_texture->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-        pane_texture->RenderToViewport(true);
+        pane_texture->RenderToViewport();
         DrawInstanceLables();
       }
 
@@ -326,7 +341,6 @@ protected:
     cout << "Loading George..." << endl;
     dummy_img = cv::imread("/home/andrei/Pictures/george.jpg");
 
-
     cv::flip(dummy_img, dummy_img, kCvFlipVertical);
     const int george_width = dummy_img.cols;
     const int george_height = dummy_img.rows;
@@ -384,11 +398,12 @@ protected:
     );
 
     // Main workhorse function of the underlying SLAM system.
-    dyn_slam_->ProcessFrame();
+    dyn_slam_->ProcessFrame(this->dyn_slam_input_);
   }
 
 private:
   DynSlam *dyn_slam_;
+  Input *dyn_slam_input_;
 
   /// Input frame dimensions. They dictate the overall window size.
   int width, height;
@@ -452,15 +467,28 @@ int main(int argc, char **argv) {
     return -1;
   }
 
+  const string dir = "/home/barsana/datasets/kitti/odometry-dataset/sequences/06";
+  auto calib = ReadITMCalibration(dir + "/itm-calib.txt");
+  Input *input = new Input(
+      dir,
+      new PrecomputedDepthEngine(dir + "/precomputed-depth/Frames/", "%04d.pgm"),
+      calib);
+
   gui::DynSlam *dyn_slam = new gui::DynSlam();
-  ImageSourceEngine *image_source;
-  drivers::InfiniTamDriver *driver = InfiniTamDriver::Build(dataset_root, &image_source);
+  cv::Vec2i rgb_size(static_cast<int>(calib.intrinsics_rgb.sizeX),
+                     static_cast<int>(calib.intrinsics_rgb.sizeY));
+  cv::Vec2i depth_size(static_cast<int>(calib.intrinsics_d.sizeX),
+                       static_cast<int>(calib.intrinsics_d.sizeY));
+  // TODO(andrei): Sane error if there's a mismatch between the calibration params and the actual
+  // image sizes.
+
+  drivers::InfiniTamDriver *driver = InfiniTamDriver::Build(dataset_root, calib, rgb_size, depth_size);
 
   const string seg_folder = dataset_root + "/seg_image_2/mnc";
   auto segmentation_provider = new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder);
-  dyn_slam->Initialize(driver, image_source, segmentation_provider);
+  dyn_slam->Initialize(driver, segmentation_provider);
 
-  gui::PangolinGui pango_gui(dyn_slam);
+  gui::PangolinGui pango_gui(dyn_slam, input);
   pango_gui.Run();
 
   delete dyn_slam;
