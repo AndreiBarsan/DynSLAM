@@ -312,14 +312,14 @@ protected:
     // FWIW it takes DispNet about 50 seconds to chew through a 1101 image kitti sequence at full
     // resolution (this includes the network initialization overhead AND dumping the images to the
     // disk). This means ~0.05s/frame, or 20 FPS.
-    const string pfm_path = "/home/barsana/datasets/kitti/odometry-dataset/sequences/06/precomputed-depth-dispnet/000000.pfm";
-    ReadFilePFM(im, pfm_path);
-
-    // Convert the 32-bit "HDR" depth into something we can display.
-    im.convertTo(preview, CV_8UC1, 1.0);
-
-    cv::imshow("PFM depth map preview", preview);
-    cv::waitKey(0);
+//    const string pfm_path = "/home/barsana/datasets/kitti/odometry-dataset/sequences/06/precomputed-depth-dispnet/000000.pfm";
+//    ReadFilePFM(im, pfm_path);
+//
+//    // Convert the 32-bit "HDR" depth into something we can display.
+//    im.convertTo(preview, CV_8UC1, 1.0);
+//
+//    cv::imshow("PFM depth map preview", preview);
+//    cv::waitKey(0);
   }
 
   void SetupDummyImage() {

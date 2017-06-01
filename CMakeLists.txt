@@ -86,7 +86,7 @@ set(DYNSLAM_SOURCES
     src/pfmLib/ImageIOpfm.cpp)
 set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
-    src/DynSLAM/DynSLAMGUI.cpp)
+    src/DynSLAM/DynSLAMGUI.cpp src/DynSLAM/Input.cpp src/DynSLAM/Input.h)
 
 add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} src/DynSLAM/DepthEngine.h src/DynSLAM/PrecomputedDepthEngine.cpp src/DynSLAM/PrecomputedDepthEngine.h)
 

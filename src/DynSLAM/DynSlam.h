@@ -20,9 +20,11 @@ using namespace dynslam::drivers;
 class DynSlam {
 
 public:
+  // TODO(andrei): If possible, get rid of the initialize method.
+  // TODO(andrei): Use as much dependency injection as you can.
   void Initialize(InfiniTamDriver* itm_static_scene_engine_,
-                    ImageSourceEngine* image_source,
-                    SegmentationProvider* segmentation_provider);
+                  ImageSourceEngine* image_source,
+                  SegmentationProvider* segmentation_provider);
 
   /// \brief Reads in and processes the next frame from the data source.
   void ProcessFrame();
