@@ -88,7 +88,7 @@ set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
     src/DynSLAM/DynSLAMGUI.cpp)
 
-add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
+add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} src/DynSLAM/DepthEngine.h src/DynSLAM/PrecomputedDepthEngine.cpp src/DynSLAM/PrecomputedDepthEngine.h)
 
 #target_link_libraries(DynSLAM ${OpenCV_LIBS})
 ## TODO(andrei): Rename this to ITMEngine or something for clarity.
