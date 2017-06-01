@@ -151,14 +151,14 @@ void InstanceReconstructor::ProcessReconstructions() {
   for (auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
 
-    if (track.GetId() > 5) {
+//    if (track.GetId() > 5) {
 //    if (track.GetId() != 0) {
       // Since this is very memory-hungry, we (hackily) restrict creation to the very first things
       // we see.
 //      cout << "Won't create voxel volume for instance #" << track.GetId() << " in the current"
 //           << " experimental mode." << endl;
-      continue;
-    }
+//      continue;
+//    }
 
     if (! track.HasReconstruction()) {
       bool eligible = track.EligibleForReconstruction();
