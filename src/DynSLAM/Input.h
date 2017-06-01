@@ -11,6 +11,7 @@
 #include "../InfiniTAM/InfiniTAM/ITMLib/Utils/ITMLibDefines.h"
 #include "../InfiniTAM/InfiniTAM/ITMLib/Objects/ITMRGBDCalib.h"
 #include "../InfiniTAM/InfiniTAM/ITMLib/Utils/ITMCalibIO.h"
+#include "../InfiniTAM/InfiniTAM/Utils/FileUtils.h"
 
 namespace dynslam {
 
@@ -77,21 +78,36 @@ class Input {
     std::string left_folder = dataset_folder_ + "/image_2";
     std::string right_folder = dataset_folder_ + "/image_3";
     std::string rgb_frame_fname_format = "%06d.png";
-    cv::Mat left_frame_buf_ = cv::imread(GetRgbFrameName(left_folder, rgb_frame_fname_format, frame_idx_));
-    cv::Mat right_frame_buf_ = cv::imread(GetRgbFrameName(right_folder, rgb_frame_fname_format, frame_idx_));
+    std::string left_frame_fpath = GetRgbFrameName(left_folder, rgb_frame_fname_format, frame_idx_);
+    std::string right_frame_fpath = GetRgbFrameName(right_folder, rgb_frame_fname_format, frame_idx_);
+//    cv::Mat left_frame_buf_ = cv::imread(left_frame_fpath);
+//    cv::Mat right_frame_buf_ = cv::imread(right_frame_fpath);
 
     // The left frame is our RGB.
-    CvToItm(left_frame_buf_, rgb);
+//    CvToItm(left_frame_buf_, rgb);
+    std::string rgb_hack_fpath = utils::Format(
+        "%s/%s/%s/%04d.ppm", dataset_folder_.c_str(), "precomputed-depth", "Frames", frame_idx_);
+
+    if(! ReadImageFromFile(rgb, rgb_hack_fpath.c_str())) {
+      throw std::runtime_error(rgb_hack_fpath.c_str());
+    }
 
     // TODO(andrei): Make sure you actually use this. ATM, libelas-tooling's kitti2klg does the
     // depth from disparity calculation!
 //    StereoCalibration stereo_calibration(0, 0);
 
-    cv::Mat depth_buf_;
-    depth_engine_->DisparityMapFromStereo(left_frame_buf_, right_frame_buf_, depth_buf_);
+//    cv::Mat depth_buf_;
+//    depth_engine_->DisparityMapFromStereo(left_frame_buf_, right_frame_buf_, depth_buf_);
 //    depth_engine_->DepthFromDisparityMap(disparity, stereo_calibration, depth);
 
-    CvToItm(depth_buf_, raw_depth);
+//    CvToItm(depth_buf_, raw_depth);
+
+    std::string depth_hack_fpath = utils::Format(
+        "%s/%s/%s/%04d.pgm", dataset_folder_.c_str(), "precomputed-depth", "Frames", frame_idx_
+    );
+    if(! ReadImageFromFile(raw_depth, depth_hack_fpath.c_str())) {
+      throw std::runtime_error(utils::Format("Nope: %s", depth_hack_fpath));
+    }
 
     frame_idx_++;
   }

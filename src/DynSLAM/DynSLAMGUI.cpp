@@ -85,7 +85,6 @@ public:
       glColor3f(1.0f, 1.0f, 1.0f);
       const unsigned char *slam_frame_data = dyn_slam_->GetRaycastPreview();
 
-      // Render the real-time graph(s)
       // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance, so you get dark, uncolored images.
 //      pane_texture->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
 //      pane_texture->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
@@ -111,10 +110,19 @@ public:
 //      UploadDummyTexture();
 //      dummy_image_texture->RenderToViewport(true);
 
+      // this seems to render fine!!
+      const unsigned char *preview = dyn_slam_->GetObjectRaycastFreeViewPreview(
+          visualized_object_idx_,
+          pane_cam_->GetModelViewMatrix());
+
+//      if (dyn_slam_->GetCurrentFrameNo() > 0) {
+//        cv::Mat monkey_penis(cv::Size(1242, 375), CV_8UC4, (void*) preview);
+//        cv::imshow("", monkey_penis);
+//        cv::waitKey(0);
+//      }
+
       pane_texture->Upload(
-          dyn_slam_->GetObjectRaycastFreeViewPreview(
-              visualized_object_idx_,
-              pane_cam_->GetModelViewMatrix()),
+          preview,
           GL_RGBA,
           GL_UNSIGNED_BYTE);
       pane_texture->RenderToViewport(true);
@@ -159,9 +167,9 @@ public:
           ),
           GL_RGBA,
           GL_UNSIGNED_BYTE);
+      pane_texture->RenderToViewport(true);
       pangolin::GlFont &font = pangolin::GlFont::I();
       font.Text("Instance #%d", visualized_object_idx_).Draw(-1.0, 0.9);
-      pane_texture->RenderToViewport(true);
 
       // Update various elements in the toolbar on the left.
       *(reconstructions) = Format(
