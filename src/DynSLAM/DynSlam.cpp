@@ -41,7 +41,9 @@ void DynSlam::ProcessFrame(Input *input) {
     return;
   }
 
-  input->GetITMImages(input_rgb_image_, input_raw_depth_image_);
+  if(! input->GetITMImages(input_rgb_image_, input_raw_depth_image_)) {
+    throw runtime_error("Could not read input from the data source.");
+  }
 
   static_scene_->UpdateView(input_rgb_image_, input_raw_depth_image_);
 

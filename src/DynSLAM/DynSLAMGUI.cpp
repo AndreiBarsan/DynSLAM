@@ -475,11 +475,10 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  const string dir = "/home/barsana/datasets/kitti/odometry-dataset/sequences/06";
-  auto calib = ReadITMCalibration(dir + "/itm-calib.txt");
+  auto calib = ReadITMCalibration(dataset_root + "/itm-calib.txt");
   Input *input = new Input(
-      dir,
-      new PrecomputedDepthEngine(dir + "/precomputed-depth/Frames/", "%04d.pgm"),
+      dataset_root,
+      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm"),
       calib);
 
   gui::DynSlam *dyn_slam = new gui::DynSlam();
@@ -487,18 +486,21 @@ int main(int argc, char **argv) {
                      static_cast<int>(calib.intrinsics_rgb.sizeY));
   cv::Vec2i depth_size(static_cast<int>(calib.intrinsics_d.sizeX),
                        static_cast<int>(calib.intrinsics_d.sizeY));
-  // TODO(andrei): Sane error if there's a mismatch between the calibration params and the actual
-  // image sizes.
+
+  // [RIP] I lost a couple of hours debugging a bug caused by the fact that InfiniTAM still works
+  // even when there is a discrepancy between the size of the depth/rgb inputs, as specified in the
+  // calibration file, and the actual size of the input images.
 
   drivers::InfiniTamDriver *driver = InfiniTamDriver::Build(dataset_root, calib, rgb_size, depth_size);
 
   const string seg_folder = dataset_root + "/seg_image_2/mnc";
   auto segmentation_provider = new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder);
-  dyn_slam->Initialize(driver, segmentation_provider);
 
+  dyn_slam->Initialize(driver, segmentation_provider);
   gui::PangolinGui pango_gui(dyn_slam, input);
   pango_gui.Run();
 
   delete dyn_slam;
+  delete input;
 }
 
