@@ -8,32 +8,22 @@ namespace dynslam {
 
 using namespace instreclib::reconstruction;
 
-void DynSlam::Initialize(InfiniTamDriver* itm_static_scene_engine_,
-                         ImageSourceEngine* image_source,
-                         SegmentationProvider* segmentation_provider) {
-
-  this->image_source_ = image_source;
-
-  // TODO make sure you pass this to the slam object. ideally, it shouldn't even touch it directly.
-  string dir = "/home/barsana/datasets/kitti/odometry-dataset/sequences/06";
-  this->input_ = new Input(
-      dir,
-      new PrecomputedDepthEngine(dir + "/precomputed-depth/Frames/", "%04d.pgm"),
-      image_source->calib
-  );
-
-  window_size_.x = image_source->getDepthImageSize().x;
-  window_size_.y = image_source->getDepthImageSize().y;
+void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_,
+                         SegmentationProvider *segmentation_provider) {
 
   this->static_scene_ = itm_static_scene_engine_;
   this->current_frame_no_ = 0;
 
   bool allocate_gpu = true;
-  Vector2i input_shape = image_source->getDepthImageSize();
+
+  Vector2i input_shape = itm_static_scene_engine_->GetImageSize();
   out_image_ = new ITMUChar4Image(input_shape, true, allocate_gpu);
   out_image_float_ = new ITMFloatImage(input_shape, true, allocate_gpu);
   input_rgb_image_= new ITMUChar4Image(input_shape, true, allocate_gpu);
   input_raw_depth_image_ = new ITMShortImage(input_shape, true, allocate_gpu);
+
+  input_width = input_shape.x;
+  input_height = input_shape.y;
 
   // TODO(andrei): Own CUDA safety wrapper. With blackjack. And hookers.
   ITMSafeCall(cudaThreadSynchronize());
@@ -44,20 +34,14 @@ void DynSlam::Initialize(InfiniTamDriver* itm_static_scene_engine_,
   cout << "DynSLAM initialization complete." << endl;
 }
 
-void DynSlam::ProcessFrame() {
-//  if (! image_source_->hasMoreImages()) {
-//    cout << "No more frames left in image source." << endl;
-//    return;
-//  }
-
+void DynSlam::ProcessFrame(Input *input) {
   // Read the images from the first part of the pipeline
-//  image_source_->getImages(input_rgb_image_, input_raw_depth_image_);
-  if (! input_->HasMoreImages()) {
+  if (! input->HasMoreImages()) {
     cout << "No more frames left in image source." << endl;
     return;
   }
 
-  input_->GetITMImages(input_rgb_image_, input_raw_depth_image_);
+  input->GetITMImages(input_rgb_image_, input_raw_depth_image_);
 
   static_scene_->UpdateView(input_rgb_image_, input_raw_depth_image_);
 
