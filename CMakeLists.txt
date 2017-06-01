@@ -82,13 +82,17 @@ set(DYNSLAM_SOURCES
     src/DynSLAM/Utils.cpp
     src/DynSLAM/DynSlam.cpp
     src/DynSLAM/InfiniTamDriver.cpp
+    src/DynSLAM/Input.cpp
+    src/DynSLAM/DepthEngine.h
+    src/DynSLAM/PrecomputedDepthEngine.cpp
     # A tiny library for working with portable float map (PFM) files.
     src/pfmLib/ImageIOpfm.cpp)
+
 set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
-    src/DynSLAM/DynSLAMGUI.cpp src/DynSLAM/Input.cpp src/DynSLAM/Input.h)
+    src/DynSLAM/DynSLAMGUI.cpp)
 
-add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} src/DynSLAM/DepthEngine.h src/DynSLAM/PrecomputedDepthEngine.cpp src/DynSLAM/PrecomputedDepthEngine.h)
+add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} )
 
 #target_link_libraries(DynSLAM ${OpenCV_LIBS})
 ## TODO(andrei): Rename this to ITMEngine or something for clarity.
