@@ -10,20 +10,24 @@ namespace dynslam {
 /// \brief Reads precomputed depth maps from a folder.
 class PrecomputedDepthEngine : public DepthEngine {
  public:
-  PrecomputedDepthEngine(const std::string &folder, const std::string &fname_format)
-      : folder(folder), fname_format(fname_format), frame_idx(0) {}
+  virtual ~PrecomputedDepthEngine() { }
 
-  void DisparityMapFromStereo(const cv::Mat &left,
+  PrecomputedDepthEngine(const std::string &folder, const std::string &fname_format)
+      : folder(folder),
+        fname_format(fname_format),
+        frame_idx(0) { }
+
+  virtual void DisparityMapFromStereo(const cv::Mat &left,
                               const cv::Mat &right,
                               cv::Mat &out_disparity) override;
 
-  float DepthFromDisparity(const float disparity_px,
+  virtual float DepthFromDisparity(const float disparity_px,
                            const StereoCalibration &calibration) override;
 
  private:
-  int frame_idx;
   std::string folder;
   std::string fname_format;
+  int frame_idx;
 };
 
 } // namespace dynslam

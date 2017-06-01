@@ -7,6 +7,7 @@
 #include "InfiniTamDriver.h"
 #include "InstRecLib/InstanceReconstructor.h"
 #include "InstRecLib/PrecomputedSegmentationProvider.h"
+#include "Input.h"
 
 namespace dynslam {
 
@@ -98,6 +99,7 @@ private:
   ITMLibSettings itm_lib_settings_;
   // TODO(andrei): Write custom image source.
   ImageSourceEngine *image_source_;
+  Input *input_;
 
   // This is the main reconstruction component. Should split for dynamic+static.
   // In the future, we may need to write our own.
