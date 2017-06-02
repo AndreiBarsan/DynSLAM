@@ -21,7 +21,11 @@ inline bool file_exists(const std::__cxx11::string& name) {
   return stat(name.c_str(), &buffer) == 0;
 }
 
+/// \brief Converts OpenCV image types to readable strings.
+std::string type2str(int type);
+
 } // namespace utils
 } // namespace dynslam
 
 #endif //DYNSLAM_UTILS_H
+

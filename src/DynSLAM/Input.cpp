@@ -75,20 +75,29 @@ bool Input::GetITMImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
   // The left frame is the RGB input to our system.
   CvToItm(left_frame_buf_, rgb);
 
-  depth_engine_->DisparityMapFromStereo(left_frame_buf_, right_frame_buf_, depth_buf_);
+  depth_engine_->DisparityMapFromStereo(left_frame_buf_, right_frame_buf_, disparity_buf_);
 
-  const auto &depth_size = GetDepthSize();
-  if (depth_buf_.rows != depth_size.height || depth_buf_.cols != depth_size.width) {
-    cerr << "Unexpected depth map size. Got " << depth_buf_.size() << ", but the "
-         << "calibration file specified " << depth_size << "." << endl;
+  const auto &disparity_size = GetDepthSize();
+  if (disparity_buf_.rows != disparity_size.height || disparity_buf_.cols != disparity_size.width) {
+    cerr << "Unexpected disparity map size. Got " << disparity_buf_.size() << ", but the "
+         << "calibration file specified " << disparity_size << "." << endl;
     return false;
   }
 
+  // TODO(andrei): Use more than just short for the pixel type.
+  depth_buf_ = cv::Mat(disparity_buf_.size(), CV_16UC1);
+
   // TODO(andrei): Make sure you actually use this. ATM, libelas-tooling's kitti2klg does the
   // depth from disparity calculation!
-//    StereoCalibration stereo_calibration(0, 0);
-//    depth_engine_->DepthFromDisparityMap(disparity, stereo_calibration, depth);
-  CvToItm(depth_buf_, raw_depth);
+
+  // Parameters used in the KITTI-odometry dataset.
+  float baseline_m = 0.537150654273f;
+  float focal_length_px = 707.0912f;
+  StereoCalibration stereo_calibration(baseline_m, focal_length_px);
+  depth_engine_->DepthFromDisparityMap(disparity_buf_, stereo_calibration, depth_buf_);
+
+//  CvToItm(depth_buf_, raw_depth);
+  CvToItm(disparity_buf_, raw_depth);
 
   frame_idx_++;
   return true;

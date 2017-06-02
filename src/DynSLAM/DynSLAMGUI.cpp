@@ -313,24 +313,6 @@ protected:
     // Internally, InfiniTAM stores these as RGBA, but we discard the alpha when we upload the
     // textures for visualization (hence the 'GL_RGB' specification).
     this->pane_texture = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
-
-    // DispNet outputs depth maps as 32-bit float single-channel HDR images. Yes, not a lot of
-    // programs can load them natively for manual inspection. Photoshop can,
-    cv::Mat im(370, 1226, CV_32FC1);
-    cv::Mat preview(370, 1226, CV_8UC1);
-
-    // FWIW it takes DispNet about 50 seconds to chew through a 1101 image kitti sequence at full
-    // resolution (this includes the network initialization overhead AND dumping the images to the
-    // disk). This means ~0.05s/frame, or 20 FPS.
-//    const string pfm_path = "/home/barsana/datasets/kitti/odometry-dataset/sequences/06/precomputed-depth-dispnet/000000.pfm";
-//    ReadFilePFM(im, pfm_path);
-//
-//    // Convert the 32-bit "HDR" depth into something we can display.
-//    im.convertTo(preview, CV_8UC1, 1.0);
-//
-//    cv::imshow("PFM depth map preview", preview);
-//    cv::waitKey(0);
-
     cout << "Pangolin UI setup complete." << endl;
   }
 
@@ -461,6 +443,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   *input_out = new Input(
       dataset_root,
       new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm"),
+//      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", true),
       calib);
 
   *dyn_slam_out = new gui::DynSlam();

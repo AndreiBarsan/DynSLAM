@@ -6,6 +6,7 @@
 // TODO(andrei): Get rid of this dependency.
 #include "../../InfiniTAM/InfiniTAM/Utils/FileUtils.h"
 #include "../Utils.h"
+#include "../Input.h"
 
 #include <cstdlib>
 #include <fstream>
@@ -148,6 +149,8 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
         "Could not read segmentation preview image from file [%s].",
         img_fpath));
   }
+  // TODO(andrei): Why not just make the preview a CV image and be done with it?
+  dynslam::CvToItm(img, last_seg_preview_);
 
   stringstream meta_img_ss;
   meta_img_ss << this->segFolder_ << "/" << setfill('0') << setw(6) << this->frameIdx_ << ".png";
