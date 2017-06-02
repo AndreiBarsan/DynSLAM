@@ -118,9 +118,11 @@ void InstanceReconstructor::ProcessFrame(
   main_view->depth->UpdateDeviceFromHost();
 
   // ``Graphically'' display the object tracks for debugging.
+  /*
   for (const auto &pair: this->instance_tracker_->GetActiveTracks()) {
     cout << "Track: " << pair.second.GetAsciiArt() << endl;
   }
+  // */
 
   frame_idx_++;
 }

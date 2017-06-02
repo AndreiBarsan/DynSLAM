@@ -49,7 +49,6 @@ void DynSlam::ProcessFrame(Input *input) {
 
   // InstRec: semantic segmentation
   auto segmentationResult = segmentation_provider_->SegmentFrame(input_rgb_image_);
-  cout << segmentationResult << endl;
 
   // Split the scene up into instances, and fuse each instance independently.
   instance_reconstructor_->ProcessFrame(static_scene_->GetView(), *segmentationResult);

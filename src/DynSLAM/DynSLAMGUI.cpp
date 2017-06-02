@@ -494,10 +494,16 @@ int main(int argc, char **argv) {
   // even when there is a discrepancy between the size of the depth/rgb inputs, as specified in the
   // calibration file, and the actual size of the input images.
 
-  drivers::InfiniTamDriver *driver = InfiniTamDriver::Build(dataset_root, calib, rgb_size, depth_size);
+  ITMLibSettings *settings = new ITMLibSettings();
+  drivers::InfiniTamDriver *driver = new InfiniTamDriver(
+      settings,
+      new ITMRGBDCalib(calib),
+      ToItmVec(rgb_size),
+      ToItmVec(depth_size));
 
   const string seg_folder = dataset_root + "/seg_image_2/mnc";
-  auto segmentation_provider = new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder);
+  auto segmentation_provider =
+      new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder);
 
   dyn_slam->Initialize(driver, segmentation_provider);
   gui::PangolinGui pango_gui(dyn_slam, input);
