@@ -54,16 +54,16 @@ class DepthEngine {
       for(int j = 0; j < disparity.cols; ++j) {
 //        cout << i << ", " << j << " " << disparity.cols << " x " << disparity.cols << endl;
         // TODO correctly use the right way depending on whether the input image is short or float
-//        float disp = disparity.at<float>(i, j);
+        float disp = disparity.at<float>(i, j);
 
-//        int32_t disp_long = static_cast<int32_t>(1000.0 * DepthFromDisparity(disp, calibration));
-//        if (disp_long > 16 * 1000 || disp_long < 2000) {
-//          disp_long = numeric_limits<uint16_t>::max();
-//        }
-//
-//        uint16_t depth_s = static_cast<uint16_t>(disp_long);
+        int32_t disp_long = static_cast<int32_t>(1000.0 * DepthFromDisparity(disp, calibration));
+        if (disp_long > 20 * 1000 || disp_long < 1000) {
+          disp_long = numeric_limits<uint16_t>::max();
+        }
+////
+        uint16_t depth_s = static_cast<uint16_t>(disp_long);
         // Use for oldschoold pgm depth files
-        uint16_t depth_s = disparity.at<uint16_t>(i, j);
+//        uint16_t depth_s = disparity.at<uint16_t>(i, j);
         out_depth.at<uint16_t>(i, j) = depth_s;
       }
     }
