@@ -5,7 +5,7 @@ namespace dynslam {
 
 using namespace std;
 
-ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const std::string &fpath) {
+ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const string &fpath) {
   ITMLib::Objects::ITMRGBDCalib out_calib;
   if (! ITMLib::Objects::readRGBDCalib(fpath.c_str(), out_calib)) {
     throw runtime_error(dynslam::utils::Format(
@@ -45,7 +45,6 @@ bool Input::HasMoreImages() {
       dataset_folder_ + "/image_0/",
       "%06d.png",
       frame_idx_);
-  cout << next_fpath << endl;
   return utils::file_exists(next_fpath);
 }
 
@@ -63,13 +62,13 @@ bool Input::GetITMImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
   const auto &rgb_size = GetRgbSize();
   if (left_frame_buf_.rows != rgb_size.height || left_frame_buf_.cols != rgb_size.width) {
     cerr << "Unexpected left RGB frame size. Got " << left_frame_buf_.size() << ", but the "
-         << "calibration file specified " << rgb_size << ".";
+         << "calibration file specified " << rgb_size << "." << endl;
     return false;
   }
 
   if (right_frame_buf_.rows != rgb_size.height || right_frame_buf_.cols != rgb_size.width) {
     cerr << "Unexpected right RGB frame size. Got " << right_frame_buf_.size() << ", but the "
-        << "calibration file specified " << rgb_size << ".";
+        << "calibration file specified " << rgb_size << "." << endl;
     return false;
   }
 
@@ -80,8 +79,8 @@ bool Input::GetITMImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
 
   const auto &depth_size = GetDepthSize();
   if (depth_buf_.rows != depth_size.height || depth_buf_.cols != depth_size.width) {
-    cerr << "Unexpected depth map size. Got [" << depth_buf_.size() << "], but the "
-         << "calibration file specified [" << depth_size << "].";
+    cerr << "Unexpected depth map size. Got " << depth_buf_.size() << ", but the "
+         << "calibration file specified " << depth_size << "." << endl;
     return false;
   }
 
