@@ -20,7 +20,6 @@ void CvToItm(const cv::Mat &mat, ITMUChar4Image *out_rgb);
 /// \brief Converts an OpenCV depth Mat into an InfiniTAM depth image.
 void CvToItm(const cv::Mat1s &mat, ITMShortImage *out_depth);
 
-
 // TODO do not depend on infinitam objects. The ITM driver should be the only bit worrying about
 // them.
 ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const std::string& fpath);
@@ -53,9 +52,6 @@ class Input {
     return cv::Size2i(static_cast<int>(calibration_.intrinsics_rgb.sizeX),
                      static_cast<int>(calibration_.intrinsics_rgb.sizeY));
   }
-
-  /// \note The ordering of the coordinates, in accordance with the OpenCV conventions.
-  // TODO remove this comment
 
   cv::Size2i GetDepthSize() {
     return cv::Size2i(static_cast<int>(calibration_.intrinsics_d.sizeX),

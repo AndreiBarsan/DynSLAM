@@ -118,8 +118,7 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
     sscanf(result.c_str(), "[%d %d %d %d %*d], %f, %d", &bounding_box.r.x0, &bounding_box.r.y0,
            &bounding_box.r.x1, &bounding_box.r.y1, &class_probability, &class_id);
 
-    // Process the mask file. The mask area covers the edges of the bounding
-    // box, too.
+    // Process the mask file. The mask area covers the edges of the bounding box, too.
     uint8_t *mask_pixels = ReadMask(mask_in, bounding_box.GetWidth(), bounding_box.GetHeight());
     cv::Mat *mask_cv_mat = new cv::Mat(
         bounding_box.GetHeight(),
@@ -138,21 +137,17 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
   return detections;
 }
 
-shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentFrame(
-    ITMUChar4Image *rgb) {
+shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentFrame(ITMUChar4Image *) {
   stringstream img_fpath_ss;
   img_fpath_ss << this->segFolder_ << "/"
                << "cls_" << setfill('0') << setw(6) << this->frameIdx_ << ".png";
   const string img_fpath = img_fpath_ss.str();
-  bool result = ReadImageFromFile(last_seg_preview_, img_fpath.c_str());
-  if (! result) {
-    throw std::runtime_error("Could not read segmentation preview OK.");
-  }
-
   cv::Mat img = cv::imread(img_fpath);
-
-  // TODO(andrei): Utility to marshal between opencv images and cuda-style ones. Prefer working
-  // directly in the ITM-preferred format, if possible with the opencv utilities.
+  if (! img.data) {
+    throw std::runtime_error(Format(
+        "Could not read segmentation preview image from file [%s].",
+        img_fpath));
+  }
 
   stringstream meta_img_ss;
   meta_img_ss << this->segFolder_ << "/" << setfill('0') << setw(6) << this->frameIdx_ << ".png";

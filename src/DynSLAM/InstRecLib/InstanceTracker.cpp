@@ -21,7 +21,6 @@ void InstanceTracker::ProcessInstanceViews(int frame_idx, const vector<InstanceV
   this->AssignToTracks(new_track_frames);
 
   // 2. For leftover detections, put them into new, single-frame, tracks.
-  cout << new_track_frames.size() << " new unassigned frames." << endl;
   for (const TrackFrame &track_frame : new_track_frames) {
     int track_id = track_count_;
     track_count_++;
@@ -55,7 +54,7 @@ void InstanceTracker::PruneTracks(int current_frame_idx) {
   }
 }
 
-std::pair<Track *, float> InstanceTracker::FindBestTrack(const TrackFrame &track_frame) {
+pair<Track *, float> InstanceTracker::FindBestTrack(const TrackFrame &track_frame) {
   if (id_to_active_track_.empty()) {
     return kNoBestTrack;
   }
@@ -85,9 +84,9 @@ void InstanceTracker::AssignToTracks(std::list<TrackFrame> &new_detections) {
     float score = match.second;
 
     if (score > kTrackScoreThreshold) {
-      cout << "Found a match based on overlap with score " << score << "." << endl;
-      cout << "Adding it to track #" << track->GetId() << " of length " << track->GetSize() << "."
-           << endl;
+//      cout << "Found a match based on overlap with score " << score << "." << endl;
+//      cout << "Adding it to track #" << track->GetId() << " of length " << track->GetSize() << "."
+//           << endl;
 
       track->AddFrame(*it);
       it = new_detections.erase(it);

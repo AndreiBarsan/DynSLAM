@@ -32,26 +32,7 @@ ORUtils::Vector4<T> ToItmVec(const cv::Vec<T, 4> in) {
 class InfiniTamDriver : public ITMMainEngine {
 public:
   // TODO(andrei): We may need to add another layer of abstraction above the drivers to get the best
-  // modularity possible.
-  static InfiniTamDriver* Build(
-      const string &dataset_root,
-      const ITMRGBDCalib& calib,
-      const cv::Vec2i& rgb_image_size,
-      const cv::Vec2i& depth_image_size
-  ) {
-    ITMLibSettings *settings = new ITMLibSettings();
-
-    const string calib_fpath = dataset_root + "/itm-calib.txt";
-    const string rgb_image_format = dataset_root + "/precomputed-depth/Frames/%04i.ppm";
-    const string depth_image_format = dataset_root + "/precomputed-depth/Frames/%04i.pgm";
-
-    InfiniTamDriver *driver = new InfiniTamDriver(
-        settings,
-        new ITMRGBDCalib(calib),
-        ToItmVec(rgb_image_size),
-        ToItmVec(depth_image_size));
-    return driver;
-  }
+  // modularity possible (driver+inpu+custom settings combos).
 
   InfiniTamDriver(const ITMLibSettings* settings,
                   const ITMRGBDCalib* calib,
