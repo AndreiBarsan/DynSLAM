@@ -96,8 +96,8 @@ bool Input::GetITMImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
   depth_engine_->DepthFromDisparityMap(disparity_buf_, stereo_calibration, depth_buf_);
 
-//  CvToItm(depth_buf_, raw_depth);
-  CvToItm(disparity_buf_, raw_depth);
+  CvToItm(depth_buf_, raw_depth);
+//  CvToItm(disparity_buf_, raw_depth);
 
   frame_idx_++;
   return true;

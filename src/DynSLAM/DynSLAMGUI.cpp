@@ -98,13 +98,13 @@ public:
         gettimeofday(&tp, NULL);
         double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
         double time_scale = 1500.0;
-        double r = 0.25;
+        double r = 0.2;
         double cx = cos(time_ms / time_scale) * r;
         double cy = sin(time_ms / time_scale) * r - r * 2;
         double cz = sin(time_ms / time_scale) * r;
         pane_cam_->SetModelViewMatrix(
             pangolin::ModelViewLookAt(
-                0, 0.0, 1.0,
+                0, 0.0, 0.2,
                 0, 0.5 + cy, -1.0,
                 pangolin::AxisY)
         );
@@ -442,8 +442,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   auto calib = ReadITMCalibration(dataset_root + "/itm-calib.txt");
   *input_out = new Input(
       dataset_root,
-      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm"),
-//      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", true),
+//      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm"),
+      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", true),
       calib);
 
   *dyn_slam_out = new gui::DynSlam();
