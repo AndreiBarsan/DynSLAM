@@ -463,8 +463,48 @@ private:
   }
 };
 
+} // namespace gui
+
+/// \brief Constructs a DynSLAM instance to run on a KITTI Odometry dataset sequence, using the
+///        ground truth pose information from the Inertial Navigation System (INS) instead of any
+///        visual odometry.
+/// This is useful when you want to focus on the quality of the reconstruction, instead of that of
+/// the odometry.
+void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
+  auto calib = ReadITMCalibration(dataset_root + "/itm-calib.txt");
+  *input_out = new Input(
+      dataset_root,
+      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm"),
+      calib);
+
+  *dyn_slam_out = new gui::DynSlam();
+  cv::Vec2i rgb_size(static_cast<int>(calib.intrinsics_rgb.sizeX),
+                     static_cast<int>(calib.intrinsics_rgb.sizeY));
+  cv::Vec2i depth_size(static_cast<int>(calib.intrinsics_d.sizeX),
+                       static_cast<int>(calib.intrinsics_d.sizeY));
+
+  // [RIP] I lost a couple of hours debugging a bug caused by the fact that InfiniTAM still works
+  // even when there is a discrepancy between the size of the depth/rgb inputs, as specified in the
+  // calibration file, and the actual size of the input images.
+
+  ITMLibSettings *settings = new ITMLibSettings();
+  // TODO(andrei): Add this to dataset prep script!
+  settings->groundTruthPoseFpath = dataset_root + "/poses.txt";
+
+  drivers::InfiniTamDriver *driver = new InfiniTamDriver(
+      settings,
+      new ITMRGBDCalib(calib),
+      ToItmVec(rgb_size),
+      ToItmVec(depth_size));
+
+  const string seg_folder = dataset_root + "/seg_image_2/mnc";
+  auto segmentation_provider =
+      new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder);
+
+  (*dyn_slam_out)->Initialize(driver, segmentation_provider);
 }
-}
+
+} // namespace dynslam
 
 int main(int argc, char **argv) {
   using namespace dynslam;
@@ -478,34 +518,9 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  auto calib = ReadITMCalibration(dataset_root + "/itm-calib.txt");
-  Input *input = new Input(
-      dataset_root,
-      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm"),
-      calib);
-
-  gui::DynSlam *dyn_slam = new gui::DynSlam();
-  cv::Vec2i rgb_size(static_cast<int>(calib.intrinsics_rgb.sizeX),
-                     static_cast<int>(calib.intrinsics_rgb.sizeY));
-  cv::Vec2i depth_size(static_cast<int>(calib.intrinsics_d.sizeX),
-                       static_cast<int>(calib.intrinsics_d.sizeY));
-
-  // [RIP] I lost a couple of hours debugging a bug caused by the fact that InfiniTAM still works
-  // even when there is a discrepancy between the size of the depth/rgb inputs, as specified in the
-  // calibration file, and the actual size of the input images.
-
-  ITMLibSettings *settings = new ITMLibSettings();
-  drivers::InfiniTamDriver *driver = new InfiniTamDriver(
-      settings,
-      new ITMRGBDCalib(calib),
-      ToItmVec(rgb_size),
-      ToItmVec(depth_size));
-
-  const string seg_folder = dataset_root + "/seg_image_2/mnc";
-  auto segmentation_provider =
-      new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder);
-
-  dyn_slam->Initialize(driver, segmentation_provider);
+  DynSlam *dyn_slam;
+  Input *input;
+  BuildDynSlamKittiOdometryGT(dataset_root, &dyn_slam, &input);
   gui::PangolinGui pango_gui(dyn_slam, input);
   pango_gui.Run();
 

@@ -7,6 +7,27 @@ Currently under development as my Master's Thesis, as part of the [Computer
 Vision and Geometry Group](https://cvg.ethz.ch) of [ETH
 Zurich](https://ethz.ch).
 
+## Related Repositories
+
+ * [My InfiniTAM fork](https://github.com/AndreiBarsan/InfiniTAM), which
+   is used by this system for the actual 3D reconstruction (via
+   volumetric fusion, using voxel hashing for map storage). My fork
+   contains a series of small tweaks designe to make InfiniTAM a little
+   easier to use as a component of a larger system.
+ * [My fork of the official implemntation of Multi-task Network Cascades](https://github.com/AndreiBarsan/MNC)
+    for image semantic segmentation. We need this for identifying where
+    the cars are in the input videos. Using semantics enables us to
+    detect both moving and static cars.
+ * [My fork of the modified Caffe used by MNC](https://github.com/AndreiBarsan/caffe-mnc). Since MNC's architecture requires
+ some tweaks to Caffe's internals, its authors forked Caffe and modified
+ it to their needs. I forked their fork and made it work with my tools,
+ while also making it faster by merging it with the Caffe master, which
+ enabled cuDNN 5 support, among many other things.
+  * [My mirror of libelas](https://github.com/AndreiBarsan/libelas-tooling)
+  which I use for pre-computing the depth maps. I'm working on getting
+  the depth computation to happen on the fly, and investigating other
+  methods for estimating depth from stereo.
+
 ## Getting Started
 
 Coming soon! Right now the system is a bit tangled up, so it can't be run out
@@ -48,3 +69,14 @@ forget it, just run `git submodule update --init --recursive`.
  ```bash
  ./DynSLAM path/to/kitti/sequence
  ```
+
+## Remarks
+
+  * The code follows
+    [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html)
+    with the following modifications:
+
+    * The column limit is 100 instead of 80, because of the bias towards
+      longer type names in the code base.
+    * Exceptions are allowed, but must be used judiciously (i.e., for
+      serious errors and exceptional situations).
