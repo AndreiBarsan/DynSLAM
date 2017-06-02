@@ -90,7 +90,10 @@ public:
   }
 
   void SaveStaticMap() {
-    // TODO(andrei): Custom name, etc.
+    // TODO(andrei): Custom file name, etc.
+    auto err = cudaGetLastError();
+    cout << cudaSuccess << " is success. We have: " << err << "." << endl;
+    cout << cudaGetErrorName(err) << endl << cudaGetErrorString(err) << endl << endl;
     static_scene_->SaveSceneToMesh("mesh_out.stl");
   }
 

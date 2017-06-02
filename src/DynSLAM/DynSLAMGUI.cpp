@@ -97,8 +97,8 @@ public:
         struct timeval tp;
         gettimeofday(&tp, NULL);
         double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-        double time_scale = 500.0;
-        double r = 0.3;
+        double time_scale = 1500.0;
+        double r = 0.25;
         double cx = cos(time_ms / time_scale) * r;
         double cy = sin(time_ms / time_scale) * r - r * 2;
         double cz = sin(time_ms / time_scale) * r;
@@ -110,36 +110,21 @@ public:
         );
       }
 
-//      UploadDummyTexture();
-//      dummy_image_texture->RenderToViewport(true);
-
-      // this seems to render fine!!
       const unsigned char *preview = dyn_slam_->GetObjectRaycastFreeViewPreview(
           visualized_object_idx_,
           pane_cam_->GetModelViewMatrix());
-
-//      if (dyn_slam_->GetCurrentFrameNo() > 0) {
-//        cv::Mat monkey_penis(cv::Size(1242, 375), CV_8UC4, (void*) preview);
-//        cv::imshow("", monkey_penis);
-//        cv::waitKey(0);
-//      }
 
       pane_texture->Upload(
           preview,
           GL_RGBA,
           GL_UNSIGNED_BYTE);
+      pangolin::GlFont &font = pangolin::GlFont::I();
       pane_texture->RenderToViewport(true);
+      font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-1.0, 0.9);
 
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
       pane_texture->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-
-//      if (dyn_slam_->GetCurrentFrameNo() > 0) {
-//        cv::Mat foo(cv::Size(1242, 375), CV_8UC4, (void *) dyn_slam_->GetRgbPreview());
-//        cv::imshow("", foo);
-//        cv::waitKey(0);
-//      }
-
       pane_texture->RenderToViewport(true);
 
       depth_view_.Activate();
@@ -171,7 +156,6 @@ public:
           GL_RGBA,
           GL_UNSIGNED_BYTE);
       pane_texture->RenderToViewport(true);
-      pangolin::GlFont &font = pangolin::GlFont::I();
       font.Text("Instance #%d", visualized_object_idx_).Draw(-1.0, 0.9);
 
       // Update various elements in the toolbar on the left.
@@ -346,6 +330,8 @@ protected:
 //
 //    cv::imshow("PFM depth map preview", preview);
 //    cv::waitKey(0);
+
+    cout << "Pangolin UI setup complete." << endl;
   }
 
   void SetupDummyImage() {
@@ -445,9 +431,9 @@ private:
   // Atomic because it gets set from a UI callback. Technically, Pangolin shouldn't invoke callbacks
   // from a different thread, but using atomics for this is generally a good practice anyway.
   atomic<int> active_object_count_;
+
   /// \brief Whether the 3D scene view should be automatically moving around.
   /// If this is off, then the user has control over the camera.
-
   pangolin::Var<bool> *wiggle_mode_;
 
   // Indicates which object is currently being visualized in the GUI.
@@ -521,6 +507,7 @@ int main(int argc, char **argv) {
   DynSlam *dyn_slam;
   Input *input;
   BuildDynSlamKittiOdometryGT(dataset_root, &dyn_slam, &input);
+
   gui::PangolinGui pango_gui(dyn_slam, input);
   pango_gui.Run();
 

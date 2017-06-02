@@ -9,7 +9,7 @@ ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const string &fpath) {
   ITMLib::Objects::ITMRGBDCalib out_calib;
   if (! ITMLib::Objects::readRGBDCalib(fpath.c_str(), out_calib)) {
     throw runtime_error(dynslam::utils::Format(
-        "Could not read calibration file: [%s]\n", fpath));
+        "Could not read calibration file: [%s]\n", fpath.c_str()));
   }
   return out_calib;
 }
