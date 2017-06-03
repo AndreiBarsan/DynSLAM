@@ -96,7 +96,7 @@ public:
     cout << cudaGetErrorName(err) << endl << cudaGetErrorString(err) << endl << endl;
 
     // TODO(andrei): Custom file name, etc.
-    static_scene_->SaveSceneToMesh("mesh_out.stl");
+    static_scene_->SaveSceneToMesh("mesh_out.obj");
   }
 
   void SaveDynamicObject(const::string &dataset_name, int object_id) {
@@ -104,7 +104,7 @@ public:
     // TODO(andrei): Make this more cross-platform.
     system(utils::Format("mkdir -p mesh_out/%s", dataset_name.c_str()).c_str());
 
-    string instance_fpath = utils::Format("mesh_out/%s/instance_%d_mesh.stl", dataset_name.c_str(), object_id);
+    string instance_fpath = utils::Format("mesh_out/%s/instance_%d_mesh.obj", dataset_name.c_str(), object_id);
     instance_reconstructor_->SaveObjectToMesh(object_id, instance_fpath);
 
     cout << "Done saving mesh for object #" << object_id << "'s reconstruction in file ["
