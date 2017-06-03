@@ -66,8 +66,8 @@ class Input {
 
   cv::Mat left_frame_buf_;
   cv::Mat right_frame_buf_;
-  cv::Mat depth_buf_;
-  cv::Mat disparity_buf_;
+  cv::Mat_<uint16_t> depth_buf_;
+//  cv::Mat disparity_buf_;
 
   // TODO get rid of this
   ITMLib::Objects::ITMRGBDCalib calibration_;
