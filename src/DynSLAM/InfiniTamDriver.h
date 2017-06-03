@@ -108,10 +108,7 @@ public:
           &itm_freeview_pose,
           &intrinsics);
     }
-    else {
-      // We're before the very first frame, so no raycast is available yet.
-//      std::cerr << "Warning: no raycast available yet." << endl;
-    }
+    // Otherwise: We're before the very first frame, so no raycast is available yet.
   }
 
 };

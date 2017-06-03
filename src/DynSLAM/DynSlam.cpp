@@ -22,8 +22,8 @@ void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_,
   input_rgb_image_= new ITMUChar4Image(input_shape, true, allocate_gpu);
   input_raw_depth_image_ = new ITMShortImage(input_shape, true, allocate_gpu);
 
-  input_width = input_shape.x;
-  input_height = input_shape.y;
+  input_width_ = input_shape.x;
+  input_height_ = input_shape.y;
 
   // TODO(andrei): Own CUDA safety wrapper. With blackjack. And hookers.
   ITMSafeCall(cudaThreadSynchronize());
