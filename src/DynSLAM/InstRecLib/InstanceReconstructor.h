@@ -87,7 +87,7 @@ class InstanceReconstructor {
 
     // TODO(andrei): Wrap this meshing code inside a nice utility.
     // Begin ITM-specific meshing code
-    const ITMLibSettings *settings = driver->GetSettings();
+    const ITMLibSettings *settings = track.GetReconstruction()->GetSettings();
     auto *meshing_engine = new ITMMeshingEngine_CUDA<ITMVoxel, ITMVoxelIndex>(
         settings->sdfLocalBlockNum);
     track.GetReconstruction()->GetScene();
@@ -104,7 +104,8 @@ class InstanceReconstructor {
     }
 
     meshing_engine->MeshScene(mesh, track.GetReconstruction()->GetScene());
-    mesh->WriteSTL(fpath.c_str());
+    mesh->WriteOBJ(fpath.c_str());
+//    mesh->WriteSTL(fpath.c_str());
 
     // TODO(andrei): This is obviously wasteful!
     delete mesh;
