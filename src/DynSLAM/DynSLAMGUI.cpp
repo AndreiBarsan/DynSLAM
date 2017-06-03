@@ -237,11 +237,9 @@ protected:
     wiggle_mode_ = new pangolin::Var<bool>("ui.Wiggle mode", true);
 
     pangolin::Var<function<void(void)>> previous_object("ui.Previous Object", [&]() {
-      cout << "Will select previous reconstructed object, once available..." << endl;
       SelectPreviousVisualizedObject();
     });
     pangolin::Var<function<void(void)>> next_object("ui.Next Object", [&]() {
-      cout << "Will select next reconstructed object, once available..." << endl;
       SelectNextVisualizedObject();
     });
     pangolin::RegisterKeyPressCallback('n', [&]() {
@@ -249,6 +247,9 @@ protected:
     });
     pangolin::Var<function<void(void)>> quit_button("ui.Quit", []() {
       pangolin::QuitAll();
+    });
+    pangolin::Var<function<void(void)>> save_object("ui.Save Active Object", [this]() {
+      dyn_slam_->SaveDynamicObject(dyn_slam_input_->GetName(), visualized_object_idx_);
     });
 
     // This is used for the free view camera. The focal lengths are not used in rendering, BUT they
@@ -442,6 +443,15 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   auto calib = ReadITMCalibration(dataset_root + "/itm-calib.txt");
   *input_out = new Input(
       dataset_root,
+      // TODO(andrei): ¿Por qué no los dos? Maybe it's worth investigating to use the more
+      // conservative, sharper libelas depth maps for the main map, but the smoother ones produced
+      // by dispnet for the objects. This may be a good idea since libelas tends to screw up when
+      // faced with reflective surfaces, but dispnet is more robust to that. Similarly, for certain
+      // areas of the static map such as foliage and fences, dispnet's smoothness is more of a
+      // liability than an asset.
+      // TODO(andrei): Make sure you normalize dispnet's depth range when using it, since it seems
+      // to be inconsistent across frames.
+      // TODO(andrei): Carefully read the dispnet paper.
 //      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm", false, true),
       new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", true, false),
       calib);

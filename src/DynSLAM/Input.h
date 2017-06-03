@@ -58,6 +58,10 @@ class Input {
                       static_cast<int>(calibration_.intrinsics_d.sizeY));
   }
 
+  std::string GetName() {
+    return dataset_folder_.substr(dataset_folder_.rfind('/'));
+  }
+
  private:
   DepthEngine *depth_engine_;
 
