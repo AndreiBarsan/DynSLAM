@@ -442,8 +442,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   auto calib = ReadITMCalibration(dataset_root + "/itm-calib.txt");
   *input_out = new Input(
       dataset_root,
-      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm", false, true),
-//      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", true, false),
+//      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm", false, true),
+      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", true, false),
       calib);
 
   *dyn_slam_out = new gui::DynSlam();

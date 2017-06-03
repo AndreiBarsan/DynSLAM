@@ -153,6 +153,11 @@ void InstanceReconstructor::ProcessReconstructions() {
   for (auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
 
+    if( track.GetLastFrame().frame_idx != frame_idx_) {
+      // If we don't have any new information in this track, there's nothing to fuse.
+      continue;
+    }
+
     if (! track.HasReconstruction()) {
       bool eligible = track.EligibleForReconstruction();
 
