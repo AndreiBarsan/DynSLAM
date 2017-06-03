@@ -78,11 +78,11 @@ public:
   }
 
   int GetInputWidth() {
-    return input_width;
+    return input_width_;
   }
 
   int GetInputHeight() {
-    return input_height;
+    return input_height_;
   }
 
   int GetCurrentFrameNo() {
@@ -90,17 +90,28 @@ public:
   }
 
   void SaveStaticMap() {
-    // TODO(andrei): Custom file name, etc.
+    // TODO(andrei): This sometimes indicates some error; find out what it means.
     auto err = cudaGetLastError();
     cout << cudaSuccess << " is success. We have: " << err << "." << endl;
     cout << cudaGetErrorName(err) << endl << cudaGetErrorString(err) << endl << endl;
+
+    // TODO(andrei): Custom file name, etc.
     static_scene_->SaveSceneToMesh("mesh_out.stl");
   }
 
-private:
-//  ITMLibSettings itm_lib_settings_;
-//  Input *input_;
+  void SaveDynamicObject(const::string &dataset_name, int object_id) {
+    cout << "Saving mesh for object #" << object_id << "'s reconstruction..." << endl;
+    // TODO(andrei): Make this more cross-platform.
+    system(utils::Format("mkdir -p mesh_out/%s", dataset_name.c_str()).c_str());
 
+    string instance_fpath = utils::Format("mesh_out/%s/instance_%d_mesh.stl", dataset_name.c_str(), object_id);
+    instance_reconstructor_->SaveObjectToMesh(object_id, instance_fpath);
+
+    cout << "Done saving mesh for object #" << object_id << "'s reconstruction in file ["
+         << instance_fpath << "]." << endl;
+  }
+
+private:
   // This is the main reconstruction component. Should split for dynamic+static.
   // In the future, we may need to write our own.
   // For now, this shall only handle reconstructing the static part of a scene.
@@ -114,15 +125,14 @@ private:
   ITMShortImage  *input_raw_depth_image_;
 
   int current_frame_no_;
-  int input_width;
-  int input_height;
+  int input_width_;
+  int input_height_;
 
   // TODO(andrei): Isolate this in a specific itam driver.
   const unsigned char* GetItamData(ITMMainEngine::GetImageType image_type) {
     static_scene_->GetImage(out_image_, image_type);
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
-
 };
 
 }

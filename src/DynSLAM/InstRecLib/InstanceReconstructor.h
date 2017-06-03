@@ -11,6 +11,10 @@
 
 #include "../InfiniTamDriver.h"
 
+namespace dynslam {
+  class DynSlam;
+}
+
 namespace instreclib {
 namespace reconstruction {
 
@@ -20,7 +24,9 @@ using namespace dynslam::drivers;
 class InstanceReconstructor {
  public:
   InstanceReconstructor(InfiniTamDriver *driver)
-      : instance_tracker_(new InstanceTracker()), frame_idx_(0), driver(driver) {}
+      : instance_tracker_(new InstanceTracker()),
+        frame_idx_(0),
+        driver(driver) {}
 
   /// \brief Uses the segmentation result to remove dynamic objects from the main view and save
   /// them to separate buffers, which are then used for individual object reconstruction.
@@ -67,9 +73,42 @@ class InstanceReconstructor {
     out->Clear();
   }
 
-  template<typename T>
-  bool Contains(const std::vector<T>& v, const T& el) {
-    return std::find(std::begin(v), std::end(v), el) != std::end(v);
+  void SaveObjectToMesh(int object_id, const string &fpath) {
+    // TODO nicer error handling
+    if(! instance_tracker_->HasTrack(object_id)) {
+      throw std::runtime_error("Unknown track");
+    }
+
+    const Track& track = instance_tracker_->GetTrack(object_id);
+
+    if(! track.HasReconstruction()) {
+      throw std::runtime_error("Track exists but has no reconstruction.");
+    }
+
+    // TODO(andrei): Wrap this meshing code inside a nice utility.
+    // Begin ITM-specific meshing code
+    const ITMLibSettings *settings = driver->GetSettings();
+    auto *meshing_engine = new ITMMeshingEngine_CUDA<ITMVoxel, ITMVoxelIndex>(
+        settings->sdfLocalBlockNum);
+    track.GetReconstruction()->GetScene();
+
+    MemoryDeviceType deviceType = (settings->deviceType == ITMLibSettings::DEVICE_CUDA
+                                   ? MEMORYDEVICE_CUDA
+                                   : MEMORYDEVICE_CPU);
+    ITMMesh *mesh = new ITMMesh(deviceType, settings->sdfLocalBlockNum);
+
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+      cerr << "Warning: we seem to have inherited an error here. Meshing should work OK but you "
+           << "should look into this..." << endl;
+    }
+
+    meshing_engine->MeshScene(mesh, track.GetReconstruction()->GetScene());
+    mesh->WriteSTL(fpath.c_str());
+
+    // TODO(andrei): This is obviously wasteful!
+    delete mesh;
+    delete meshing_engine;
   }
 
  private:
@@ -81,8 +120,12 @@ class InstanceReconstructor {
   /// detections through time, and dump old-enough reconstructions to the disk.
   int frame_idx_;
 
-  std::map<int, InfiniTamDriver *> id_to_reconstruction_;
-  // A bit hacky, but used as a "template" when allocating new reconstructors for objects.
+  // TODO(andrei): Is this still necessary?
+//  std::map<int, InfiniTamDriver *> id_to_reconstruction_;
+
+  // A bit hacky, but used as a "template" when allocating new reconstructors for objects. This is a
+  // pointer to the driver used for reconstructing the static scene.
+  // TODO(andrei): Looks like a good place to use factories.
   InfiniTamDriver *driver;
 
   void ProcessReconstructions();
