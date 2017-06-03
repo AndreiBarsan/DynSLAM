@@ -90,7 +90,7 @@ class DepthEngine {
         T disp = disparity.template at<T>(i, j);
 
         int32_t depth_long = static_cast<int32_t>(1000.0 * DepthFromDisparity(disp, calibration));
-        const int32_t kMaxDepthMeters = 25;
+        const int32_t kMaxDepthMeters = 20;
 
         if (depth_long > kMaxDepthMeters * 1000 || depth_long < 0) {
           depth_long = std::numeric_limits<uint16_t>::max();
