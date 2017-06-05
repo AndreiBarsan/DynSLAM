@@ -452,15 +452,10 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       // TODO(andrei): Make sure you normalize dispnet's depth range when using it, since it seems
       // to be inconsistent across frames.
       // TODO(andrei): Carefully read the dispnet paper.
-//      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm", false, true),
-      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", true, false),
+//      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm", true),
+      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", false),
       calib);
 
-  *dyn_slam_out = new gui::DynSlam();
-  cv::Vec2i rgb_size(static_cast<int>(calib.intrinsics_rgb.sizeX),
-                     static_cast<int>(calib.intrinsics_rgb.sizeY));
-  cv::Vec2i depth_size(static_cast<int>(calib.intrinsics_d.sizeX),
-                       static_cast<int>(calib.intrinsics_d.sizeY));
 
   // [RIP] I lost a couple of hours debugging a bug caused by the fact that InfiniTAM still works
   // even when there is a discrepancy between the size of the depth/rgb inputs, as specified in the
@@ -473,13 +468,14 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   drivers::InfiniTamDriver *driver = new InfiniTamDriver(
       settings,
       new ITMRGBDCalib(calib),
-      ToItmVec(rgb_size),
-      ToItmVec(depth_size));
+      ToItmVec((*input_out)->GetRgbSize()),
+      ToItmVec((*input_out)->GetDepthSize()));
 
   const string seg_folder = dataset_root + "/seg_image_2/mnc";
   auto segmentation_provider =
       new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder);
 
+  *dyn_slam_out = new gui::DynSlam();
   (*dyn_slam_out)->Initialize(driver, segmentation_provider);
 }
 

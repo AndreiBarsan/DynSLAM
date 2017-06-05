@@ -181,9 +181,13 @@ void InstanceReconstructor::ProcessReconstructions() {
       settings->createMeshingEngine = false;
       // Make the ground truth tracker start from the current frame, and not from the default
       // 0th frame.
-      settings->groundTruthPoseOffset = 0;
+      settings->groundTruthPoseOffset = track.GetStartTime();
       // TODO(andrei): Do the same once you support proper tracking, since you will need to
       // initialize the instance's "tracker" with some pose, or change the tracker used, etc.
+
+      // Lowering this can slightly increase the quality of the object's reconstruction, but at the
+      // cost of additional memory.
+//      settings->sceneParams.voxelSize = 0.0025f;
 
       track.GetReconstruction() = make_shared<InfiniTamDriver>(
           settings,
