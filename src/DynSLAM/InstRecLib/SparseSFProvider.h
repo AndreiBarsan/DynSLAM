@@ -7,7 +7,7 @@
 
 namespace instreclib {
 
-using ViewPair = std::pair<cv::Mat_<uint8_t>, cv::Mat_<uint8_t>>;
+using ViewPair = std::pair<cv::Mat1b*, cv::Mat1b*>;
 
 /// \brief Interface for components which can compute sparse scene flow from a scene view.
 class SparseSFProvider {

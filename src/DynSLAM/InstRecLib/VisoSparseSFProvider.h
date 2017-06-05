@@ -5,6 +5,8 @@
 
 #include "SparseSFProvider.h"
 
+#include <opencv/highgui.h>
+
 #include "../../libviso2/src/viso_stereo.h"
 
 namespace instreclib {
@@ -23,7 +25,7 @@ class VisoSparseSFProvider : public SparseSFProvider {
   }
 
   // TODO do we still need to path both? It seems viso keeps track of them internally anyway.
-  void ComputeSparseSceneFlow(const ViewPair &last_view,
+  void ComputeSparseSceneFlow(const ViewPair &_,
                               const ViewPair &current_view) override {
 
     using namespace std;
@@ -34,19 +36,22 @@ class VisoSparseSFProvider : public SparseSFProvider {
     // of the engine need it...
 
     // TODO(andrei): Is this safe? What if OpenCV represents the images differently?
-    uint8_t *left_bytes = current_view.first.data;
-    uint8_t *right_bytes = current_view.second.data;
+    uint8_t *left_bytes = current_view.first->data;
+    uint8_t *right_bytes = current_view.second->data;
 
     int dims[] = {
-        current_view.first.cols,
-        current_view.first.rows,
-        current_view.first.rows
+        current_view.first->cols,
+        current_view.first->rows,
+        current_view.first->rows
     };
     bool viso2_success = stereo_vo->process(left_bytes, right_bytes, dims);
     if (! viso2_success) {
       // TODO(andrei): In the long run, handle these failures more gracefully.
-      throw runtime_error("viso2 could not estimate egomotion and scene flow!");
+//      throw runtime_error("viso2 could not estimate egomotion and scene flow!");
+      cerr << "viso2 could not estimate egomotion and scene flow!";
     }
+
+    cout << "Computed scene flow OK." << endl;
 
     // TODO(andrei): Ensure this is not horribly slow (the match vector can be very big, and the
     // compiler isn't guaranteed to optimize away the two copies this call implies).

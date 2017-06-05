@@ -15,6 +15,7 @@
 
 #include "../pfmLib/ImageIOpfm.h"
 #include "PrecomputedDepthEngine.h"
+#include "InstRecLib/VisoSparseSFProvider.h"
 
 // Commandline arguments
 DEFINE_string(dataset_root, "", "The root folder of the dataset to use.");
@@ -436,6 +437,10 @@ private:
   /// user input.
   pangolin::Var<bool> *autoplay_;
 
+  // TODO(andrei): On-the-fly depth toggling.
+  // TODO(andrei): Reset button.
+  // TODO(andrei): Dynamically set depth range.
+
   // Indicates which object is currently being visualized in the GUI.
   int visualized_object_idx_ = 0;
 
@@ -457,7 +462,14 @@ private:
 /// This is useful when you want to focus on the quality of the reconstruction, instead of that of
 /// the odometry.
 void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
-  auto calib = ReadITMCalibration(dataset_root + "/itm-calib.txt");
+  auto itm_calibration = ReadITMCalibration(dataset_root + "/itm-calib.txt");
+
+  // Parameters used in the KITTI-odometry dataset.
+  // TODO(andrei): Read from a file or something.
+  float baseline_m = 0.537150654273f;
+  float focal_length_px = 707.0912f;
+  StereoCalibration stereo_calibration(baseline_m, focal_length_px);
+
   *input_out = new Input(
       dataset_root,
       // TODO(andrei): ¿Por qué no los dos? Maybe it's worth investigating to use the more
@@ -471,7 +483,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       // TODO(andrei): Carefully read the dispnet paper.
 //      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm", true),
       new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", false),
-      calib);
+      itm_calibration,
+      stereo_calibration);
 
 
   // [RIP] I lost a couple of hours debugging a bug caused by the fact that InfiniTAM still works
@@ -484,7 +497,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 
   drivers::InfiniTamDriver *driver = new InfiniTamDriver(
       settings,
-      new ITMRGBDCalib(calib),
+      new ITMRGBDCalib(itm_calibration),
       ToItmVec((*input_out)->GetRgbSize()),
       ToItmVec((*input_out)->GetDepthSize()));
 
@@ -492,8 +505,16 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   auto segmentation_provider =
       new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder);
 
+  VisualOdometryStereo::parameters sf_params;
+  sf_params.base = baseline_m;
+  sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;
+  sf_params.calib.cv = itm_calibration.intrinsics_rgb.projectionParamsSimple.py;
+  sf_params.calib.f  = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx; // TODO should be average fx and fy?
+
+  auto sparse_sf_provider = new instreclib::VisoSparseSFProvider(sf_params);
+
   *dyn_slam_out = new gui::DynSlam();
-  (*dyn_slam_out)->Initialize(driver, segmentation_provider);
+  (*dyn_slam_out)->Initialize(driver, segmentation_provider, sparse_sf_provider);
 }
 
 } // namespace dynslam
