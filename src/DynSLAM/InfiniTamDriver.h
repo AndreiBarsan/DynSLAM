@@ -34,18 +34,7 @@ ORUtils::Vector4<T> ToItmVec(const cv::Vec<T, 4> in) {
   return ORUtils::Vector4<T>(in[0], in[1], in[2], in[3]);
 }
 
-ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix) {
-  Matrix4f M;
-  for(int i = 0; i < 16; ++i) {
-    M.m[i] = static_cast<float>(pangolin_matrix.m[i]);
-  }
-
-  ITMPose itm_pose;
-  itm_pose.SetM(M);
-  itm_pose.Coerce();
-
-  return itm_pose;
-}
+ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix);
 
 /// \brief Interfaces between DynSLAM and InfiniTAM.
 class InfiniTamDriver : public ITMMainEngine {

@@ -55,6 +55,8 @@ find_package(Pangolin REQUIRED)
 
 # Use the Google flag library for sane handling of command-line flags.
 add_subdirectory(src/gflags)
+# Library for stereo visual odometry and sparse scene flow estimation.
+add_subdirectory(src/libviso2)
 
 IF(WITH_CUDA)
   include_directories(${CUDA_INCLUDE_DIRS})
@@ -69,6 +71,7 @@ find_package(OpenCV REQUIRED)
 # TODO(andrei): See pangolin's 'external' folder for neat ways of bringing in dependencies
 # from GitHub and building them if necessary.
 
+include_directories(${Viso2_INCLUDE_DIRS})
 include_directories(${Pangolin_INCLUDE_DIRS})
 include_directories(${OpenCV_INCLUDE_DIRS})
 
@@ -94,16 +97,10 @@ set(DYNSLAM_GUI_SOURCES
 
 add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} )
 
-#target_link_libraries(DynSLAM ${OpenCV_LIBS})
-## TODO(andrei): Rename this to ITMEngine or something for clarity.
-#target_link_libraries(DynSLAM Engine)
-## TODO(andrei): Ditto. These are the InfiniTAM utilities!
-#target_link_libraries(DynSLAM Utils)
-#target_link_libraries(DynSLAM ORUtils)
-#target_link_libraries(DynSLAM InstRecLib)
-
 add_executable(DynSLAMGUI ${DYNSLAM_GUI_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
+# TODO(andrei): Rename this to ITMEngine or something for clarity.
 target_link_libraries(DynSLAMGUI Engine)
+# TODO(andrei): Ditto. These are the InfiniTAM utilities!
 target_link_libraries(DynSLAMGUI Utils)
 target_link_libraries(DynSLAMGUI ITMLib)
 target_link_libraries(DynSLAMGUI ORUtils)
@@ -111,3 +108,4 @@ target_link_libraries(DynSLAMGUI InstRecLib)
 target_link_libraries(DynSLAMGUI ${Pangolin_LIBRARIES})
 target_link_libraries(DynSLAMGUI ${OpenCV_LIBS})
 target_link_libraries(DynSLAMGUI gflags)
+target_link_libraries(DynSLAMGUI ${Viso2_LIBS})
