@@ -9,7 +9,7 @@
 
 // Some necessary forward declarations
 namespace dynslam { namespace utils {
-  std::string type2str(int type);
+  std::string Type2Str(int type);
   std::string Format(const std::string& fmt, ...);
 }}
 
@@ -59,7 +59,7 @@ class DepthEngine {
     else {
       throw std::runtime_error(utils::Format(
           "Unknown data type for disparity matrix [%s]. Supported are CV_32FC1 and CV_16UC1.",
-          utils::type2str(out_disparity.type()).c_str()
+          utils::Type2Str(out_disparity.type()).c_str()
       ));
     }
   }
@@ -90,7 +90,12 @@ class DepthEngine {
         T disp = disparity.template at<T>(i, j);
 
         int32_t depth_long = static_cast<int32_t>(1000.0 * DepthFromDisparity(disp, calibration));
-        const int32_t kMaxDepthMeters = 20;
+
+        // TODO(andrei): Pass this as a parameter.
+        const int32_t kMaxDepthMeters = 12;
+
+        // TODO(andrei): Log min/max/mean depth and other stats, and verify whether the disparities
+        // produced by dispnet are consistent.
 
         if (depth_long > kMaxDepthMeters * 1000 || depth_long < 0) {
           depth_long = std::numeric_limits<uint16_t>::max();
