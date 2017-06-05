@@ -32,11 +32,13 @@ class Input {
  public:
   Input(const std::string &dataset_folder,
         DepthEngine *depth_engine,
-        const ITMLib::Objects::ITMRGBDCalib &calibration)
+        const ITMLib::Objects::ITMRGBDCalib &calibration,
+        const StereoCalibration &stereo_calibration)
       : depth_engine_(depth_engine),
         dataset_folder_(dataset_folder),
         frame_idx_(0),
-        calibration_(calibration) {}
+        calibration_(calibration),
+        stereo_calibration_(stereo_calibration) {}
 
   bool HasMoreImages();
 
@@ -52,24 +54,24 @@ class Input {
 
   void GetCvImages(cv::Mat4b &rgb, cv::Mat_<uint16_t> &raw_depth);
 
-  void GetCvStereoGray(const cv::Mat1b **left, const cv::Mat1b **right);
+  void GetCvStereoGray(cv::Mat1b **left, cv::Mat1b **right);
 
   ITMLib::Objects::ITMRGBDCalib GetITMCalibration() {
     std::cerr << "Warning: Using deprecated ITM calibration accessor!" << std::endl;
     return calibration_;
   };
 
-  cv::Size2i GetRgbSize() {
+  cv::Size2i GetRgbSize() const {
     return cv::Size2i(static_cast<int>(calibration_.intrinsics_rgb.sizeX),
                      static_cast<int>(calibration_.intrinsics_rgb.sizeY));
   }
 
-  cv::Size2i GetDepthSize() {
+  cv::Size2i GetDepthSize() const {
     return cv::Size2i(static_cast<int>(calibration_.intrinsics_d.sizeX),
                       static_cast<int>(calibration_.intrinsics_d.sizeY));
   }
 
-  std::string GetName() {
+  std::string GetName() const {
     return dataset_folder_.substr(dataset_folder_.rfind('/'));
   }
 
@@ -91,6 +93,7 @@ class Input {
 
   // TODO get rid of this and replace with a similar object which doesn't require ITM.
   ITMLib::Objects::ITMRGBDCalib calibration_;
+  StereoCalibration stereo_calibration_;
 
   // TODO dedicated subclass for reading stereo input
   std::string GetFrameName(std::string folder, std::string fname_format, int frame_idx) const {
