@@ -16,13 +16,13 @@ bool EndsWith(const std::string &value, const std::string &ending);
 /// \brief Streamlined 'sprintf' functionality for C++.
 std::string Format(const std::string& fmt, ...);
 
-inline bool file_exists(const std::__cxx11::string& name) {
+inline bool FileExists(const std::string &fpath) {
   struct stat buffer;
-  return stat(name.c_str(), &buffer) == 0;
+  return stat(fpath.c_str(), &buffer) == 0;
 }
 
-/// \brief Converts OpenCV image types to readable strings.
-std::string type2str(int type);
+/// \brief Converts an OpenCV image type to a human-readable string.
+std::string Type2Str(int type);
 
 } // namespace utils
 } // namespace dynslam

@@ -86,9 +86,9 @@ class Track {
 
   /// \brief Uses a series of ``goodness heuristics'' to establish whether the information
   /// contained in this track's frames is good enough for a 3D reconstruction.
-  /// TODO(andrei): Consider delegating this task to a separate (highly configurable) class.
+  // TODO(andrei): Consider delegating this task to a separate (highly configurable) class.
   bool EligibleForReconstruction() const {
-    // For now, use this simple heuristic.
+    // For now, use this simple heuristic: at least k frames in track.
     return GetSize() >= 7;
   }
 };
