@@ -5,6 +5,19 @@
 namespace dynslam {
 namespace drivers {
 
+ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix) {
+  Matrix4f M;
+  for(int i = 0; i < 16; ++i) {
+    M.m[i] = static_cast<float>(pangolin_matrix.m[i]);
+  }
+
+  ITMPose itm_pose;
+  itm_pose.SetM(M);
+  itm_pose.Coerce();
+
+  return itm_pose;
+}
+
 InfiniTamDriver::InfiniTamDriver(//const string& dataset_root,
                                  const ITMLibSettings* settings,
                                  const ITMRGBDCalib* calib,
@@ -31,7 +44,6 @@ void InfiniTamDriver::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawD
   this->Integrate();
   this->PrepareNextStep();
 }
-
 
 } // namespace drivers}
 } // namespace dynslam
