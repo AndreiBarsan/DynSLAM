@@ -7,10 +7,12 @@
 #include "InfiniTamDriver.h"
 #include "InstRecLib/InstanceReconstructor.h"
 #include "InstRecLib/PrecomputedSegmentationProvider.h"
+#include "InstRecLib/SparseSFProvider.h"
 #include "Input.h"
 
 namespace dynslam {
 
+using namespace instreclib;
 using namespace instreclib::reconstruction;
 using namespace instreclib::segmentation;
 using namespace dynslam::drivers;
@@ -22,9 +24,9 @@ class DynSlam {
 
 public:
   // TODO(andrei): If possible, get rid of the initialize method.
-  // TODO(andrei): Use as much dependency injection as you can.
-  void Initialize(InfiniTamDriver *itm_static_scene_engine_,
-                  SegmentationProvider *segmentation_provider);
+  void Initialize(InfiniTamDriver *itm_static_scene_engine,
+                  SegmentationProvider *segmentation_provider,
+                  SparseSFProvider *sparse_sf_provider);
 
   /// \brief Reads in and processes the next frame from the data source.
   void ProcessFrame(Input *input);
@@ -118,6 +120,7 @@ private:
   InfiniTamDriver *static_scene_;
   SegmentationProvider *segmentation_provider_;
   InstanceReconstructor *instance_reconstructor_;
+  SparseSFProvider *sparse_sf_provider_;
 
   ITMUChar4Image *out_image_;
   ITMFloatImage *out_image_float_;

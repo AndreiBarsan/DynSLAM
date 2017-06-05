@@ -8,15 +8,17 @@ namespace dynslam {
 
 using namespace instreclib::reconstruction;
 
-void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_,
-                         SegmentationProvider *segmentation_provider) {
+void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine,
+                         SegmentationProvider *segmentation_provider,
+                         SparseSFProvider *sparse_sf_provider) {
 
-  this->static_scene_ = itm_static_scene_engine_;
+  this->static_scene_ = itm_static_scene_engine;
+  this->sparse_sf_provider_ = sparse_sf_provider;
   this->current_frame_no_ = 0;
 
   bool allocate_gpu = true;
 
-  Vector2i input_shape = itm_static_scene_engine_->GetImageSize();
+  Vector2i input_shape = itm_static_scene_engine->GetImageSize();
   out_image_ = new ITMUChar4Image(input_shape, true, allocate_gpu);
   out_image_float_ = new ITMFloatImage(input_shape, true, allocate_gpu);
   input_rgb_image_= new ITMUChar4Image(input_shape, true, allocate_gpu);
@@ -29,7 +31,7 @@ void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine_,
   ITMSafeCall(cudaThreadSynchronize());
 
   this->segmentation_provider_ = segmentation_provider;
-  this->instance_reconstructor_ = new InstanceReconstructor(itm_static_scene_engine_);
+  this->instance_reconstructor_ = new InstanceReconstructor(itm_static_scene_engine);
 
   cout << "DynSLAM initialization complete." << endl;
 }
@@ -44,6 +46,16 @@ void DynSlam::ProcessFrame(Input *input) {
   if(!input->ReadNextFrame()) {
     throw runtime_error("Could not read input from the data source.");
   }
+
+  cv::Mat1b *left_gray, *right_gray;
+  input->GetCvStereoGray(&left_gray, &right_gray);
+
+  cout << left_gray->size() << ", " << right_gray->size() << endl;
+
+  sparse_sf_provider_->ComputeSparseSceneFlow(
+      make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
+      make_pair(left_gray, right_gray)
+  );
 
   input->GetItmImages(input_rgb_image_, input_raw_depth_image_);
 

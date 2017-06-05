@@ -55,8 +55,10 @@ bool Input::ReadNextFrame() {
   string right_color_folder = dataset_folder_ + "/image_3";
   string fname_format = "%06d.png";
 
-  left_frame_gray_buf_ = cv::imread(GetFrameName(left_gray_folder, fname_format, frame_idx_));
-  right_frame_gray_buf_ = cv::imread(GetFrameName(right_gray_folder, fname_format, frame_idx_));
+  left_frame_gray_buf_ = cv::imread(GetFrameName(left_gray_folder, fname_format, frame_idx_),
+                                    CV_LOAD_IMAGE_UNCHANGED);
+  right_frame_gray_buf_ = cv::imread(GetFrameName(right_gray_folder, fname_format, frame_idx_),
+                                     CV_LOAD_IMAGE_UNCHANGED);
   left_frame_color_buf_ = cv::imread(GetFrameName(left_color_folder, fname_format, frame_idx_));
   right_frame_color_buf_ = cv::imread(GetFrameName(right_color_folder, fname_format, frame_idx_));
 
@@ -77,12 +79,10 @@ bool Input::ReadNextFrame() {
     return false;
   }
 
-  // Parameters used in the KITTI-odometry dataset.
-  // TODO(andrei): Pass these things to the Input class!
-  float baseline_m = 0.537150654273f;
-  float focal_length_px = 707.0912f;
-  StereoCalibration stereo_calibration(baseline_m, focal_length_px);
-  depth_engine_->DepthFromStereo(left_frame_color_buf_, right_frame_color_buf_, stereo_calibration, depth_buf_);
+  depth_engine_->DepthFromStereo(left_frame_color_buf_,
+                                 right_frame_color_buf_,
+                                 stereo_calibration_,
+                                 depth_buf_);
 
   const auto &depth_size = GetDepthSize();
   if (depth_buf_.rows != depth_size.height || depth_buf_.cols != depth_size.width) {
@@ -106,7 +106,9 @@ void Input::GetCvImages(cv::Mat4b &rgb, cv::Mat_<uint16_t> &raw_depth) {
   raw_depth = depth_buf_;
 }
 
-void Input::GetCvStereoGray(const cv::Mat1b **left, const cv::Mat1b **right) {
+void Input::GetCvStereoGray(cv::Mat1b **left, cv::Mat1b **right) {
+  cout << "Getting image..." << endl;
+
   *left = &left_frame_gray_buf_;
   *right = &right_frame_gray_buf_;
 }
