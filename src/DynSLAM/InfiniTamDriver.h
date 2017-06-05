@@ -13,9 +13,15 @@
 namespace dynslam {
 namespace drivers {
 
+// Utilities for converting from OpenCV to InfiniTAM vectors.
 template<typename T>
 ORUtils::Vector2<T> ToItmVec(const cv::Vec<T, 2> in) {
   return ORUtils::Vector2<T>(in[0], in[1]);
+}
+
+template<typename T>
+ORUtils::Vector2<T> ToItmVec(const cv::Size_<T> in) {
+  return ORUtils::Vector2<T>(in.width, in.height);
 }
 
 template<typename T>
@@ -26,6 +32,19 @@ ORUtils::Vector3<T> ToItmVec(const cv::Vec<T, 3> in) {
 template<typename T>
 ORUtils::Vector4<T> ToItmVec(const cv::Vec<T, 4> in) {
   return ORUtils::Vector4<T>(in[0], in[1], in[2], in[3]);
+}
+
+ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix) {
+  Matrix4f M;
+  for(int i = 0; i < 16; ++i) {
+    M.m[i] = static_cast<float>(pangolin_matrix.m[i]);
+  }
+
+  ITMPose itm_pose;
+  itm_pose.SetM(M);
+  itm_pose.Coerce();
+
+  return itm_pose;
 }
 
 /// \brief Interfaces between DynSLAM and InfiniTAM.
@@ -91,16 +110,8 @@ public:
       GetImageType get_image_type,
       const pangolin::OpenGlMatrix &model_view = pangolin::IdentityMatrix()
   ) {
-    // TODO helper function for this
-    Matrix4f M;
-    for(int i = 0; i < 16; ++i) {
-      M.m[i] = static_cast<float>(model_view.m[i]);
-    }
-
-    ITMPose itm_freeview_pose;
-    itm_freeview_pose.SetM(M);
-
     if (nullptr != this->view) {
+      ITMPose itm_freeview_pose = PoseFromPangolin(model_view);
       ITMIntrinsics intrinsics = this->view->calib->intrinsics_d;
       ITMMainEngine::GetImage(
           out,
