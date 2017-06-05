@@ -56,7 +56,7 @@ public:
       : dyn_slam_(dyn_slam),
         dyn_slam_input_(input)
   {
-    cout << "Pangolin GUI initialized." << endl;
+    cout << "Pangolin GUI initializing..." << endl;
 
     // TODO(andrei): Proper scaling to save space and memory.
     width = dyn_slam->GetInputWidth(); // / 1.5;
@@ -64,6 +64,8 @@ public:
 
     SetupDummyImage();
     CreatePangolinDisplays();
+
+    cout << "Pangolin GUI initialized." << endl;
   }
 
   virtual ~PangolinGui() {
@@ -83,6 +85,10 @@ public:
 
       // TODO(andrei): You've ransacked this method quite a lot looking for that calibration bug on
       // June 1st. Please clean up!
+
+      if (autoplay_->Get()) {
+        ProcessFrame();
+      }
 
       main_view->Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
@@ -120,7 +126,7 @@ public:
           GL_UNSIGNED_BYTE);
       pangolin::GlFont &font = pangolin::GlFont::I();
       pane_texture->RenderToViewport(true);
-      font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-1.0, 0.9);
+      font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.95, 0.9);
 
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
@@ -163,6 +169,11 @@ public:
         "%d active reconstructions",
         dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount()
       );
+
+      // Disable autoplay once we reach the end of a sequence.
+      if (! this->dyn_slam_input_->HasMoreImages()) {
+        (*this->autoplay_) = false;
+      }
 
       // Swap frames and Process Events
       pangolin::FinishFrame();
@@ -234,7 +245,8 @@ protected:
     });
     reconstructions = new pangolin::Var<string>("ui.Rec", "");
 
-    wiggle_mode_ = new pangolin::Var<bool>("ui.Wiggle mode", true);
+    wiggle_mode_ = new pangolin::Var<bool>("ui.Wiggle mode", false, true);
+    autoplay_ = new pangolin::Var<bool>("ui.Autoplay", false, true);
 
     pangolin::Var<function<void(void)>> previous_object("ui.Previous Object", [&]() {
       SelectPreviousVisualizedObject();
@@ -243,6 +255,7 @@ protected:
       SelectNextVisualizedObject();
     });
     pangolin::RegisterKeyPressCallback('n', [&]() {
+      *(this->autoplay_) = false;
       this->ProcessFrame();
     });
     pangolin::Var<function<void(void)>> quit_button("ui.Quit", []() {
@@ -295,7 +308,8 @@ protected:
     // OpenGL 'view' of data such as the number of actively tracked instances over time.
     float tick_x = 1.0f;
     float tick_y = 1.0f;
-    plotter_ = new pangolin::Plotter(&data_log_, 0.0f, 100.0f, -0.1f, 25.0f, tick_x, tick_y);
+    plotter_ = new pangolin::Plotter(&data_log_, 0.0f, 200.0f, -0.1f, 25.0f, tick_x, tick_y);
+    plotter_->Track("$i");  // This enables automatic scrolling for the live plots.
 
     // TODO(andrei): Maybe wrap these guys in another controller, make it an equal layout and
     // automagically support way more aspect ratios?
@@ -418,6 +432,9 @@ private:
   /// \brief Whether the 3D scene view should be automatically moving around.
   /// If this is off, then the user has control over the camera.
   pangolin::Var<bool> *wiggle_mode_;
+  /// \brief When this is on, the input gets processed as fast as possible, without requiring any
+  /// user input.
+  pangolin::Var<bool> *autoplay_;
 
   // Indicates which object is currently being visualized in the GUI.
   int visualized_object_idx_ = 0;

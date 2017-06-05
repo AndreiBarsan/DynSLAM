@@ -41,46 +41,48 @@ void CvToItm(const cv::Mat1s &mat, ITMShortImage *out_depth) {
 }
 
 bool Input::HasMoreImages() {
-  string next_fpath = GetRgbFrameName(
+  string next_fpath = GetFrameName(
       dataset_folder_ + "/image_0/",
       "%06d.png",
       frame_idx_);
-  return utils::file_exists(next_fpath);
+  return utils::FileExists(next_fpath);
 }
 
-bool Input::GetITMImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
-  string left_folder = dataset_folder_ + "/image_2";
-  string right_folder = dataset_folder_ + "/image_3";
-  string rgb_frame_fname_format = "%06d.png";
-  string left_frame_fpath = GetRgbFrameName(left_folder, rgb_frame_fname_format, frame_idx_);
-  string right_frame_fpath = GetRgbFrameName(right_folder, rgb_frame_fname_format, frame_idx_);
-  left_frame_buf_ = cv::imread(left_frame_fpath);
-  right_frame_buf_ = cv::imread(right_frame_fpath);
+bool Input::ReadNextFrame() {
+  string left_gray_folder = dataset_folder_ + "/image_0";
+  string right_gray_folder = dataset_folder_ + "/image_1";
+  string left_color_folder = dataset_folder_ + "/image_2";
+  string right_color_folder = dataset_folder_ + "/image_3";
+  string fname_format = "%06d.png";
+
+  left_frame_gray_buf_ = cv::imread(GetFrameName(left_gray_folder, fname_format, frame_idx_));
+  right_frame_gray_buf_ = cv::imread(GetFrameName(right_gray_folder, fname_format, frame_idx_));
+  left_frame_color_buf_ = cv::imread(GetFrameName(left_color_folder, fname_format, frame_idx_));
+  right_frame_color_buf_ = cv::imread(GetFrameName(right_color_folder, fname_format, frame_idx_));
 
   // Sanity checks to ensure the dimensions from the calibration file and the actual image
   // dimensions correspond.
   const auto &rgb_size = GetRgbSize();
-  if (left_frame_buf_.rows != rgb_size.height || left_frame_buf_.cols != rgb_size.width) {
-    cerr << "Unexpected left RGB frame size. Got " << left_frame_buf_.size() << ", but the "
+  if (left_frame_color_buf_.rows != rgb_size.height ||
+      left_frame_color_buf_.cols != rgb_size.width) {
+    cerr << "Unexpected left RGB frame size. Got " << left_frame_color_buf_.size() << ", but the "
          << "calibration file specified " << rgb_size << "." << endl;
     return false;
   }
 
-  if (right_frame_buf_.rows != rgb_size.height || right_frame_buf_.cols != rgb_size.width) {
-    cerr << "Unexpected right RGB frame size. Got " << right_frame_buf_.size() << ", but the "
-        << "calibration file specified " << rgb_size << "." << endl;
+  if (right_frame_color_buf_.rows != rgb_size.height ||
+      right_frame_color_buf_.cols != rgb_size.width) {
+    cerr << "Unexpected right RGB frame size. Got " << right_frame_color_buf_.size() << ", but the "
+         << "calibration file specified " << rgb_size << "." << endl;
     return false;
   }
-
-  // The left frame is the RGB input to our system.
-  CvToItm(left_frame_buf_, rgb);
 
   // Parameters used in the KITTI-odometry dataset.
   // TODO(andrei): Pass these things to the Input class!
   float baseline_m = 0.537150654273f;
   float focal_length_px = 707.0912f;
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
-  depth_engine_->DepthFromStereo(left_frame_buf_, right_frame_buf_, stereo_calibration, depth_buf_);
+  depth_engine_->DepthFromStereo(left_frame_color_buf_, right_frame_color_buf_, stereo_calibration, depth_buf_);
 
   const auto &depth_size = GetDepthSize();
   if (depth_buf_.rows != depth_size.height || depth_buf_.cols != depth_size.width) {
@@ -89,10 +91,24 @@ bool Input::GetITMImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
     return false;
   }
 
-  CvToItm(depth_buf_, raw_depth);
-
   frame_idx_++;
   return true;
+}
+
+void Input::GetItmImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
+  // The left frame is the RGB input to our system.
+  CvToItm(left_frame_color_buf_, rgb);
+  CvToItm(depth_buf_, raw_depth);
+}
+
+void Input::GetCvImages(cv::Mat4b &rgb, cv::Mat_<uint16_t> &raw_depth) {
+  rgb = left_frame_color_buf_;
+  raw_depth = depth_buf_;
+}
+
+void Input::GetCvStereoGray(const cv::Mat1b **left, const cv::Mat1b **right) {
+  *left = &left_frame_gray_buf_;
+  *right = &right_frame_gray_buf_;
 }
 
 } // namespace dynslam

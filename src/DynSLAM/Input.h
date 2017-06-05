@@ -24,8 +24,10 @@ void CvToItm(const cv::Mat1s &mat, ITMShortImage *out_depth);
 // them.
 ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const std::string& fpath);
 
-// TODO(andrei): Better name and docs for this once the interface is fleshed out.
-// TODO(andrei): Move code to cpp.
+/// \brief Provides input from DynSLAM, in the form of RGBD frames.
+/// Since DynSLAM currently operates with stereo input, this class also computes depth from stereo.
+/// Currently, this is "computed" by reading the depth maps from disk, but the plan is to compute
+/// depth on the fly in the future.
 class Input {
  public:
   Input(const std::string &dataset_folder,
@@ -38,10 +40,19 @@ class Input {
 
   bool HasMoreImages();
 
-  // TODO get rid of this and use some other format
+  /// \brief Advances the input reader to the next frame.
+  /// \returns True if the next frame's files could be read successfully.
+  bool ReadNextFrame();
+
+  // TODO(andrei): This copies shit around anyway. Make things neater, and copy that shit using the
+  // ITM driver instead.
   /// \brief Reads from the input folders into the specified InfiniTAM buffers.
   /// \return True if the images could be loaded and processed appropriately.
-  bool GetITMImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth);
+  void GetItmImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth);
+
+  void GetCvImages(cv::Mat4b &rgb, cv::Mat_<uint16_t> &raw_depth);
+
+  void GetCvStereoGray(const cv::Mat1b **left, const cv::Mat1b **right);
 
   ITMLib::Objects::ITMRGBDCalib GetITMCalibration() {
     std::cerr << "Warning: Using deprecated ITM calibration accessor!" << std::endl;
@@ -68,16 +79,21 @@ class Input {
   std::string dataset_folder_;
   int frame_idx_;
 
-  cv::Mat left_frame_buf_;
-  cv::Mat right_frame_buf_;
+  cv::Mat left_frame_color_buf_;
+  cv::Mat right_frame_color_buf_;
   cv::Mat_<uint16_t> depth_buf_;
 //  cv::Mat disparity_buf_;
 
-  // TODO get rid of this
+  // Store the grayscale information necessary for scene flow computation using libviso2, and
+  // on-the-fly depth map computation using libelas.
+  cv::Mat1b left_frame_gray_buf_;
+  cv::Mat1b right_frame_gray_buf_;
+
+  // TODO get rid of this and replace with a similar object which doesn't require ITM.
   ITMLib::Objects::ITMRGBDCalib calibration_;
 
   // TODO dedicated subclass for reading stereo input
-  std::string GetRgbFrameName(std::string folder, std::string fname_format, int frame_idx) const {
+  std::string GetFrameName(std::string folder, std::string fname_format, int frame_idx) const {
     return folder + "/" + utils::Format(fname_format, frame_idx);
   }
 
