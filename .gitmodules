@@ -9,7 +9,7 @@
 	url = https://github.com/gflags/gflags
 [submodule "src/pfmLib"]
 	path = src/pfmLib
-	url = https://github.com/dscharstein/pfmLib
+	url = https://github.com/AndreiBarsan/pfmLib
 [submodule "src/libviso2"]
 	path = src/libviso2
 	url = https://github.com/AndreiBarsan/libviso2-mirror
