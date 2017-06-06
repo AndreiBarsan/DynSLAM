@@ -34,16 +34,9 @@ using namespace dynslam::utils;
 uint8_t *ReadMask(std::istream &np_txt_in, const int width, const int height) {
   // TODO(andrei): Is this stupidly slow?
   // TODO(andrei): Move to general utils or to IO library.
-  // TODO(andrei): We could probably YOLO and work with binary anyway.
   int lines_read = 0;
   string line_buf;
-//  uint8_t **mask = new uint8_t *[height];
   uint8_t *mask_data = new uint8_t[height * width];
-
-//  memset(mask, 0, sizeof(size_t) * height);
-//  for(int i = 0; i < height; ++i) {
-//    mask[i] =
-//  }
 
   while (getline(np_txt_in, line_buf)) {
     if (lines_read >= height) {
@@ -52,7 +45,6 @@ uint8_t *ReadMask(std::istream &np_txt_in, const int width, const int height) {
       throw runtime_error(error_ss.str());
     }
 
-//    mask[lines_read] = new uint8_t[width];
     istringstream line_ss(line_buf);
     int col = 0;
     while (!line_ss.eof()) {
@@ -73,7 +65,6 @@ uint8_t *ReadMask(std::istream &np_txt_in, const int width, const int height) {
     lines_read++;
   }
 
-//  return mask;
   return mask_data;
 }
 
@@ -84,12 +75,10 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
   // They are saved by the pre-segmentation tool as:
   //     '${base_img_fpath}.${instance_idx}.{result,mask}.txt'.
   //
-  // The result file is one line with the format "[x1 y1 x2 y2 junk],
-  // probability, class". The
-  // first part represents the bounding box of the detection.
+  // The result file is one line with the format "[x1 y1 x2 y2 junk], probability, class".
+  // The first part represents the bounding box of the detection.
   //
-  // The mask file is a numpy text file containing the saved (boolean) mask
-  // created by the neural
+  // The mask file is a numpy text file containing the saved (boolean) mask created by the neural
   // network. Its size is exactly the size of the bounding box.
 
   int instance_idx = 0;
@@ -138,38 +127,42 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
   return detections;
 }
 
-shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentFrame(ITMUChar4Image *) {
+shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentFrame(const cv::Mat4b &rgb) {
   stringstream img_fpath_ss;
-  img_fpath_ss << this->segFolder_ << "/"
-               << "cls_" << setfill('0') << setw(6) << this->frameIdx_ << ".png";
+  img_fpath_ss << this->seg_folder_ << "/"
+               << "cls_" << setfill('0') << setw(6) << this->frame_idx_ << ".png";
   const string img_fpath = img_fpath_ss.str();
-  cv::Mat img = cv::imread(img_fpath);
-  if (! img.data) {
+  if (last_seg_preview_ == nullptr) {
+    last_seg_preview_ = new cv::Mat4b(rgb.rows, rgb.cols);
+  }
+
+  *last_seg_preview_ = cv::imread(img_fpath);
+  if (! last_seg_preview_->data) {
     throw std::runtime_error(Format(
         "Could not read segmentation preview image from file [%s].",
         img_fpath));
   }
-  // TODO(andrei): Why not just make the preview a CV image and be done with it?
-  dynslam::CvToItm(img, last_seg_preview_);
 
   stringstream meta_img_ss;
-  meta_img_ss << this->segFolder_ << "/" << setfill('0') << setw(6) << this->frameIdx_ << ".png";
+  meta_img_ss << this->seg_folder_ << "/" << setfill('0') << setw(6) << this->frame_idx_ << ".png";
   vector<InstanceDetection> instance_detections = ReadInstanceInfo(meta_img_ss.str());
 
   // We read pre-computed segmentations off the disk, so we assume this is 0.
   long inference_time_ns = 0L;
 
-  this->frameIdx_++;
+  this->frame_idx_++;
 
-  return make_shared<InstanceSegmentationResult>(dataset_used, instance_detections,
-                                                 inference_time_ns);
+  return make_shared<InstanceSegmentationResult>(
+      dataset_used,
+      instance_detections,
+      inference_time_ns);
 }
 
-const ORUtils::Image<Vector4u> *PrecomputedSegmentationProvider::GetSegResult() const {
+const cv::Mat4b* PrecomputedSegmentationProvider::GetSegResult() const {
   return this->last_seg_preview_;
 }
 
-ORUtils::Image<Vector4u> *PrecomputedSegmentationProvider::GetSegResult() {
+cv::Mat4b* PrecomputedSegmentationProvider::GetSegResult() {
   return this->last_seg_preview_;
 }
 

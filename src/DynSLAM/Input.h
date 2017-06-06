@@ -46,11 +46,12 @@ class Input {
   /// \returns True if the next frame's files could be read successfully.
   bool ReadNextFrame();
 
-  // TODO(andrei): This copies shit around anyway. Make things neater, and copy that shit using the
+  // TODO(andrei): This copies things around anyway. Make things neater, and copy that shit using the
   // ITM driver instead.
+
   /// \brief Reads from the input folders into the specified InfiniTAM buffers.
   /// \return True if the images could be loaded and processed appropriately.
-  void GetItmImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth);
+//  void GetItmImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth);
 
   void GetCvImages(cv::Mat4b &rgb, cv::Mat_<uint16_t> &raw_depth);
 

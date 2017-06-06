@@ -17,14 +17,12 @@ class SegmentationProvider {
   virtual ~SegmentationProvider(){};
 
   /// \brief Performs semantic segmentation of the given frame.
-  /// Usually uses only RGB data, but some segmentation pipelines may leverage
-  /// e.g., depth as
-  /// well.
-  virtual std::shared_ptr<InstanceSegmentationResult> SegmentFrame(ITMUChar4Image *rgb) = 0;
+  /// Usually uses only RGB data, but some segmentation pipelines may leverage depth as well.
+  virtual std::shared_ptr<InstanceSegmentationResult> SegmentFrame(const cv::Mat4b &rgb) = 0;
 
-  virtual ITMUChar4Image *GetSegResult() = 0;
+  virtual cv::Mat4b *GetSegResult() = 0;
 
-  virtual const ITMUChar4Image *GetSegResult() const = 0;
+  virtual const cv::Mat4b *GetSegResult() const = 0;
 };
 
 }  // namespace segmentation
