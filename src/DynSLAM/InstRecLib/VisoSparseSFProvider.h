@@ -28,7 +28,6 @@ class VisoSparseSFProvider : public SparseSFProvider {
   // TODO do we still need to path both? It seems viso keeps track of them internally anyway.
   void ComputeSparseSceneFlow(const ViewPair &_,
                               const ViewPair &current_view) override {
-
     using namespace std;
     using namespace dynslam::utils;
 
@@ -70,7 +69,7 @@ class VisoSparseSFProvider : public SparseSFProvider {
     if (! viso2_success) {
       // TODO(andrei): In the long run, handle these failures more gracefully.
 //      throw runtime_error("viso2 could not estimate egomotion and scene flow!");
-      cerr << "viso2 could not estimate egomotion and scene flow! (OK fir first frame)" << endl;
+//      cerr << "viso2 could not estimate egomotion and scene flow! (OK for first frame)" << endl;
       matches_available_ = false;
     }
     else {
