@@ -17,11 +17,11 @@
 #include "PrecomputedDepthEngine.h"
 #include "InstRecLib/VisoSparseSFProvider.h"
 
-// Commandline arguments
+// Commandline arguments using gflags
 DEFINE_string(dataset_root, "", "The root folder of the dataset to use.");
 
-// TODO(andrei): Use [RIP] tags to signal spots where you wasted more than 30 minutes debugging a
-// small, silly issue.
+// Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
+// issue.
 
 // Handle SIGSEGV and its friends by printing sensible stack traces with code snippets.
 // TODO(andrei): this is a hack, please remove or depend on backward directly.
@@ -47,9 +47,9 @@ using namespace dynslam::utils;
 static const int kUiWidth = 300;
 static const float kPlotTimeIncrement = 0.1f;
 
-/// TODO(andrei): Seriously consider using QT or wxWidgets. Pangolin is VERY limited in terms of the
-/// widgets it supports. It doesn't even seem to support multiline text, or any reasonable way to
-/// paint labels or lists or anything... Might be better not to worry too much about this, since
+/// TODO-LOW(andrei): Consider using QT or wxWidgets. Pangolin is limited in terms of the widgets it
+/// supports. It doesn't even seem to support multiline text, or any reasonable way to display plain
+/// labels or lists or anything... Might be better not to worry too much about this, since
 /// there isn't that much time...
 class PangolinGui {
 public:
@@ -82,48 +82,48 @@ public:
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       glColor3f(1.0, 1.0, 1.0);
 
-      // TODO(andrei): You've ransacked this method quite a lot looking for that calibration bug on
-      // June 1st. Please clean up!
-
       if (autoplay_->Get()) {
         ProcessFrame();
       }
 
       main_view_->Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
-      const unsigned char *slam_frame_data = dyn_slam_->GetRaycastPreview();
 
-      // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance,
-      // so you get dark, uncolored images.
-//      pane_texture_->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
-//      pane_texture_->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-
-      // Some experimental code for getting the camera to move on its own.
-      if (wiggle_mode_->Get()) {
-        struct timeval tp;
-        gettimeofday(&tp, NULL);
-        double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-        double time_scale = 1500.0;
-        double r = 0.2;
-        double cx = cos(time_ms / time_scale) * r;
-        double cy = sin(time_ms / time_scale) * r - r * 2;
-        double cz = sin(time_ms / time_scale) * r;
-        pane_cam_->SetModelViewMatrix(
-            pangolin::ModelViewLookAt(
-                0, 0.0, 0.2,
-                0, 0.5 + cy, -1.0,
-                pangolin::AxisY)
-        );
+      if(live_raycast_->Get()) {
+        const unsigned char *slam_frame_data = dyn_slam_->GetRaycastPreview();
+        pane_texture_->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
       }
+      else {
+        // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance,
+        // so you get dark, uncolored images.
 
-      const unsigned char *preview = dyn_slam_->GetObjectRaycastFreeViewPreview(
-          visualized_object_idx_,
-          pane_cam_->GetModelViewMatrix());
+        // Some experimental code for getting the camera to move on its own.
+        if (wiggle_mode_->Get()) {
+          struct timeval tp;
+          gettimeofday(&tp, NULL);
+          double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+          double time_scale = 1500.0;
+          double r = 0.2;
+//          double cx = cos(time_ms / time_scale) * r;
+          double cy = sin(time_ms / time_scale) * r - r * 2;
+//          double cz = sin(time_ms / time_scale) * r;
+          pane_cam_->SetModelViewMatrix(
+              pangolin::ModelViewLookAt(
+                  0, 0.0, 0.2,
+                  0, 0.5 + cy, -1.0,
+                  pangolin::AxisY)
+          );
+        }
 
-      pane_texture_->Upload(
-          preview,
-          GL_RGBA,
-          GL_UNSIGNED_BYTE);
+        const unsigned char *preview = dyn_slam_->GetObjectRaycastFreeViewPreview(
+            visualized_object_idx_,
+            pane_cam_->GetModelViewMatrix());
+
+        pane_texture_->Upload(
+            preview,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE);
+      }
       pangolin::GlFont &font = pangolin::GlFont::I();
       pane_texture_->RenderToViewport(true);
       font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.95, 0.9);
@@ -227,6 +227,8 @@ public:
     pangolin::GlFont &font = pangolin::GlFont::I();
     font.Text("libviso2 scene flow preview").Draw(-0.98f, 0.89f);
 
+    // We don't need z-checks since we're rendering UI stuff.
+    glDisable(GL_DEPTH_TEST);
     for(const Matcher::p_match &match : flow.matches) {
       // TODO(andrei): uv-to-gl coordinate transformation utility.
       float gl_x = (match.u1c - panel_width) / panel_width;
@@ -238,52 +240,12 @@ public:
       float delta_y = gl_y - gl_y_old;
       float magnitude = sqrt(delta_x * delta_x + delta_y * delta_y) * 15.0f;
 
-      // TODO(andrei): Unfuck the projection matrix so that whatever we draw looks nice and not stretched.
-      glDisable(GL_DEPTH_TEST);
-      glColor4f(min(1.0f, magnitude), 0.3f, 0.3f, 1.0f);
-
-      pangolin::glDrawCross(gl_x, gl_y, 0.02f);
+      glColor4f(max(0.2f, min(1.0f, magnitude)), 0.4f, 0.4f, 1.0f);
+      pangolin::glDrawCross(gl_x, gl_y, 0.025f);
       pangolin::glDrawLine(gl_x_old, gl_y_old, gl_x, gl_y);
-
-      glEnable(GL_DEPTH_TEST);
-
-      /*
-      GLdouble projection[16];
-      GLdouble modelview[16];
-      GLint    view[4];
-      GLdouble scrn[3];
-
-      glGetDoublev(GL_PROJECTION_MATRIX, projection );
-      glGetDoublev(GL_MODELVIEW_MATRIX, modelview );
-      glGetIntegerv(GL_VIEWPORT, view );
-
-      pangolin::glProject(gl_x, gl_y, 0.0, modelview, projection, view,
-                          scrn, scrn + 1, scrn + 2);
-
-//      DisplayBase().Activate();
-      glMatrixMode(GL_PROJECTION);
-      glPushMatrix();
-      glLoadIdentity();
-      glOrtho(-0.5, 0.5, -0.5, 0.5, -1, 1);
-      glMatrixMode(GL_MODELVIEW);
-      glPushMatrix();
-      glLoadIdentity();
-
-      glTranslatef(std::floor((GLfloat)scrn[0]), std::floor((GLfloat)scrn[1]), (GLfloat)scrn[2]);
-
-      // Is all the boilerplate really necessary?
-      pangolin::glDrawCross(gl_x, gl_y, 0.10f);
-
-      // Restore viewport
-      glViewport(view[0],view[1],view[2],view[3]);
-
-      // Restore modelview / project matrices
-      glMatrixMode(GL_PROJECTION);
-      glPopMatrix();
-      glMatrixMode(GL_MODELVIEW);
-      glPopMatrix();
-      //*/
     }
+
+    glEnable(GL_DEPTH_TEST);
   }
 
 protected:
@@ -317,6 +279,7 @@ protected:
 
     wiggle_mode_ = new pangolin::Var<bool>("ui.Wiggle mode", false, true);
     autoplay_ = new pangolin::Var<bool>("ui.Autoplay", false, true);
+    live_raycast_ = new pangolin::Var<bool>("ui.Raycast Mode", false, true);
 
     pangolin::Var<function<void(void)>> previous_object("ui.Previous Object", [&]() {
       SelectPreviousVisualizedObject();
@@ -328,11 +291,11 @@ protected:
       *(this->autoplay_) = false;
       this->ProcessFrame();
     });
-    pangolin::Var<function<void(void)>> quit_button("ui.Quit", []() {
-      pangolin::QuitAll();
-    });
     pangolin::Var<function<void(void)>> save_object("ui.Save Active Object", [this]() {
       dyn_slam_->SaveDynamicObject(dyn_slam_input_->GetName(), visualized_object_idx_);
+    });
+    pangolin::Var<function<void(void)>> quit_button("ui.Quit", []() {
+      pangolin::QuitAll();
     });
 
     // This is used for the free view camera. The focal lengths are not used in rendering, BUT they
@@ -504,6 +467,9 @@ private:
   /// \brief When this is on, the input gets processed as fast as possible, without requiring any
   /// user input.
   pangolin::Var<bool> *autoplay_;
+  /// \brief If enabled, the latest frame's raycast is displayed in the main pane. Otherwise, a
+  /// free-roam view of the scene is provided.
+  pangolin::Var<bool> *live_raycast_;
 
   // TODO(andrei): On-the-fly depth toggling.
   // TODO(andrei): Reset button.
@@ -549,8 +515,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       // TODO(andrei): Make sure you normalize dispnet's depth range when using it, since it seems
       // to be inconsistent across frames.
       // TODO(andrei): Carefully read the dispnet paper.
-//      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm", true),
-      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", false),
+      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm", true),
+//      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", false),
       itm_calibration,
       stereo_calibration);
 
