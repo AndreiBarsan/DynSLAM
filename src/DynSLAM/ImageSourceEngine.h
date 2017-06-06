@@ -1,6 +1,7 @@
 // Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
 
-#pragma once
+#ifndef DYNSLAM_IMAGESOURCEENGINE_H
+#define DYNSLAM_IMAGESOURCEENGINE_H
 
 #include "../InfiniTAM/InfiniTAM/ITMLib/ITMLib.h"
 #include "../InfiniTAM/InfiniTAM/ITMLib/Utils/ITMLibDefines.h"
@@ -88,4 +89,6 @@ namespace dynslam {
 			Vector2i getRGBImageSize(void) { return imgSize; }
 		};
 }
+
+#endif
 

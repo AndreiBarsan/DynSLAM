@@ -65,6 +65,33 @@ std::string Type2Str(int type) {
   return r;
 }
 
+Timers Timers::instance_;
+
+int64_t GetTimeMs() {
+  struct timeval time;
+  gettimeofday(&time, NULL);
+  int64_t time_ms = time.tv_sec * 1000 + time.tv_usec / 1000;
+  return time_ms;
 }
+
+void Tic(const std::string &name) {
+  Timers::Get().Start(name);
 }
+
+int64_t Toc(const std::string &name, bool quiet) {
+  Timers::Get().Stop(name);
+  int64_t duration_ms = Timers::Get().GetDuration(name);
+  if (! quiet) {
+    cout << "Timer: " << name << " took " << duration_ms << "ms." << endl;
+  }
+  return duration_ms;
+}
+
+int64_t Toc(bool quiet) {
+  const string& name = Timers::Get().GetLatestName();
+  return Toc(name, quiet);
+}
+
+} // namespace utils
+} // namespace dynslam
 

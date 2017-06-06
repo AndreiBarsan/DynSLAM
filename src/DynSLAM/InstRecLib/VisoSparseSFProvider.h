@@ -3,6 +3,7 @@
 #ifndef INSTRECLIB_VISOSSFPROVIDER_H
 #define INSTRECLIB_VISOSSFPROVIDER_H
 
+#include "../Utils.h"
 #include "SparseSFProvider.h"
 
 #include <opencv/highgui.h>
@@ -29,6 +30,7 @@ class VisoSparseSFProvider : public SparseSFProvider {
                               const ViewPair &current_view) override {
 
     using namespace std;
+    using namespace dynslam::utils;
 
     cout << "Computing sparse scene flow using libviso2 (TODO)..." << endl;
 
@@ -61,7 +63,10 @@ class VisoSparseSFProvider : public SparseSFProvider {
         current_view.first->rows,
         current_view.first->cols
     };
+    Tic("Viso2 frame processing");
     bool viso2_success = stereo_vo->process(left_bytes, right_bytes, dims);
+    Toc();
+
     if (! viso2_success) {
       // TODO(andrei): In the long run, handle these failures more gracefully.
 //      throw runtime_error("viso2 could not estimate egomotion and scene flow!");
@@ -73,9 +78,11 @@ class VisoSparseSFProvider : public SparseSFProvider {
       // compiler isn't guaranteed to optimize away the two copies this call implies).
       // TODO(andrei): Don't read this right after the first frame. SF needs at least 2 frames before
       // it can compute the motion estimates.
+      Tic("get matches");
       matches_ = stereo_vo->getMatches();
       matches_available_ = true;
       cout << "viso2 success! " << matches_.size() << " matches found." << endl;
+      Toc();
     }
   }
 
