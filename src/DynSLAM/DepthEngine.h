@@ -89,20 +89,24 @@ class DepthEngine {
         // BURN THE WITCH
         T disp = disparity.template at<T>(i, j);
 
-        int32_t depth_long = static_cast<int32_t>(1000.0 * DepthFromDisparity(disp, calibration));
+        double kMetersToMillimeters = 1000.0;
+        int32_t depth_mm = static_cast<int32_t>(kMetersToMillimeters * DepthFromDisparity(disp, calibration));
 
         // TODO(andrei): Pass this as a parameter.
+        // This is an important factor for the quality of the resulting maps. Too big, and our map
+        // will be very noisy; too small, and we only map the road and a couple of meters of the
+        // sidewalks.
         const int32_t kMaxDepthMeters = 12;
 
         // TODO(andrei): Log min/max/mean depth and other stats, and verify whether the disparities
-        // produced by dispnet are consistent.
+        // produced by dispnet are consistent across frames.
 
-        if (depth_long > kMaxDepthMeters * 1000 || depth_long < 0) {
-          depth_long = std::numeric_limits<uint16_t>::max();
+        if (depth_mm > kMaxDepthMeters * kMetersToMillimeters || depth_mm < 0) {
+          depth_mm = std::numeric_limits<uint16_t>::max();
         }
 
-        uint16_t depth_s = static_cast<uint16_t>(depth_long);
-        out_depth.at<uint16_t>(i, j) = depth_s;
+        uint16_t depth_mm_short = static_cast<uint16_t>(depth_mm);
+        out_depth.at<uint16_t>(i, j) = depth_mm_short;
       }
     }
   }

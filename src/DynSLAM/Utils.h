@@ -6,6 +6,7 @@
 
 #include <highgui.h>
 #include <sys/time.h>
+#include <stack>
 
 #include "DepthEngine.h"
 
@@ -133,26 +134,30 @@ class Timers {
     }
 
     timers_.at(name).Start();
-    latest_name_ = name;
+    names_.push(name);
   }
 
   void Stop(const std::string &name) {
     timers_.at(name).Stop();
+    // TODO(andrei): Is this way of functioning too confusing?
+    if (name == names_.top()) {
+      names_.pop();
+    }
   }
 
   int64_t GetDuration(const std::string &name) {
     return timers_.at(name).GetDuration();
   }
 
-  const std::string& GetLatestName() const {
+  std::string GetLatestName() const {
     assert(timers_.size() > 0 && "No timers started.");
-    return latest_name_;
+    return names_.top();
   }
 
  private:
   Timers() { }
   std::map<std::string, Timer> timers_;
-  std::string latest_name_;
+  std::stack<std::string> names_;
 };
 
 /// \brief Easily start a timer.

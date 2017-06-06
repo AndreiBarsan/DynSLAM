@@ -52,28 +52,35 @@ void DynSlam::ProcessFrame(Input *input) {
 
   cout << left_gray->size() << ", " << right_gray->size() << endl;
 
+  utils::Tic("Sparse Scene Flow");
   sparse_sf_provider_->ComputeSparseSceneFlow(
       make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
       make_pair(left_gray, right_gray)
   );
+  utils::Toc();
 
+  utils::Tic("Read input and depth");
   input->GetItmImages(input_rgb_image_, input_raw_depth_image_);
-
   static_scene_->UpdateView(input_rgb_image_, input_raw_depth_image_);
+  utils::Toc();
 
-  // InstRec: semantic segmentation
+  utils::Tic("Semantic segmentation");
   auto segmentationResult = segmentation_provider_->SegmentFrame(input_rgb_image_);
+  utils::Toc();
 
   // Split the scene up into instances, and fuse each instance independently.
+  utils::Tic("Instance tracking and reconstruction");
   instance_reconstructor_->ProcessFrame(static_scene_->GetView(), *segmentationResult);
+  utils::Toc();
 
   // Perform the tracking after the segmentation, so that we may in the future leverage semantic
   // information to enhance tracking.
+  utils::Tic("Static map fusion");
   static_scene_->Track();
   static_scene_->Integrate();
   static_scene_->PrepareNextStep();
-
   ITMSafeCall(cudaThreadSynchronize());
+  utils::Toc();
 
   current_frame_no_++;
 }

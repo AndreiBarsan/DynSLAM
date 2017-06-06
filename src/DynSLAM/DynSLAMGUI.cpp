@@ -507,6 +507,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 
   VisualOdometryStereo::parameters sf_params;
   sf_params.base = baseline_m;
+//  sf_params.ransac_iters = 50;
+//  sf_params.match.refinement = 0;
   sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;
   sf_params.calib.cv = itm_calibration.intrinsics_rgb.projectionParamsSimple.py;
   sf_params.calib.f  = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx; // TODO should be average fx and fy?

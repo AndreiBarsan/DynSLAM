@@ -107,8 +107,6 @@ void Input::GetCvImages(cv::Mat4b &rgb, cv::Mat_<uint16_t> &raw_depth) {
 }
 
 void Input::GetCvStereoGray(cv::Mat1b **left, cv::Mat1b **right) {
-  cout << "Getting image..." << endl;
-
   *left = &left_frame_gray_buf_;
   *right = &right_frame_gray_buf_;
 }
