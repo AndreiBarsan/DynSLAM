@@ -132,11 +132,17 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
   img_fpath_ss << this->seg_folder_ << "/"
                << "cls_" << setfill('0') << setw(6) << this->frame_idx_ << ".png";
   const string img_fpath = img_fpath_ss.str();
+
   if (last_seg_preview_ == nullptr) {
-    last_seg_preview_ = new cv::Mat4b(rgb.rows, rgb.cols);
+    last_seg_preview_ = new cv::Mat3b(rgb.rows, rgb.cols);
   }
 
-  *last_seg_preview_ = cv::imread(img_fpath);
+  *last_seg_preview_ = cv::imread(img_fpath, CV_LOAD_IMAGE_UNCHANGED);
+//  auto *foo = new cv::Mat3b(rgb.rows, rgb.cols);
+//  *foo = cv::imread(img_fpath, CV_LOAD_IMAGE_UNCHANGED);
+//  cv::imshow("TEST", *last_seg_preview_);
+//  cv::waitKey(0);
+
   if (! last_seg_preview_->data) {
     throw std::runtime_error(Format(
         "Could not read segmentation preview image from file [%s].",
@@ -158,11 +164,11 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
       inference_time_ns);
 }
 
-const cv::Mat4b* PrecomputedSegmentationProvider::GetSegResult() const {
+const cv::Mat3b* PrecomputedSegmentationProvider::GetSegResult() const {
   return this->last_seg_preview_;
 }
 
-cv::Mat4b* PrecomputedSegmentationProvider::GetSegResult() {
+cv::Mat3b* PrecomputedSegmentationProvider::GetSegResult() {
   return this->last_seg_preview_;
 }
 

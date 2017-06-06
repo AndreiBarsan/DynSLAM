@@ -14,6 +14,7 @@ ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const string &fpath) {
   return out_calib;
 }
 
+// TODO(andrei): Make this more type-safe!
 void CvToItm(const cv::Mat &mat, ITMUChar4Image *out_rgb) {
   Vector2i newSize(mat.cols, mat.rows);
   out_rgb->ChangeDims(newSize);
@@ -101,9 +102,9 @@ bool Input::ReadNextFrame() {
 //  CvToItm(depth_buf_, raw_depth);
 //}
 
-void Input::GetCvImages(cv::Mat4b &rgb, cv::Mat_<uint16_t> &raw_depth) {
-  rgb = left_frame_color_buf_;
-  raw_depth = depth_buf_;
+void Input::GetCvImages(cv::Mat3b **rgb, cv::Mat_<uint16_t> **raw_depth) {
+  *rgb = &left_frame_color_buf_;
+  *raw_depth = &depth_buf_;
 }
 
 void Input::GetCvStereoGray(cv::Mat1b **left, cv::Mat1b **right) {
