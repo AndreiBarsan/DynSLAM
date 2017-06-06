@@ -43,23 +43,23 @@ void DynSlam::ProcessFrame(Input *input) {
     return;
   }
 
+  utils::Tic("Read input and compute depth");
   if(!input->ReadNextFrame()) {
     throw runtime_error("Could not read input from the data source.");
   }
+  utils::Toc();
 
   cv::Mat1b *left_gray, *right_gray;
   input->GetCvStereoGray(&left_gray, &right_gray);
 
-  cout << left_gray->size() << ", " << right_gray->size() << endl;
-
   utils::Tic("Sparse Scene Flow");
-  sparse_sf_provider_->ComputeSparseSceneFlow(
+  sparse_sf_provider_->ComputeSparseSF(
       make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
       make_pair(left_gray, right_gray)
   );
   utils::Toc();
 
-  utils::Tic("Read input and depth");
+  utils::Tic("Input preprocessing");
   input->GetItmImages(input_rgb_image_, input_raw_depth_image_);
   static_scene_->UpdateView(input_rgb_image_, input_raw_depth_image_);
   utils::Toc();

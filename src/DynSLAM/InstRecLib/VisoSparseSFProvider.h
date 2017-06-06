@@ -12,6 +12,7 @@
 
 namespace instreclib {
 
+// TODO(andrei): Consider using the joint VO+SF work Peidong sent you (open source from TUM).
 // Note that at this point, we use libviso2, which is primarily a visual odometry library, as a
 // library for scene flow computation, in order to understand the motion of the other vehicles in
 // view.
@@ -26,8 +27,8 @@ class VisoSparseSFProvider : public SparseSFProvider {
   }
 
   // TODO do we still need to path both? It seems viso keeps track of them internally anyway.
-  void ComputeSparseSceneFlow(const ViewPair &_,
-                              const ViewPair &current_view) override {
+  void ComputeSparseSF(const ViewPair &_,
+                       const ViewPair &current_view) override {
     using namespace std;
     using namespace dynslam::utils;
 
@@ -78,27 +79,26 @@ class VisoSparseSFProvider : public SparseSFProvider {
       // TODO(andrei): Don't read this right after the first frame. SF needs at least 2 frames before
       // it can compute the motion estimates.
       Tic("get matches");
-      matches_ = stereo_vo->getMatches();
+      latest_flow_.matches = stereo_vo->getMatches();
       matches_available_ = true;
-      cout << "viso2 success! " << matches_.size() << " matches found." << endl;
+      cout << "viso2 success! " << latest_flow_.matches.size() << " matches found." << endl;
       Toc();
     }
   }
 
-  bool MatchesAvailable() {
+  virtual bool FlowAvailable() const {
     return matches_available_;
   }
 
-  const std::vector<Matcher::p_match>& GetMatches() const {
+  virtual SparseSceneFlow& GetFlow() {
     assert(matches_available_ && "Last frame's matches are not available.");
-    return matches_;
+    return latest_flow_;
   }
 
  private:
   VisualOdometryStereo *stereo_vo;
   bool matches_available_;
-  std::vector<Matcher::p_match> matches_;
-
+  SparseSceneFlow latest_flow_;
 };
 
 }  // namespace instreclib
