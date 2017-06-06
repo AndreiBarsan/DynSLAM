@@ -60,8 +60,8 @@ public:
     cout << "Pangolin GUI initializing..." << endl;
 
     // TODO(andrei): Proper scaling to save space and memory.
-    width = dyn_slam->GetInputWidth(); // / 1.5;
-    height = dyn_slam->GetInputHeight();// / 1.5;
+    width_ = dyn_slam->GetInputWidth(); // / 1.5;
+    height_ = dyn_slam->GetInputHeight();// / 1.5;
 
     SetupDummyImage();
     CreatePangolinDisplays();
@@ -71,8 +71,8 @@ public:
 
   virtual ~PangolinGui() {
     // No need to delete any view pointers; Pangolin deletes those itself on shutdown.
-    delete dummy_image_texture;
-    delete pane_texture;
+    delete dummy_image_texture_;
+    delete pane_texture_;
   }
 
   /// \brief Executes the main Pangolin input and rendering loop.
@@ -89,13 +89,14 @@ public:
         ProcessFrame();
       }
 
-      main_view->Activate();
+      main_view_->Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
       const unsigned char *slam_frame_data = dyn_slam_->GetRaycastPreview();
 
-      // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance, so you get dark, uncolored images.
-//      pane_texture->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
-//      pane_texture->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance,
+      // so you get dark, uncolored images.
+//      pane_texture_->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
+//      pane_texture_->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
 
       // Some experimental code for getting the camera to move on its own.
       if (wiggle_mode_->Get()) {
@@ -119,18 +120,18 @@ public:
           visualized_object_idx_,
           pane_cam_->GetModelViewMatrix());
 
-      pane_texture->Upload(
+      pane_texture_->Upload(
           preview,
           GL_RGBA,
           GL_UNSIGNED_BYTE);
       pangolin::GlFont &font = pangolin::GlFont::I();
-      pane_texture->RenderToViewport(true);
+      pane_texture_->RenderToViewport(true);
       font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.95, 0.9);
 
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
-      pane_texture->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-      pane_texture->RenderToViewport(true);
+      pane_texture_->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      pane_texture_->RenderToViewport(true);
 
       if (dyn_slam_->GetCurrentFrameNo() > 1) {
         PreviewSparseSF(dyn_slam_->GetLatestFlow(),
@@ -140,33 +141,33 @@ public:
 
       depth_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
-      pane_texture->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-      pane_texture->RenderToViewport(true);
+      pane_texture_->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      pane_texture_->RenderToViewport(true);
 
       segment_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
       if (nullptr != dyn_slam_->GetSegmentationPreview()) {
-        pane_texture->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-        pane_texture->RenderToViewport(true);
+        pane_texture_->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+        pane_texture_->RenderToViewport(true);
         DrawInstanceLables();
       }
 
       object_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
-      pane_texture->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
+      pane_texture_->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
                              GL_RGBA, GL_UNSIGNED_BYTE);
-      pane_texture->RenderToViewport(true);
+      pane_texture_->RenderToViewport(true);
 
       object_reconstruction_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
-      pane_texture->Upload(
+      pane_texture_->Upload(
           dyn_slam_->GetObjectRaycastPreview(
               visualized_object_idx_,
               instance_cam_->GetModelViewMatrix()
           ),
           GL_RGBA,
           GL_UNSIGNED_BYTE);
-      pane_texture->RenderToViewport(true);
+      pane_texture_->RenderToViewport(true);
       font.Text("Instance #%d", visualized_object_idx_).Draw(-1.0, 0.9);
 
       // Update various elements in the toolbar on the left.
@@ -291,10 +292,10 @@ protected:
   /// common in autonomous driving datasets.
   void CreatePangolinDisplays() {
     pangolin::CreateWindowAndBind("DynSLAM GUI",
-                                  kUiWidth + width,
+                                  kUiWidth + width_,
                                   // One full-height pane with the main preview, plus 3 * 0.5
                                   // height ones for various visualizations.
-                                  static_cast<int>(ceil(height * 2.5)));
+                                  static_cast<int>(ceil(height_ * 2.5)));
 
     // 3D Mouse handler requires depth testing to be enabled
     glEnable(GL_DEPTH_TEST);
@@ -336,9 +337,9 @@ protected:
 
     // This is used for the free view camera. The focal lengths are not used in rendering, BUT they
     // impact the sensitivity of the free view camera.
-    proj_ = pangolin::ProjectionMatrix(width, height,
+    proj_ = pangolin::ProjectionMatrix(width_, height_,
                                        1000, 1000,
-                                       width / 2, height / 2,
+                                       width_ / 2, height_ / 2,
                                        0.1, 1000);
     pane_cam_ = new pangolin::OpenGlRenderState(
         proj_,
@@ -346,7 +347,7 @@ protected:
                                   0, 0, -1,
                                   pangolin::AxisY));
 
-    // TODO(andrei): Set dynamically based on where instances are detected.
+    // TODO(andrei): Set dynamically based on where instances are detected (non-trivial).
     instance_cam_ = new pangolin::OpenGlRenderState(
         proj_,
         pangolin::ModelViewLookAt(
@@ -355,7 +356,7 @@ protected:
           pangolin::AxisY)
     );
 
-    float aspect_ratio = static_cast<float>(width) / height;
+    float aspect_ratio = static_cast<float>(width_) / height_;
     rgb_view_ = pangolin::Display("rgb").SetAspect(aspect_ratio);
     depth_view_ = pangolin::Display("depth").SetAspect(aspect_ratio);
 
@@ -366,8 +367,8 @@ protected:
 
     // Storing pointers to these objects prevents a series of strange issues. The objects remain
     // under Pangolin's management, so they don't need to be deleted by the current class.
-    main_view = &(pangolin::Display("main").SetAspect(aspect_ratio));
-    main_view->SetHandler(new pangolin::Handler3D(*pane_cam_));
+    main_view_ = &(pangolin::Display("main").SetAspect(aspect_ratio));
+    main_view_->SetHandler(new pangolin::Handler3D(*pane_cam_));
 
     detail_views_ = &(pangolin::Display("detail"));
 
@@ -382,9 +383,9 @@ protected:
 
     // TODO(andrei): Maybe wrap these guys in another controller, make it an equal layout and
     // automagically support way more aspect ratios?
-    main_view->SetBounds(pangolin::Attach::Pix(height * 1.5), 1.0,
+    main_view_->SetBounds(pangolin::Attach::Pix(height_ * 1.5), 1.0,
                          pangolin::Attach::Pix(kUiWidth), 1.0);
-    detail_views_->SetBounds(0.0, pangolin::Attach::Pix(height * 1.5),
+    detail_views_->SetBounds(0.0, pangolin::Attach::Pix(height_ * 1.5),
                             pangolin::Attach::Pix(kUiWidth), 1.0);
     detail_views_->SetLayout(pangolin::LayoutEqual)
       .AddDisplay(rgb_view_)
@@ -396,18 +397,16 @@ protected:
 
     // Internally, InfiniTAM stores these as RGBA, but we discard the alpha when we upload the
     // textures for visualization (hence the 'GL_RGB' specification).
-    this->pane_texture = new pangolin::GlTexture(width, height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+    this->pane_texture_ = new pangolin::GlTexture(width_, height_, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
     cout << "Pangolin UI setup complete." << endl;
   }
 
   void SetupDummyImage() {
-    cout << "Loading George..." << endl;
-    dummy_img = cv::imread("/home/andrei/Pictures/george.jpg");
-
-    cv::flip(dummy_img, dummy_img, kCvFlipVertical);
-    const int george_width = dummy_img.cols;
-    const int george_height = dummy_img.rows;
-    this->dummy_image_texture = new pangolin::GlTexture(
+    dummy_img_ = cv::imread("../data/george.jpg");
+    cv::flip(dummy_img_, dummy_img_, kCvFlipVertical);
+    const int george_width = dummy_img_.cols;
+    const int george_height = dummy_img_.rows;
+    this->dummy_image_texture_ = new pangolin::GlTexture(
       george_width, george_height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
   }
 
@@ -469,9 +468,9 @@ private:
   Input *dyn_slam_input_;
 
   /// Input frame dimensions. They dictate the overall window size.
-  int width, height;
+  int width_, height_;
 
-  pangolin::View *main_view;
+  pangolin::View *main_view_;
   pangolin::View *detail_views_;
   pangolin::View rgb_view_;
   pangolin::View depth_view_;
@@ -487,12 +486,13 @@ private:
   pangolin::Plotter *plotter_;
   pangolin::DataLog data_log_;
 
-  pangolin::GlTexture *dummy_image_texture;
-  pangolin::GlTexture *pane_texture;
+  pangolin::GlTexture *dummy_image_texture_;
+  pangolin::GlTexture *pane_texture_;
 
   pangolin::Var<string> *reconstructions;
 
-  cv::Mat dummy_img;
+  /// \brief Used for UI testing whenever necessary. Not related to the SLAM system in any way.
+  cv::Mat dummy_img_;
 
   // Atomic because it gets set from a UI callback. Technically, Pangolin shouldn't invoke callbacks
   // from a different thread, but using atomics for this is generally a good practice anyway.
@@ -515,10 +515,10 @@ private:
   void UploadDummyTexture() {
     // Mess with George's bytes a little bit for OpenGL <-> OpenCV compatibility.
     //use fast 4-byte alignment (default anyway) if possible
-    glPixelStorei(GL_UNPACK_ALIGNMENT, (dummy_img.step & 3) ? 1 : 4);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, (dummy_img_.step & 3) ? 1 : 4);
     //set length of one complete row in data (doesn't need to equal img.cols)
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, dummy_img.step/dummy_img.elemSize());
-    dummy_image_texture->Upload(dummy_img.data, GL_BGR, GL_UNSIGNED_BYTE);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, dummy_img_.step/dummy_img_.elemSize());
+    dummy_image_texture_->Upload(dummy_img_.data, GL_BGR, GL_UNSIGNED_BYTE);
   }
 };
 
@@ -533,7 +533,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   auto itm_calibration = ReadITMCalibration(dataset_root + "/itm-calib.txt");
 
   // Parameters used in the KITTI-odometry dataset.
-  // TODO(andrei): Read from a file or something.
+  // TODO(andrei): Read from a file.
   float baseline_m = 0.537150654273f;
   float focal_length_px = 707.0912f;
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
@@ -553,7 +553,6 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", false),
       itm_calibration,
       stereo_calibration);
-
 
   // [RIP] I lost a couple of hours debugging a bug caused by the fact that InfiniTAM still works
   // even when there is a discrepancy between the size of the depth/rgb inputs, as specified in the
