@@ -113,6 +113,12 @@ public:
          << instance_fpath << "]." << endl;
   }
 
+  // Variants would solve this nicely, but they are C++17-only...
+  // Will error out if no flow information is available.
+  const SparseSceneFlow& GetLatestFlow() {
+    return sparse_sf_provider_->GetFlow();
+  }
+
 private:
   // This is the main reconstruction component. Should split for dynamic+static.
   // In the future, we may need to write our own.

@@ -70,10 +70,8 @@ public:
   }
 
   virtual ~PangolinGui() {
-    delete reconstructions;
+    // No need to delete any view pointers; Pangolin deletes those itself on shutdown.
     delete dummy_image_texture;
-    delete main_view;
-    delete detail_views_;
     delete pane_texture;
   }
 
@@ -134,6 +132,12 @@ public:
       pane_texture->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
       pane_texture->RenderToViewport(true);
 
+      if (dyn_slam_->GetCurrentFrameNo() > 1) {
+        PreviewSparseSF(dyn_slam_->GetLatestFlow(),
+                        rgb_view_.GetBounds().w,
+                        rgb_view_.GetBounds().h);
+      }
+
       depth_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
       pane_texture->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
@@ -183,7 +187,7 @@ public:
 
   /// \brief Renders informative labels regardin the currently active bounding boxes.
   /// Meant to be rendered over the segmentation preview window pane.
-  void DrawInstanceLables() const {
+  void DrawInstanceLables() {
     pangolin::GlFont &font = pangolin::GlFont::I();
 
     auto &instanceTracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
@@ -214,6 +218,70 @@ public:
                  << latest_detection.class_probability;
       glColor3f(1.0f, 0.0f, 0.0f);
       font.Text(info_label.str()).Draw(gl_x, gl_y, 0);
+    }
+  }
+
+  /// \brief Renders a simple preview of the scene flow information onto the currently active pane.
+  void PreviewSparseSF(const SparseSceneFlow &flow, float panel_width, float panel_height) {
+    pangolin::GlFont &font = pangolin::GlFont::I();
+    font.Text("libviso2 scene flow preview").Draw(-0.98f, 0.89f);
+
+    for(const Matcher::p_match &match : flow.matches) {
+      // TODO(andrei): uv-to-gl coordinate transformation utility.
+      float gl_x = (match.u1c - panel_width) / panel_width;
+      float gl_y = (panel_height - match.v1c) / panel_height;
+      float gl_x_old = (match.u1p - panel_width) / panel_width;
+      float gl_y_old = (panel_height - match.v1p) / panel_height;
+
+      float delta_x = gl_x - gl_x_old;
+      float delta_y = gl_y - gl_y_old;
+      float magnitude = sqrt(delta_x * delta_x + delta_y * delta_y) * 15.0f;
+
+      // TODO(andrei): Unfuck the projection matrix so that whatever we draw looks nice and not stretched.
+      glDisable(GL_DEPTH_TEST);
+      glColor4f(min(1.0f, magnitude), 0.3f, 0.3f, 1.0f);
+
+      pangolin::glDrawCross(gl_x, gl_y, 0.02f);
+      pangolin::glDrawLine(gl_x_old, gl_y_old, gl_x, gl_y);
+
+      glEnable(GL_DEPTH_TEST);
+
+      /*
+      GLdouble projection[16];
+      GLdouble modelview[16];
+      GLint    view[4];
+      GLdouble scrn[3];
+
+      glGetDoublev(GL_PROJECTION_MATRIX, projection );
+      glGetDoublev(GL_MODELVIEW_MATRIX, modelview );
+      glGetIntegerv(GL_VIEWPORT, view );
+
+      pangolin::glProject(gl_x, gl_y, 0.0, modelview, projection, view,
+                          scrn, scrn + 1, scrn + 2);
+
+//      DisplayBase().Activate();
+      glMatrixMode(GL_PROJECTION);
+      glPushMatrix();
+      glLoadIdentity();
+      glOrtho(-0.5, 0.5, -0.5, 0.5, -1, 1);
+      glMatrixMode(GL_MODELVIEW);
+      glPushMatrix();
+      glLoadIdentity();
+
+      glTranslatef(std::floor((GLfloat)scrn[0]), std::floor((GLfloat)scrn[1]), (GLfloat)scrn[2]);
+
+      // Is all the boilerplate really necessary?
+      pangolin::glDrawCross(gl_x, gl_y, 0.10f);
+
+      // Restore viewport
+      glViewport(view[0],view[1],view[2],view[3]);
+
+      // Restore modelview / project matrices
+      glMatrixMode(GL_PROJECTION);
+      glPopMatrix();
+      glMatrixMode(GL_MODELVIEW);
+      glPopMatrix();
+      //*/
     }
   }
 
