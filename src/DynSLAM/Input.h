@@ -53,7 +53,7 @@ class Input {
   /// \return True if the images could be loaded and processed appropriately.
 //  void GetItmImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth);
 
-  void GetCvImages(cv::Mat4b &rgb, cv::Mat_<uint16_t> &raw_depth);
+  void GetCvImages(cv::Mat3b **rgb, cv::Mat_<uint16_t> **raw_depth);
 
   void GetCvStereoGray(cv::Mat1b **left, cv::Mat1b **right);
 
@@ -82,8 +82,8 @@ class Input {
   std::string dataset_folder_;
   int frame_idx_;
 
-  cv::Mat left_frame_color_buf_;
-  cv::Mat right_frame_color_buf_;
+  cv::Mat3b left_frame_color_buf_;
+  cv::Mat3b right_frame_color_buf_;
   cv::Mat_<uint16_t> depth_buf_;
 //  cv::Mat disparity_buf_;
 

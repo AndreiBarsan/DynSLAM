@@ -48,7 +48,9 @@ public:
                   const Vector2i &img_size_rgb,
                   const Vector2i &img_size_d);
 
-  void UpdateView(const cv::Mat4b &rgb_image, const cv::Mat_<uint16_t> &raw_depth_image) {
+  // TODO(andrei): I was passing a Mat4b but didnt even get a warning. Is that normal? I was
+  // expecting a little more type safety...
+  void UpdateView(const cv::Mat3b &rgb_image, const cv::Mat_<uint16_t> &raw_depth_image) {
     CvToItm(rgb_image, rgb_itm_);
     CvToItm(raw_depth_image, raw_depth_itm_);
 
