@@ -21,8 +21,8 @@ void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine,
   Vector2i input_shape = itm_static_scene_engine->GetImageSize();
   out_image_ = new ITMUChar4Image(input_shape, true, allocate_gpu);
   out_image_float_ = new ITMFloatImage(input_shape, true, allocate_gpu);
-  input_rgb_image_= new ITMUChar4Image(input_shape, true, allocate_gpu);
-  input_raw_depth_image_ = new ITMShortImage(input_shape, true, allocate_gpu);
+  input_rgb_image_ = new cv::Mat4b(input_shape.x, input_shape.y);
+  input_raw_depth_image_ = new cv::Mat_<uint16_t>(input_shape.x, input_shape.y);
 
   input_width_ = input_shape.x;
   input_height_ = input_shape.y;
@@ -60,12 +60,13 @@ void DynSlam::ProcessFrame(Input *input) {
   utils::Toc();
 
   utils::Tic("Input preprocessing");
-  input->GetItmImages(input_rgb_image_, input_raw_depth_image_);
-  static_scene_->UpdateView(input_rgb_image_, input_raw_depth_image_);
+//  input->GetItmImages(input_rgb_image_, input_raw_depth_image_);
+  input->GetCvImages(*input_rgb_image_, *input_raw_depth_image_);
+  static_scene_->UpdateView(*input_rgb_image_, *input_raw_depth_image_);
   utils::Toc();
 
   utils::Tic("Semantic segmentation");
-  auto segmentationResult = segmentation_provider_->SegmentFrame(input_rgb_image_);
+  auto segmentationResult = segmentation_provider_->SegmentFrame(*input_rgb_image_);
   utils::Toc();
 
   // Split the scene up into instances, and fuse each instance independently.

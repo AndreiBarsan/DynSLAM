@@ -9,6 +9,7 @@
 #include <pangolin/pangolin.h>
 #include "../InfiniTAM/InfiniTAM/ITMLib/Engine/ITMMainEngine.h"
 #include "ImageSourceEngine.h"
+#include "Input.h"
 
 namespace dynslam {
 namespace drivers {
@@ -34,7 +35,7 @@ ORUtils::Vector4<T> ToItmVec(const cv::Vec<T, 4> in) {
   return ORUtils::Vector4<T>(in[0], in[1], in[2], in[3]);
 }
 
-ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix);
+ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix, bool flip_ud = true, bool fix_roll = true);
 
 /// \brief Interfaces between DynSLAM and InfiniTAM.
 class InfiniTamDriver : public ITMMainEngine {
@@ -42,21 +43,21 @@ public:
   // TODO(andrei): We may need to add another layer of abstraction above the drivers to get the best
   // modularity possible (driver+inpu+custom settings combos).
 
-  InfiniTamDriver(const ITMLibSettings* settings,
-                  const ITMRGBDCalib* calib,
-                  const Vector2i& imgSize_rgb,
-                  const Vector2i& imgSize_d);
+  InfiniTamDriver(const ITMLibSettings *settings,
+                  const ITMRGBDCalib *calib,
+                  const Vector2i &img_size_rgb,
+                  const Vector2i &img_size_d);
 
-  void ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage,
-                    ITMIMUMeasurement *imuMeasurement = nullptr) override;
+  void UpdateView(const cv::Mat4b &rgb_image, const cv::Mat_<uint16_t> &raw_depth_image) {
+    CvToItm(rgb_image, rgb_itm_);
+    CvToItm(raw_depth_image, raw_depth_itm_);
 
-  void UpdateView(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage) {
     // * If 'view' is null, this allocates its RGB and depth buffers.
     // * Afterwards, it converts the depth map we give it into a float depth map (we may be able to
     //   skip this step in our case, since we have control over how our depth map is computed).
     // * It then filters the shit out of the depth map (maybe we could skip this?) using five steps
     //   of bilateral filtering.
-    this->viewBuilder->UpdateView(&view, rgbImage, rawDepthImage, settings->useBilateralFilter,
+    this->viewBuilder->UpdateView(&view, rgb_itm_, raw_depth_itm_, settings->useBilateralFilter,
                                   settings->modelSensorNoise);
   }
 
@@ -101,6 +102,7 @@ public:
   ) {
     if (nullptr != this->view) {
       ITMPose itm_freeview_pose = PoseFromPangolin(model_view);
+
       ITMIntrinsics intrinsics = this->view->calib->intrinsics_d;
       ITMMainEngine::GetImage(
           out,
@@ -110,6 +112,10 @@ public:
     }
     // Otherwise: We're before the very first frame, so no raycast is available yet.
   }
+
+ private:
+  ITMUChar4Image *rgb_itm_;
+  ITMShortImage  *raw_depth_itm_;
 
 };
 
