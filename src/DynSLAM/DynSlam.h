@@ -55,8 +55,8 @@ public:
       int object_idx,
       const pangolin::OpenGlMatrix &model_view
    ) {
-
-    // TODO(andrei): Finish implementing for actual objects. This now just works for static bg.
+    // TODO(andrei): Finish implementing for actual objects. This now just works for static bg, but
+    // we use 'GetObjectRaycastPreview' to get raycasts for instances, which is confusing name-wise.
 
     static_scene_->GetImage(
         out_image_,
@@ -69,7 +69,11 @@ public:
   /// \brief Returns an RGBA unsigned char frame containing the preview of the most recent frame's
   /// semantic segmentation.
   const unsigned char* GetSegmentationPreview() {
-    return segmentation_provider_->GetSegResult()->GetData(MEMORYDEVICE_CPU)->getValues();
+    if (segmentation_provider_->GetSegResult() == nullptr) {
+      return nullptr;
+    }
+
+    return segmentation_provider_->GetSegResult()->data;
   }
 
   /// \brief Returns an **RGBA** preview of the latest segmented object instance.
@@ -130,8 +134,8 @@ private:
 
   ITMUChar4Image *out_image_;
   ITMFloatImage *out_image_float_;
-  ITMUChar4Image *input_rgb_image_;
-  ITMShortImage  *input_raw_depth_image_;
+  cv::Mat4b *input_rgb_image_;
+  cv::Mat_<uint16_t> *input_raw_depth_image_;
 
   int current_frame_no_;
   int input_width_;

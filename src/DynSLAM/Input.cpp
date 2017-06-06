@@ -95,11 +95,11 @@ bool Input::ReadNextFrame() {
   return true;
 }
 
-void Input::GetItmImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
-  // The left frame is the RGB input to our system.
-  CvToItm(left_frame_color_buf_, rgb);
-  CvToItm(depth_buf_, raw_depth);
-}
+//void Input::GetItmImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
+//  // The left frame is the RGB input to our system.
+//  CvToItm(left_frame_color_buf_, rgb);
+//  CvToItm(depth_buf_, raw_depth);
+//}
 
 void Input::GetCvImages(cv::Mat4b &rgb, cv::Mat_<uint16_t> &raw_depth) {
   rgb = left_frame_color_buf_;
