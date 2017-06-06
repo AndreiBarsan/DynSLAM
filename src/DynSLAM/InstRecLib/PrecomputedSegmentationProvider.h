@@ -23,9 +23,9 @@ class PrecomputedSegmentationProvider : public SegmentationProvider {
 
   std::shared_ptr<InstanceSegmentationResult> SegmentFrame(const cv::Mat4b &view) override;
 
-  const cv::Mat4b *GetSegResult() const override;
+  const cv::Mat3b *GetSegResult() const override;
 
-  cv::Mat4b *GetSegResult() override;
+  cv::Mat3b *GetSegResult() override;
 
  protected:
   /// \brief For the segmentation from the given file path, loads all available file containing
@@ -36,7 +36,7 @@ class PrecomputedSegmentationProvider : public SegmentationProvider {
   std::string seg_folder_;
   int frame_idx_;
   const SegmentationDataset *dataset_used;
-  cv::Mat4b *last_seg_preview_;
+  cv::Mat3b *last_seg_preview_;
 
 };
 

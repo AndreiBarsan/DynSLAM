@@ -146,11 +146,13 @@ public:
 
       segment_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
-      if (nullptr != dyn_slam_->GetSegmentationPreview()) {
-        pane_texture_->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
-        pane_texture_->RenderToViewport(true);
-        DrawInstanceLables();
-      }
+//      if (nullptr != dyn_slam_->GetSegmentationPreview()) {
+//        pane_texture_->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGB, GL_UNSIGNED_BYTE);
+//        pane_texture_->RenderToViewport(true);
+////        UploadDummyTexture();
+////        dummy_image_texture_->RenderToViewport(true);
+//        DrawInstanceLables();
+//      }
 
       object_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
@@ -366,7 +368,7 @@ protected:
 
   void SetupDummyImage() {
     dummy_img_ = cv::imread("../data/george.jpg");
-    cv::flip(dummy_img_, dummy_img_, kCvFlipVertical);
+//    cv::flip(dummy_img_, dummy_img_, kCvFlipVertical);
     const int george_width = dummy_img_.cols;
     const int george_height = dummy_img_.rows;
     this->dummy_image_texture_ = new pangolin::GlTexture(
@@ -479,8 +481,8 @@ private:
   int visualized_object_idx_ = 0;
 
   void UploadDummyTexture() {
-    // Mess with George's bytes a little bit for OpenGL <-> OpenCV compatibility.
-    //use fast 4-byte alignment (default anyway) if possible
+    // Mess with the bytes a little bit for OpenGL <-> OpenCV compatibility.
+    // use fast 4-byte alignment (default anyway) if possible
     glPixelStorei(GL_UNPACK_ALIGNMENT, (dummy_img_.step & 3) ? 1 : 4);
     //set length of one complete row in data (doesn't need to equal img.cols)
     glPixelStorei(GL_UNPACK_ROW_LENGTH, dummy_img_.step/dummy_img_.elemSize());

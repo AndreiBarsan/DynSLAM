@@ -68,12 +68,12 @@ public:
 
   /// \brief Returns an RGBA unsigned char frame containing the preview of the most recent frame's
   /// semantic segmentation.
-  const unsigned char* GetSegmentationPreview() {
+  const cv::Mat3b* GetSegmentationPreview() {
     if (segmentation_provider_->GetSegResult() == nullptr) {
       return nullptr;
     }
 
-    return segmentation_provider_->GetSegResult()->data;
+    return segmentation_provider_->GetSegResult();
   }
 
   /// \brief Returns an **RGBA** preview of the latest segmented object instance.
@@ -134,7 +134,7 @@ private:
 
   ITMUChar4Image *out_image_;
   ITMFloatImage *out_image_float_;
-  cv::Mat4b *input_rgb_image_;
+  cv::Mat3b *input_rgb_image_;
   cv::Mat_<uint16_t> *input_raw_depth_image_;
 
   int current_frame_no_;
