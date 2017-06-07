@@ -77,7 +77,7 @@ class Input {
     config.right_gray_folder      = "image_01/data";
     config.left_color_folder      = "image_02/data";
     config.right_color_folder     = "image_03/data";
-    config.fname_format           = "%10d.png";
+    config.fname_format           = "%010d.png";
     config.itm_calibration_fname  = "itm-calib.txt";
 
     config.depth_folder           = "precomputed-depth/Frames";

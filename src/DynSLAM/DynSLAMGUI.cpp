@@ -639,7 +639,7 @@ void BuildDynSlamKittiOxts(const string &dataset_root, DynSlam **dyn_slam_out, I
 
   ITMLibSettings *settings = new ITMLibSettings();
   settings->groundTruthPoseFpath = dataset_root + "/" + input_config.odometry_fname;
-//  settings->groundTruthPoseOxts = input_config.odometry_oxts;
+  settings->groundTruthPoseUseOxts = input_config.odometry_oxts;
 
   drivers::InfiniTamDriver *driver = new InfiniTamDriver(
       settings,
