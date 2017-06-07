@@ -17,12 +17,69 @@ namespace dynslam {
 /// depth on the fly in the future.
 class Input {
  public:
+  struct Config {
+    std::string left_gray_folder;
+    std::string right_gray_folder;
+    std::string left_color_folder;
+    std::string right_color_folder;
+    std::string fname_format;
+    std::string itm_calibration_fname;
+
+    // These are optional, and only used for precomputed depth/segmentation.
+    std::string depth_folder = "";
+    std::string depth_fname_format = "";
+    // Whether we read direct metric depth from the file, or just disparity values expressed in
+    // pixels.
+    bool read_depth = false;
+    // No format specifier for segmentation information, since the segmented frames' names are based
+    // on the RGB frame file names. See `PrecomputedSegmentationProvider` for more information.
+    std::string segmentation_folder = "";
+
+    // Whether to read ground truth odometry information from an OxTS dump folder (e.g., KITTI
+    // dataset), or from a single-file ground truth, as provided with the kitti-odometry dataset.
+    bool odometry_oxts = false;   // TODO(andrei): Support this.
+    std::string odometry_fname = "";
+  };
+
+  /// We don't use constants here in order to make the code easier to read.
+  static Config KittiOdometryConfig() {
+    Config config;
+    config.left_gray_folder       = "image_0";
+    config.right_gray_folder      = "image_1";
+    config.left_color_folder      = "image_2";
+    config.right_color_folder     = "image_3";
+    config.fname_format           = "%06d.png";
+    config.itm_calibration_fname  = "itm-calib.txt";
+
+    config.depth_folder           = "precomputed-depth/Frames";
+    config.depth_fname_format     = "%04d.pgm";
+    config.read_depth             = true;
+
+    config.segmentation_folder    = "seg_image_2/mnc";
+
+    config.odometry_oxts          = false;
+    config.odometry_fname         = "ground-truth-poses.txt";
+
+    return config;
+  };
+
+  static Config KittiOdometryDispnetConfig() {
+    Config config = KittiOdometryConfig();
+    config.depth_folder           = "precomputed-depth-dispnet";
+    config.depth_fname_format     = "%06d.pfm";
+    config.read_depth             = false;
+    return config;
+  }
+
+ public:
   Input(const std::string &dataset_folder,
+        const Config &config,
         DepthProvider *depth_provider,
         const ITMLib::Objects::ITMRGBDCalib &calibration,
         const StereoCalibration &stereo_calibration)
-      : depth_provider_(depth_provider),
-        dataset_folder_(dataset_folder),
+      : dataset_folder_(dataset_folder),
+        config_(config),
+        depth_provider_(depth_provider),
         frame_idx_(0),
         calibration_(calibration),
         stereo_calibration_(stereo_calibration) {}
@@ -59,10 +116,13 @@ class Input {
   }
 
  private:
-  DepthProvider *depth_provider_;
-
   std::string dataset_folder_;
+  Config config_;
+  DepthProvider *depth_provider_;
   int frame_idx_;
+  // TODO-LOW(andrei): get rid of this and replace with a similar object which doesn't require ITM.
+  ITMLib::Objects::ITMRGBDCalib calibration_;
+  StereoCalibration stereo_calibration_;
 
   cv::Mat3b left_frame_color_buf_;
   cv::Mat3b right_frame_color_buf_;
@@ -73,12 +133,11 @@ class Input {
   cv::Mat1b left_frame_gray_buf_;
   cv::Mat1b right_frame_gray_buf_;
 
-  // TODO get rid of this and replace with a similar object which doesn't require ITM.
-  ITMLib::Objects::ITMRGBDCalib calibration_;
-  StereoCalibration stereo_calibration_;
-
-  std::string GetFrameName(std::string folder, std::string fname_format, int frame_idx) const {
-    return folder + "/" + utils::Format(fname_format, frame_idx);
+  static std::string GetFrameName(std::string root,
+                                  std::string folder,
+                                  std::string fname_format,
+                                  int frame_idx) {
+    return root + "/" + folder + "/" + utils::Format(fname_format, frame_idx);
   }
 };
 

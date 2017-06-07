@@ -139,8 +139,6 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
 
   // TODO(andrei): Do we need the unchanged part?
   *last_seg_preview_ = cv::imread(img_fpath, CV_LOAD_IMAGE_UNCHANGED);
-//  cv::imshow("TEST", *last_seg_preview_);
-//  cv::waitKey(0);
 
   if (! last_seg_preview_->data) {
     throw std::runtime_error(Format(
