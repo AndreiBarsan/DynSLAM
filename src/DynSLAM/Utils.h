@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #include <stack>
 
-#include "DepthEngine.h"
+#include "DepthProvider.h"
 
 namespace dynslam {
 namespace utils {

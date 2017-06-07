@@ -1,6 +1,6 @@
 
-#ifndef DYNSLAM_DEPTHENGINE_H
-#define DYNSLAM_DEPTHENGINE_H
+#ifndef DYNSLAM_DEPTHPROVIDER_H
+#define DYNSLAM_DEPTHPROVIDER_H
 
 #include <limits>
 
@@ -25,12 +25,12 @@ struct StereoCalibration {
       : baseline_meters(baseline_meters), focal_length_px(focal_length_px) {}
 };
 
-/// \brief Interface for components computing depth from stereo image pairs.
+/// \brief ABC for components computing depth from stereo image pairs.
 /// \note The methods of this interface are designed according to the OpenCV API style, and
 /// return their results into pre-allocated out parameters.
-class DepthEngine {
+class DepthProvider {
  public:
-  virtual ~DepthEngine() {}
+  virtual ~DepthProvider() {}
 
   /// \brief Computes a depth map from a stereo image pair (stereo -> disparity -> depth).
   void DepthFromStereo(const cv::Mat &left,
@@ -111,8 +111,11 @@ class DepthEngine {
     }
   }
 
+  /// \brief The name of the technique being used for depth estimation.
+  virtual const std::string& GetName() const = 0;
+
  protected:
-  DepthEngine(bool input_is_depth) : input_is_depth_(input_is_depth) {}
+  DepthProvider(bool input_is_depth) : input_is_depth_(input_is_depth) {}
 
   /// \brief If true, then assume the read maps are depth maps, instead of disparity maps.
   /// In this case, the depth from disparity computation is no longer performed.
@@ -121,4 +124,4 @@ class DepthEngine {
 
 } // namespace dynslam
 
-#endif //DYNSLAM_DEPTHENGINE_H
+#endif //DYNSLAM_DEPTHPROVIDER_H

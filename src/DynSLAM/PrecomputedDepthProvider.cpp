@@ -2,7 +2,7 @@
 #include <iostream>
 
 #include <highgui.h>
-#include "PrecomputedDepthEngine.h"
+#include "PrecomputedDepthProvider.h"
 #include "Utils.h"
 #include "../pfmLib/ImageIOpfm.h"
 
@@ -10,7 +10,10 @@ namespace dynslam {
 
 using namespace std;
 
-void PrecomputedDepthEngine::DisparityMapFromStereo(const cv::Mat &left,
+const string kDispNetName = "precomputed-dispnet";
+const string kPrecomputedElas = "precomputed-elas";
+
+void PrecomputedDepthProvider::DisparityMapFromStereo(const cv::Mat &left,
                                                     const cv::Mat &right,
                                                     cv::Mat &out_disparity
 ) {
@@ -30,9 +33,18 @@ void PrecomputedDepthEngine::DisparityMapFromStereo(const cv::Mat &left,
   this->frame_idx++;
 }
 
-float PrecomputedDepthEngine::DepthFromDisparity(const float disparity_px,
+float PrecomputedDepthProvider::DepthFromDisparity(const float disparity_px,
                                                  const StereoCalibration &calibration) {
   return calibration.focal_length_px * calibration.baseline_meters / disparity_px;
+}
+
+const string &PrecomputedDepthProvider::GetName() const {
+  if (utils::EndsWith(fname_format, "pfm")) {
+    return kDispNetName;
+  }
+  else {
+    return kPrecomputedElas;
+  }
 }
 
 } // namespace dynslam

@@ -14,7 +14,7 @@
 #include "Utils.h"
 
 #include "../pfmLib/ImageIOpfm.h"
-#include "PrecomputedDepthEngine.h"
+#include "PrecomputedDepthProvider.h"
 #include "InstRecLib/VisoSparseSFProvider.h"
 
 // Commandline arguments using gflags
@@ -280,9 +280,10 @@ protected:
     pangolin::CreatePanel("ui")
       .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(kUiWidth));
 
-    pangolin::Var<function<void(void)>> a_button("ui.Save Static Map", [&]() {
+    pangolin::Var<function<void(void)>> a_button("ui.Save Static Map", [this]() {
       cout << "Saving static map..." << endl;
-      dyn_slam_->SaveStaticMap();
+      dyn_slam_->SaveStaticMap(dyn_slam_input_->GetName(),
+                               dyn_slam_input_->GetDepthProvider()->GetName());
       cout << "Done saving map." << endl;
     });
     reconstructions = new pangolin::Var<string>("ui.Rec", "");
@@ -292,18 +293,20 @@ protected:
     live_raycast_ = new pangolin::Var<bool>("ui.Raycast Mode", false, true);
     display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", true, true);
 
-    pangolin::Var<function<void(void)>> previous_object("ui.Previous Object", [&]() {
+    pangolin::Var<function<void(void)>> previous_object("ui.Previous Object", [this]() {
       SelectPreviousVisualizedObject();
     });
-    pangolin::Var<function<void(void)>> next_object("ui.Next Object", [&]() {
+    pangolin::Var<function<void(void)>> next_object("ui.Next Object", [this]() {
       SelectNextVisualizedObject();
     });
-    pangolin::RegisterKeyPressCallback('n', [&]() {
+    pangolin::RegisterKeyPressCallback('n', [this]() {
       *(this->autoplay_) = false;
       this->ProcessFrame();
     });
     pangolin::Var<function<void(void)>> save_object("ui.Save Active Object", [this]() {
-      dyn_slam_->SaveDynamicObject(dyn_slam_input_->GetName(), visualized_object_idx_);
+      dyn_slam_->SaveDynamicObject(dyn_slam_input_->GetName(),
+                                   dyn_slam_input_->GetDepthProvider()->GetName(),
+                                   visualized_object_idx_);
     });
     pangolin::Var<function<void(void)>> quit_button("ui.Quit", []() {
       pangolin::QuitAll();
@@ -485,7 +488,7 @@ private:
   /// static scene, i.e., with the dynamic objects removed.
   pangolin::Var<bool> *display_raw_previews_;
 
-  // TODO(andrei): On-the-fly depth toggling.
+  // TODO(andrei): On-the-fly depth provider toggling.
   // TODO(andrei): Reset button.
   // TODO(andrei): Dynamically set depth range.
 
@@ -553,8 +556,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       // TODO(andrei): Make sure you normalize dispnet's depth range when using it, since it seems
       // to be inconsistent across frames.
       // TODO(andrei): Carefully read the dispnet paper.
-      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm", true),
-//      new PrecomputedDepthEngine(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", false),
+//      new PrecomputedDepthProvider(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm", true),
+      new PrecomputedDepthProvider(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", false),
       itm_calibration,
       stereo_calibration);
 
