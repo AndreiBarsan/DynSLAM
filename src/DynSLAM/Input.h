@@ -71,6 +71,27 @@ class Input {
     return config;
   }
 
+  static Config KittiConfig() {
+    Config config;
+    config.left_gray_folder       = "image_00/data";
+    config.right_gray_folder      = "image_01/data";
+    config.left_color_folder      = "image_02/data";
+    config.right_color_folder     = "image_03/data";
+    config.fname_format           = "%10d.png";
+    config.itm_calibration_fname  = "itm-calib.txt";
+
+    config.depth_folder           = "precomputed-depth/Frames";
+    config.depth_fname_format     = "%04d.pgm";
+    config.read_depth             = true;
+
+    config.segmentation_folder    = "seg_image_02/mnc";
+
+    config.odometry_oxts          = true;
+    config.odometry_fname         = "oxts";
+
+    return config;
+  };
+
  public:
   Input(const std::string &dataset_folder,
         const Config &config,

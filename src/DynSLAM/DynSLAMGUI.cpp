@@ -619,13 +619,59 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   (*dyn_slam_out)->Initialize(driver, segmentation_provider, sparse_sf_provider);
 }
 
+// Highly experimental!
+void BuildDynSlamKittiOxts(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
+  float baseline_m = 0.537150654273f;
+  float focal_length_px = 707.0912f;
+  StereoCalibration stereo_calibration(baseline_m, focal_length_px);
+
+  Input::Config input_config = Input::KittiConfig();
+  auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
+
+  *input_out = new Input(
+      dataset_root,
+      input_config,
+      new PrecomputedDepthProvider(dataset_root + "/" + input_config.depth_folder,
+                                   input_config.depth_fname_format,
+                                   input_config.read_depth),
+      itm_calibration,
+      stereo_calibration);
+
+  ITMLibSettings *settings = new ITMLibSettings();
+  settings->groundTruthPoseFpath = dataset_root + "/" + input_config.odometry_fname;
+//  settings->groundTruthPoseOxts = input_config.odometry_oxts;
+
+  drivers::InfiniTamDriver *driver = new InfiniTamDriver(
+      settings,
+      new ITMRGBDCalib(itm_calibration),
+      ToItmVec((*input_out)->GetRgbSize()),
+      ToItmVec((*input_out)->GetDepthSize()));
+
+  const string seg_folder = dataset_root + "/" + input_config.segmentation_folder;
+  auto segmentation_provider =
+      new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder);
+
+  VisualOdometryStereo::parameters sf_params;
+  sf_params.base = baseline_m;
+  sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;
+  sf_params.calib.cv = itm_calibration.intrinsics_rgb.projectionParamsSimple.py;
+  sf_params.calib.f  = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx;
+
+  auto sparse_sf_provider = new instreclib::VisoSparseSFProvider(sf_params);
+
+  *dyn_slam_out = new gui::DynSlam();
+  (*dyn_slam_out)->Initialize(driver, segmentation_provider, sparse_sf_provider);
+}
+
 } // namespace dynslam
 
 int main(int argc, char **argv) {
   using namespace dynslam;
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  const string dataset_root = FLAGS_dataset_root;
+//  const string dataset_root = FLAGS_dataset_root;
+  const string dataset_root = "/home/barsana/datasets/kitti/2011_09_26/2011_09_26_drive_0005_sync/";
+
   if (dataset_root.empty()) {
     cerr << "Please specify a dataset to work with. The --dataset_root=<path> flag must be set."
          << endl;
@@ -635,7 +681,8 @@ int main(int argc, char **argv) {
 
   DynSlam *dyn_slam;
   Input *input;
-  BuildDynSlamKittiOdometryGT(dataset_root, &dyn_slam, &input);
+//  BuildDynSlamKittiOdometryGT(dataset_root, &dyn_slam, &input);
+  BuildDynSlamKittiOxts(dataset_root, &dyn_slam, &input);
 
   gui::PangolinGui pango_gui(dyn_slam, input);
   pango_gui.Run();
