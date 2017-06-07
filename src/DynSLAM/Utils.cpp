@@ -30,7 +30,7 @@ string Format(const string& fmt, ...) {
     va_start(ap, fmt);
     int final_n = vsnprintf(&formatted[0], out_size, fmt.c_str(), ap);
     va_end(ap);
-    if (final_n < 0 || final_n >= out_size) {
+    if (final_n < 0 || static_cast<size_t>(final_n) >= out_size) {
       int size_update = final_n - static_cast<int>(out_size) + 1;
       out_size += abs(size_update);
     }

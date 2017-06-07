@@ -86,8 +86,8 @@ set(DYNSLAM_SOURCES
     src/DynSLAM/DynSlam.cpp
     src/DynSLAM/InfiniTamDriver.cpp
     src/DynSLAM/Input.cpp
-    src/DynSLAM/DepthEngine.h
-    src/DynSLAM/PrecomputedDepthEngine.cpp
+        src/DynSLAM/DepthProvider.h
+        src/DynSLAM/PrecomputedDepthProvider.cpp
     # A tiny library for working with portable float map (PFM) files.
     src/pfmLib/ImageIOpfm.cpp)
 

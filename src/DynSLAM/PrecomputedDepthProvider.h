@@ -1,22 +1,26 @@
-#ifndef DYNSLAM_PRECOMPUTEDDEPTHENGINE_H
-#define DYNSLAM_PRECOMPUTEDDEPTHENGINE_H
+#ifndef DYNSLAM_PRECOMPUTEDDEPTHPROVIDER_H
+#define DYNSLAM_PRECOMPUTEDDEPTHPROVIDER_H
 
 #include <string>
 
-#include "DepthEngine.h"
+#include "DepthProvider.h"
 
 namespace dynslam {
+
+extern const std::string kDispNetName;
+extern const std::string kPrecomputedElas;
 
 /// \brief Reads precomputed disparity (default) or depth maps from a folder.
 /// The depth maps are expected to be grayscale, and in 8 or 16-bit format if 'hdr_depth_' if
 /// false, and in 32-bit PFM format otherwise.
-class PrecomputedDepthEngine : public DepthEngine {
+class PrecomputedDepthProvider : public DepthProvider {
  public:
-  virtual ~PrecomputedDepthEngine() {}
+  virtual ~PrecomputedDepthProvider() {}
 
-  PrecomputedDepthEngine(const std::string &folder, const std::string &fname_format,
+  PrecomputedDepthProvider(const std::string &folder,
+                         const std::string &fname_format,
                          bool input_is_depth = false)
-      : DepthEngine(input_is_depth),
+      : DepthProvider(input_is_depth),
         folder(folder),
         fname_format(fname_format),
         frame_idx(0) {}
@@ -28,6 +32,8 @@ class PrecomputedDepthEngine : public DepthEngine {
   virtual float DepthFromDisparity(const float disparity_px,
                                    const StereoCalibration &calibration) override;
 
+  const std::string& GetName() const override;
+
  private:
   std::string folder;
   /// \brief The printf-style format of the frame filenames, such as "frame-%04d.png" for frames
@@ -38,4 +44,4 @@ class PrecomputedDepthEngine : public DepthEngine {
 
 } // namespace dynslam
 
-#endif //DYNSLAM_PRECOMPUTEDDEPTHENGINE_H
+#endif //DYNSLAM_PRECOMPUTEDDEPTHPROVIDER_H

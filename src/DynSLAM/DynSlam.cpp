@@ -2,7 +2,7 @@
 
 #include "DynSlam.h"
 #include "Input.h"
-#include "PrecomputedDepthEngine.h"
+#include "PrecomputedDepthProvider.h"
 
 namespace dynslam {
 
