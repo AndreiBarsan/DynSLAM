@@ -35,6 +35,29 @@ ORUtils::Vector4<T> ToItmVec(const cv::Vec<T, 4> in) {
   return ORUtils::Vector4<T>(in[0], in[1], in[2], in[3]);
 }
 
+// TODO do not depend on infinitam objects. The ITM driver should be the only bit worrying about
+// them.
+ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const std::string& fpath);
+
+// TODO(andrei): Make */& more consistent.
+ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const string &fpath);
+
+/// \brief Converts an OpenCV RGB Mat into an InfiniTAM image.
+void CvToItm(const cv::Mat3b &mat, ITMUChar4Image *out_itm);
+
+/// \brief Converts an OpenCV depth Mat into an InfiniTAM depth image.
+void CvToItm(const cv::Mat1s &mat, ITMShortImage *out_itm);
+
+/// \brief Converts an InfiniTAM rgb(a) image into an OpenCV RGB mat, discarding the alpha information.
+void ItmToCv(const ITMUChar4Image &itm, cv::Mat3b *out_mat);
+
+/// \brief Converts an InfiniTAM depth image into an OpenCV mat.
+void ItmToCv(const ITMShortImage &itm, cv::Mat1s *out_mat);
+
+/// \brief Converts an InfiniTAM float depth image into an OpenCV mat.
+void ItmToCv(const ITMFloatImage &itm, cv::Mat1s *out_mat);
+
+
 ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix, bool flip_ud = true, bool fix_roll = true);
 
 /// \brief Interfaces between DynSLAM and InfiniTAM.
@@ -64,18 +87,7 @@ public:
 
   // TODO(andrei): I was passing a Mat4b but didnt even get a warning. Is that normal? I was
   // expecting a little more type safety...
-  void UpdateView(const cv::Mat3b &rgb_image, const cv::Mat_<uint16_t> &raw_depth_image) {
-    CvToItm(rgb_image, rgb_itm_);
-    CvToItm(raw_depth_image, raw_depth_itm_);
-
-    // * If 'view' is null, this allocates its RGB and depth buffers.
-    // * Afterwards, it converts the depth map we give it into a float depth map (we may be able to
-    //   skip this step in our case, since we have control over how our depth map is computed).
-    // * It then filters the shit out of the depth map (maybe we could skip this?) using five steps
-    //   of bilateral filtering.
-    this->viewBuilder->UpdateView(&view, rgb_itm_, raw_depth_itm_, settings->useBilateralFilter,
-                                  settings->modelSensorNoise);
-  }
+  void UpdateView(const cv::Mat3b &rgb_image, const cv::Mat_<uint16_t> &raw_depth_image);
 
   // used by the instance reconstruction
   void SetView(ITMView *view) {

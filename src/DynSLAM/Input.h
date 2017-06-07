@@ -5,35 +5,11 @@
 #include <string>
 #include <highgui.h>
 
-#include "DepthEngine.h"
+#include "DepthProvider.h"
 #include "Utils.h"
-#include "../InfiniTAM/InfiniTAM/ITMLib/Utils/ITMLibDefines.h"
 #include "../InfiniTAM/InfiniTAM/ITMLib/Objects/ITMRGBDCalib.h"
-#include "../InfiniTAM/InfiniTAM/ITMLib/Utils/ITMCalibIO.h"
-#include "../InfiniTAM/InfiniTAM/Utils/FileUtils.h"
 
 namespace dynslam {
-
-// TODO(andrei): Move helpers to driver class file and make */& more consistent.
-
-/// \brief Converts an OpenCV RGB Mat into an InfiniTAM image.
-void CvToItm(const cv::Mat3b &mat, ITMUChar4Image *out_itm);
-
-/// \brief Converts an OpenCV depth Mat into an InfiniTAM depth image.
-void CvToItm(const cv::Mat1s &mat, ITMShortImage *out_itm);
-
-/// \brief Converts an InfiniTAM rgb(a) image into an OpenCV RGB mat, discarding the alpha information.
-void ItmToCv(const ITMUChar4Image &itm, cv::Mat3b *out_mat);
-
-/// \brief Converts an InfiniTAM depth image into an OpenCV mat.
-void ItmToCv(const ITMShortImage &itm, cv::Mat1s *out_mat);
-
-/// \brief Converts an InfiniTAM float depth image into an OpenCV mat.
-void ItmToCv(const ITMFloatImage &itm, cv::Mat1s *out_mat);
-
-// TODO do not depend on infinitam objects. The ITM driver should be the only bit worrying about
-// them.
-ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const std::string& fpath);
 
 /// \brief Provides input from DynSLAM, in the form of RGBD frames.
 /// Since DynSLAM currently operates with stereo input, this class also computes depth from stereo.
@@ -42,10 +18,10 @@ ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const std::string& fpath);
 class Input {
  public:
   Input(const std::string &dataset_folder,
-        DepthEngine *depth_engine,
+        DepthProvider *depth_provider,
         const ITMLib::Objects::ITMRGBDCalib &calibration,
         const StereoCalibration &stereo_calibration)
-      : depth_engine_(depth_engine),
+      : depth_provider_(depth_provider),
         dataset_folder_(dataset_folder),
         frame_idx_(0),
         calibration_(calibration),
@@ -57,21 +33,11 @@ class Input {
   /// \returns True if the next frame's files could be read successfully.
   bool ReadNextFrame();
 
-  // TODO(andrei): This copies things around anyway. Make things neater, and copy that shit using the
-  // ITM driver instead.
-
-  /// \brief Reads from the input folders into the specified InfiniTAM buffers.
-  /// \return True if the images could be loaded and processed appropriately.
-//  void GetItmImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth);
-
+  /// \brief Returns pointers to the latest RGB and depth data.
   void GetCvImages(cv::Mat3b **rgb, cv::Mat1s **raw_depth);
 
+  /// \brief Returns pointers to the latest grayscale input frames.
   void GetCvStereoGray(cv::Mat1b **left, cv::Mat1b **right);
-
-  ITMLib::Objects::ITMRGBDCalib GetITMCalibration() {
-    std::cerr << "Warning: Using deprecated ITM calibration accessor!" << std::endl;
-    return calibration_;
-  };
 
   cv::Size2i GetRgbSize() const {
     return cv::Size2i(static_cast<int>(calibration_.intrinsics_rgb.sizeX),
@@ -83,12 +49,17 @@ class Input {
                       static_cast<int>(calibration_.intrinsics_d.sizeY));
   }
 
+  /// \brief Gets the name of the dataset folder which we are using.
   std::string GetName() const {
     return dataset_folder_.substr(dataset_folder_.rfind('/'));
   }
 
+  DepthProvider* GetDepthProvider() const {
+    return depth_provider_;
+  }
+
  private:
-  DepthEngine *depth_engine_;
+  DepthProvider *depth_provider_;
 
   std::string dataset_folder_;
   int frame_idx_;
@@ -106,11 +77,9 @@ class Input {
   ITMLib::Objects::ITMRGBDCalib calibration_;
   StereoCalibration stereo_calibration_;
 
-  // TODO dedicated subclass for reading stereo input
   std::string GetFrameName(std::string folder, std::string fname_format, int frame_idx) const {
     return folder + "/" + utils::Format(fname_format, frame_idx);
   }
-
 };
 
 } // namespace dynslam

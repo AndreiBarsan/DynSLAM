@@ -105,22 +105,28 @@ public:
     return current_frame_no_;
   }
 
-  void SaveStaticMap() {
+  void SaveStaticMap(const std::string &dataset_name, const std::string &depth_name) {
     // TODO(andrei): This sometimes indicates some error; find out what it means.
     auto err = cudaGetLastError();
     cout << cudaSuccess << " is success. We have: " << err << "." << endl;
     cout << cudaGetErrorName(err) << endl << cudaGetErrorString(err) << endl << endl;
 
-    // TODO(andrei): Custom file name, etc.
-    static_scene_->SaveSceneToMesh("mesh_out.obj");
+    system(utils::Format("mkdir -p mesh_out/%s", dataset_name.c_str()).c_str());
+    string map_fpath = utils::Format("mesh_out/%s/static-%s-%d-mesh.obj",
+                                     dataset_name.c_str(),
+                                     depth_name.c_str());
+    static_scene_->SaveSceneToMesh(map_fpath.c_str());
   }
 
-  void SaveDynamicObject(const::string &dataset_name, int object_id) {
+  void SaveDynamicObject(const std::string &dataset_name, const std::string &depth_name, int object_id) {
     cout << "Saving mesh for object #" << object_id << "'s reconstruction..." << endl;
-    // TODO(andrei): Make this more cross-platform.
+    // TODO(andrei): Make this more cross-platform and more secure.
     system(utils::Format("mkdir -p mesh_out/%s", dataset_name.c_str()).c_str());
 
-    string instance_fpath = utils::Format("mesh_out/%s/instance_%d_mesh.obj", dataset_name.c_str(), object_id);
+    string instance_fpath = utils::Format("mesh_out/%s/instance-%s-%d-mesh.obj",
+                                          dataset_name.c_str(),
+                                          depth_name.c_str(),
+                                          object_id);
     instance_reconstructor_->SaveObjectToMesh(object_id, instance_fpath);
 
     cout << "Done saving mesh for object #" << object_id << "'s reconstruction in file ["
