@@ -43,10 +43,24 @@ public:
   // TODO(andrei): We may need to add another layer of abstraction above the drivers to get the best
   // modularity possible (driver+inpu+custom settings combos).
 
-  InfiniTamDriver(const ITMLibSettings *settings,
-                  const ITMRGBDCalib *calib,
-                  const Vector2i &img_size_rgb,
-                  const Vector2i &img_size_d);
+  InfiniTamDriver(
+      const ITMLibSettings *settings,
+      const ITMRGBDCalib *calib,
+      const Vector2i &img_size_rgb,
+      const Vector2i &img_size_d)
+      : ITMMainEngine(settings, calib, img_size_rgb, img_size_d),
+        rgb_itm_(new ITMUChar4Image(img_size_rgb, true, true)),
+        raw_depth_itm_(new ITMShortImage(img_size_d, true, true)),
+        rgb_cv_(new cv::Mat3b(img_size_rgb.height, img_size_rgb.width)),
+        raw_depth_cv_(new cv::Mat1s(img_size_d.height, img_size_d.width))
+  { }
+
+  virtual ~InfiniTamDriver() {
+    delete rgb_itm_;
+    delete raw_depth_itm_;
+    delete rgb_cv_;
+    delete raw_depth_cv_;
+  }
 
   // TODO(andrei): I was passing a Mat4b but didnt even get a warning. Is that normal? I was
   // expecting a little more type safety...
@@ -90,6 +104,10 @@ public:
   void PrepareNextStep() {
     // This may not be necessary if we're using ground truth VO.
     this->trackingController->Prepare(this->trackingState, this->view, this->renderState_live);
+
+    // Keep the OpenCV previews up to date.
+    ItmToCv(*this->view->rgb, rgb_cv_);
+    ItmToCv(*this->view->depth, raw_depth_cv_);
   }
 
   const ITMLibSettings* GetSettings() const {
@@ -101,24 +119,26 @@ public:
       ITMUChar4Image *out,
       GetImageType get_image_type,
       const pangolin::OpenGlMatrix &model_view = pangolin::IdentityMatrix()
-  ) {
-    if (nullptr != this->view) {
-      ITMPose itm_freeview_pose = PoseFromPangolin(model_view);
+  );
 
-      ITMIntrinsics intrinsics = this->view->calib->intrinsics_d;
-      ITMMainEngine::GetImage(
-          out,
-          get_image_type,
-          &itm_freeview_pose,
-          &intrinsics);
-    }
-    // Otherwise: We're before the very first frame, so no raycast is available yet.
+  /// \brief Returns the RGB "seen" by this particular InfiniTAM instance.
+  /// This may not be the full original RGB frame due to, e.g., masking.
+  const cv::Mat3b* GetRgbPreview() const {
+    return rgb_cv_;
+  }
+
+  /// \brief Returns the depth "seen" by this particular InfiniTAM instance.
+  /// This may not be the full original depth frame due to, e.g., masking.
+  const cv::Mat1s* GetDepthPreview() const {
+    return raw_depth_cv_;
   }
 
  private:
   ITMUChar4Image *rgb_itm_;
   ITMShortImage  *raw_depth_itm_;
 
+  cv::Mat3b *rgb_cv_;
+  cv::Mat1s *raw_depth_cv_;
 };
 
 } // namespace drivers

@@ -137,9 +137,8 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
     last_seg_preview_ = new cv::Mat3b(rgb.rows, rgb.cols);
   }
 
+  // TODO(andrei): Do we need the unchanged part?
   *last_seg_preview_ = cv::imread(img_fpath, CV_LOAD_IMAGE_UNCHANGED);
-//  auto *foo = new cv::Mat3b(rgb.rows, rgb.cols);
-//  *foo = cv::imread(img_fpath, CV_LOAD_IMAGE_UNCHANGED);
 //  cv::imshow("TEST", *last_seg_preview_);
 //  cv::waitKey(0);
 

@@ -22,7 +22,7 @@ void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine,
   out_image_ = new ITMUChar4Image(input_shape, true, allocate_gpu);
   out_image_float_ = new ITMFloatImage(input_shape, true, allocate_gpu);
   input_rgb_image_ = new cv::Mat3b(input_shape.x, input_shape.y);
-  input_raw_depth_image_ = new cv::Mat_<uint16_t>(input_shape.x, input_shape.y);
+  input_raw_depth_image_ = new cv::Mat1s(input_shape.x, input_shape.y);
 
   input_width_ = input_shape.x;
   input_height_ = input_shape.y;

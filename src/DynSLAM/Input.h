@@ -14,11 +14,22 @@
 
 namespace dynslam {
 
+// TODO(andrei): Move helpers to driver class file and make */& more consistent.
+
 /// \brief Converts an OpenCV RGB Mat into an InfiniTAM image.
-void CvToItm(const cv::Mat &mat, ITMUChar4Image *out_rgb);
+void CvToItm(const cv::Mat3b &mat, ITMUChar4Image *out_itm);
 
 /// \brief Converts an OpenCV depth Mat into an InfiniTAM depth image.
-void CvToItm(const cv::Mat1s &mat, ITMShortImage *out_depth);
+void CvToItm(const cv::Mat1s &mat, ITMShortImage *out_itm);
+
+/// \brief Converts an InfiniTAM rgb(a) image into an OpenCV RGB mat, discarding the alpha information.
+void ItmToCv(const ITMUChar4Image &itm, cv::Mat3b *out_mat);
+
+/// \brief Converts an InfiniTAM depth image into an OpenCV mat.
+void ItmToCv(const ITMShortImage &itm, cv::Mat1s *out_mat);
+
+/// \brief Converts an InfiniTAM float depth image into an OpenCV mat.
+void ItmToCv(const ITMFloatImage &itm, cv::Mat1s *out_mat);
 
 // TODO do not depend on infinitam objects. The ITM driver should be the only bit worrying about
 // them.
@@ -53,7 +64,7 @@ class Input {
   /// \return True if the images could be loaded and processed appropriately.
 //  void GetItmImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth);
 
-  void GetCvImages(cv::Mat3b **rgb, cv::Mat_<uint16_t> **raw_depth);
+  void GetCvImages(cv::Mat3b **rgb, cv::Mat1s **raw_depth);
 
   void GetCvStereoGray(cv::Mat1b **left, cv::Mat1b **right);
 
@@ -84,8 +95,7 @@ class Input {
 
   cv::Mat3b left_frame_color_buf_;
   cv::Mat3b right_frame_color_buf_;
-  cv::Mat_<uint16_t> depth_buf_;
-//  cv::Mat disparity_buf_;
+  cv::Mat1s depth_buf_;
 
   // Store the grayscale information necessary for scene flow computation using libviso2, and
   // on-the-fly depth map computation using libelas.

@@ -130,7 +130,12 @@ public:
 
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
-      pane_texture_->Upload(dyn_slam_->GetRgbPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      if (display_raw_previews_->Get()) {
+        LoadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
+      }
+      else {
+        LoadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_);
+      }
       pane_texture_->RenderToViewport(true);
 
       if (dyn_slam_->GetCurrentFrameNo() > 1) {
@@ -141,18 +146,21 @@ public:
 
       depth_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
-      pane_texture_->Upload(dyn_slam_->GetDepthPreview(), GL_RGBA, GL_UNSIGNED_BYTE);
+      if (display_raw_previews_->Get()) {
+        LoadCvTexture(*(dyn_slam_->GetDepthPreview()), *pane_texture_, false, GL_SHORT);
+      }
+      else {
+        LoadCvTexture(*(dyn_slam_->GetStaticDepthPreview()), *pane_texture_, false, GL_SHORT);
+      }
       pane_texture_->RenderToViewport(true);
 
       segment_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
-//      if (nullptr != dyn_slam_->GetSegmentationPreview()) {
-//        pane_texture_->Upload(dyn_slam_->GetSegmentationPreview(), GL_RGB, GL_UNSIGNED_BYTE);
-//        pane_texture_->RenderToViewport(true);
-////        UploadDummyTexture();
-////        dummy_image_texture_->RenderToViewport(true);
-//        DrawInstanceLables();
-//      }
+      if (nullptr != dyn_slam_->GetSegmentationPreview()) {
+        LoadCvTexture(*dyn_slam_->GetSegmentationPreview(), *pane_texture_);
+        pane_texture_->RenderToViewport(true);
+        DrawInstanceLables();
+      }
 
       object_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
@@ -282,6 +290,7 @@ protected:
     wiggle_mode_ = new pangolin::Var<bool>("ui.Wiggle mode", false, true);
     autoplay_ = new pangolin::Var<bool>("ui.Autoplay", false, true);
     live_raycast_ = new pangolin::Var<bool>("ui.Raycast Mode", false, true);
+    display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", true, true);
 
     pangolin::Var<function<void(void)>> previous_object("ui.Previous Object", [&]() {
       SelectPreviousVisualizedObject();
@@ -472,6 +481,9 @@ private:
   /// \brief If enabled, the latest frame's raycast is displayed in the main pane. Otherwise, a
   /// free-roam view of the scene is provided.
   pangolin::Var<bool> *live_raycast_;
+  /// \brief Whether to display the RGB and depth previews directly from the input, or from the
+  /// static scene, i.e., with the dynamic objects removed.
+  pangolin::Var<bool> *display_raw_previews_;
 
   // TODO(andrei): On-the-fly depth toggling.
   // TODO(andrei): Reset button.
@@ -479,6 +491,30 @@ private:
 
   // Indicates which object is currently being visualized in the GUI.
   int visualized_object_idx_ = 0;
+
+  /// \brief Prepares the contents of an OpenCV Mat object for rendering with Pangolin (OpenGL).
+  /// Does not actually render the texture.
+  static void LoadCvTexture(
+      const cv::Mat &mat,
+      pangolin::GlTexture &texture,
+      bool color = true,
+      GLenum data_type = GL_UNSIGNED_BYTE
+  ) {
+    int old_alignment, old_row_length;
+    glGetIntegerv(GL_UNPACK_ALIGNMENT, &old_alignment);
+    glGetIntegerv(GL_UNPACK_ROW_LENGTH, &old_row_length);
+
+    int new_alignment = (mat.step & 3) ? 1 : 4;
+    int new_row_length = static_cast<int>(mat.step / mat.elemSize());
+    glPixelStorei(GL_UNPACK_ALIGNMENT, new_alignment);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, new_row_length);
+
+    GLenum data_format = (color) ? GL_BGR : GL_GREEN;
+    texture.Upload(mat.data, data_format, data_type);
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, old_alignment);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, old_row_length);
+  }
 
   void UploadDummyTexture() {
     // Mess with the bytes a little bit for OpenGL <-> OpenCV compatibility.
