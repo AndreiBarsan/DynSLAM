@@ -537,16 +537,18 @@ private:
 /// This is useful when you want to focus on the quality of the reconstruction, instead of that of
 /// the odometry.
 void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
-  auto itm_calibration = ReadITMCalibration(dataset_root + "/itm-calib.txt");
-
   // Parameters used in the KITTI-odometry dataset.
   // TODO(andrei): Read from a file.
   float baseline_m = 0.537150654273f;
   float focal_length_px = 707.0912f;
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
 
+  Input::Config input_config = Input::KittiOdometryConfig();
+  auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
+
   *input_out = new Input(
       dataset_root,
+      input_config,
       // TODO(andrei): ¿Por qué no los dos? Maybe it's worth investigating to use the more
       // conservative, sharper libelas depth maps for the main map, but the smoother ones produced
       // by dispnet for the objects. This may be a good idea since libelas tends to screw up when
@@ -556,8 +558,9 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       // TODO(andrei): Make sure you normalize dispnet's depth range when using it, since it seems
       // to be inconsistent across frames.
       // TODO(andrei): Carefully read the dispnet paper.
-//      new PrecomputedDepthProvider(dataset_root + "/precomputed-depth/Frames/", "%04d.pgm", true),
-      new PrecomputedDepthProvider(dataset_root + "/precomputed-depth-dispnet/", "%06d.pfm", false),
+      new PrecomputedDepthProvider(dataset_root + "/" + input_config.depth_folder,
+                                   input_config.depth_fname_format,
+                                   input_config.read_depth),
       itm_calibration,
       stereo_calibration);
 
@@ -566,8 +569,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   // calibration file, and the actual size of the input images.
 
   ITMLibSettings *settings = new ITMLibSettings();
-  // TODO(andrei): Add this to dataset prep script!
-  settings->groundTruthPoseFpath = dataset_root + "/poses.txt";
+  settings->groundTruthPoseFpath = dataset_root + "/" + input_config.odometry_fname;
 
   drivers::InfiniTamDriver *driver = new InfiniTamDriver(
       settings,
@@ -575,7 +577,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       ToItmVec((*input_out)->GetRgbSize()),
       ToItmVec((*input_out)->GetDepthSize()));
 
-  const string seg_folder = dataset_root + "/seg_image_2/mnc";
+  const string seg_folder = dataset_root + "/" + input_config.segmentation_folder;
   auto segmentation_provider =
       new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder);
 
