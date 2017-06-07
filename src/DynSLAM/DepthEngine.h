@@ -36,7 +36,7 @@ class DepthEngine {
   void DepthFromStereo(const cv::Mat &left,
                        const cv::Mat &right,
                        const StereoCalibration &calibration,
-                       cv::Mat_<uint16_t> &out_depth) {
+                       cv::Mat1s &out_depth) {
     if(input_is_depth_) {
       DisparityMapFromStereo(left, right, out_depth);
       return;
@@ -47,13 +47,13 @@ class DepthEngine {
     DisparityMapFromStereo(left, right, out_disparity);
 
     // ...and this one?
-    out_depth = cv::Mat_<uint16_t>(out_disparity.size(), CV_16UC1);
+    out_depth = cv::Mat1s(out_disparity.size(), CV_16SC1);
 
     // This should be templated in a nicer fashion...
     if (out_disparity.type() == CV_32FC1) {
       DepthFromDisparityMap<float>(out_disparity, calibration, out_depth);
     }
-    else if (out_disparity.type() == CV_16UC1) {
+    else if (out_disparity.type() == CV_16SC1) {
       DepthFromDisparityMap<uint16_t>(out_disparity, calibration, out_depth);
     }
     else {
@@ -81,7 +81,7 @@ class DepthEngine {
   template<typename T>
   void DepthFromDisparityMap(const cv::Mat_<T> &disparity,
                              const StereoCalibration &calibration,
-                             cv::Mat_<uint16_t> &out_depth) {
+                             cv::Mat1s &out_depth) {
     assert(disparity.size() == out_depth.size());
 
     for(int i = 0; i < disparity.rows; ++i) {
@@ -102,11 +102,11 @@ class DepthEngine {
         // produced by dispnet are consistent across frames.
 
         if (depth_mm > kMaxDepthMeters * kMetersToMillimeters || depth_mm < 0) {
-          depth_mm = std::numeric_limits<uint16_t>::max();
+          depth_mm = std::numeric_limits<int16_t>::max();
         }
 
-        uint16_t depth_mm_short = static_cast<uint16_t>(depth_mm);
-        out_depth.at<uint16_t>(i, j) = depth_mm_short;
+        int16_t depth_mm_short = static_cast<int16_t>(depth_mm);
+        out_depth.at<int16_t>(i, j) = depth_mm_short;
       }
     }
   }

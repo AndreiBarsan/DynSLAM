@@ -55,14 +55,21 @@ ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix, bool fli
   return itm_pose;
 }
 
-InfiniTamDriver::InfiniTamDriver(
-    const ITMLibSettings *settings,
-    const ITMRGBDCalib *calib,
-    const Vector2i &img_size_rgb,
-    const Vector2i &img_size_d)
-  : ITMMainEngine(settings, calib, img_size_rgb, img_size_d),
-    rgb_itm_(new ITMUChar4Image(img_size_rgb, true, true)),
-    raw_depth_itm_(new ITMShortImage(img_size_d, true, true)) { }
+void InfiniTamDriver::GetImage(ITMUChar4Image *out,
+                               ITMMainEngine::GetImageType get_image_type,
+                               const pangolin::OpenGlMatrix &model_view) {
+  if (nullptr != this->view) {
+    ITMPose itm_freeview_pose = PoseFromPangolin(model_view);
+
+    ITMIntrinsics intrinsics = this->view->calib->intrinsics_d;
+    ITMMainEngine::GetImage(
+        out,
+        get_image_type,
+        &itm_freeview_pose,
+        &intrinsics);
+  }
+  // Otherwise: We're before the very first frame, so no raycast is available yet.
+}
 
 } // namespace drivers}
 } // namespace dynslam

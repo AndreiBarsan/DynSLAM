@@ -36,14 +36,24 @@ public:
     return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST);
   }
 
-  /// \brief Returns an **RGBA** preview of the latest color frame.
-  const unsigned char* GetRgbPreview() {
-    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_ORIGINAL_RGB);
+  /// \brief Returns an RGB preview of the latest color frame.
+  const cv::Mat3b* GetRgbPreview() {
+    return input_rgb_image_;
   }
 
-  /// \brief Returns an **RGBA** preview of the latest depth frame.
-  const unsigned char* GetDepthPreview() {
-    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_ORIGINAL_DEPTH);
+  /// \brief Returns an RGB preview of the static parts from the latest color frame.
+  const cv::Mat3b* GetStaticRgbPreview() {
+    return static_scene_->GetRgbPreview();
+  }
+
+  /// \brief Returns a preview of the latest depth frame.
+  const cv::Mat1s* GetDepthPreview() {
+    return input_raw_depth_image_;
+  }
+
+  /// \brief Returns a preview of the static parts from the latest depth frame.
+  const cv::Mat1s* GetStaticDepthPreview() {
+    return static_scene_->GetDepthPreview();
   }
 
   const unsigned char* GetObjectRaycastPreview(int object_idx, const pangolin::OpenGlMatrix &model_view) {
@@ -135,7 +145,7 @@ private:
   ITMUChar4Image *out_image_;
   ITMFloatImage *out_image_float_;
   cv::Mat3b *input_rgb_image_;
-  cv::Mat_<uint16_t> *input_raw_depth_image_;
+  cv::Mat1s *input_raw_depth_image_;
 
   int current_frame_no_;
   int input_width_;

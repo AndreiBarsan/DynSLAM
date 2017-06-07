@@ -14,19 +14,19 @@ ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const string &fpath) {
   return out_calib;
 }
 
-// TODO(andrei): Make this more type-safe!
-void CvToItm(const cv::Mat &mat, ITMUChar4Image *out_rgb) {
+void CvToItm(const cv::Mat3b &mat, ITMUChar4Image *out_itm) {
   Vector2i newSize(mat.cols, mat.rows);
-  out_rgb->ChangeDims(newSize);
-  Vector4u *data_ptr = out_rgb->GetData(MEMORYDEVICE_CPU);
+  out_itm->ChangeDims(newSize);
+  Vector4u *data_ptr = out_itm->GetData(MEMORYDEVICE_CPU);
 
   for (int i = 0; i < mat.rows; ++i) {
     for (int j = 0; j < mat.cols; ++j) {
       int idx = i * mat.cols + j;
       // Convert from OpenCV's standard BGR format to RGB.
-      data_ptr[idx].r = mat.data[idx * 3 + 2];
-      data_ptr[idx].g = mat.data[idx * 3 + 1];
-      data_ptr[idx].b = mat.data[idx * 3 + 0];
+      cv::Vec3b col = mat.at<cv::Vec3b>(i, j);
+      data_ptr[idx].b = col[0];
+      data_ptr[idx].g = col[1];
+      data_ptr[idx].r = col[2];
       data_ptr[idx].a = 255u;
     }
   }
@@ -35,10 +35,42 @@ void CvToItm(const cv::Mat &mat, ITMUChar4Image *out_rgb) {
 //    memcpy(data_ptr, mat.data, mat.rows * mat.cols * 4 * sizeof(unsigned char));
 }
 
-void CvToItm(const cv::Mat1s &mat, ITMShortImage *out_depth) {
-  short *data_ptr = out_depth->GetData(MEMORYDEVICE_CPU);
-  out_depth->ChangeDims(Vector2i(mat.cols, mat.rows));
+void CvToItm(const cv::Mat1s &mat, ITMShortImage *out_itm) {
+  short *data_ptr = out_itm->GetData(MEMORYDEVICE_CPU);
+  out_itm->ChangeDims(Vector2i(mat.cols, mat.rows));
   memcpy(data_ptr, mat.data, mat.rows * mat.cols * sizeof(short));
+}
+
+void ItmToCv(const ITMUChar4Image &itm, cv::Mat3b *out_mat) {
+  // TODO(andrei): Suport resizing the matrix, if necessary.
+  const Vector4u *itm_data = itm.GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+  for (int i = 0; i < itm.noDims[1]; ++i) {
+    for (int j = 0; j < itm.noDims[0]; ++j) {
+      out_mat->at<cv::Vec3b>(i, j) = cv::Vec3b(
+          itm_data[i * itm.noDims[0] + j].b,
+          itm_data[i * itm.noDims[0] + j].g,
+          itm_data[i * itm.noDims[0] + j].r
+      );
+    }
+  }
+}
+
+void ItmToCv(const ITMShortImage &itm, cv::Mat1s *out_mat) {
+  // TODO(andrei): Suport resizing the matrix, if necessary.
+  const int16_t *itm_data = itm.GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+  memcpy(out_mat->data, itm_data, itm.noDims[0] * itm.noDims[1] * sizeof(int16_t));
+}
+
+// TODO(andrei): Float -> RGB color image with color map which makes it easier to visualize depth.
+void ItmToCv(const ITMFloatImage &itm, cv::Mat1s *out_mat) {
+  const float* itm_data = itm.GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+  for (int i = 0; i < itm.noDims[1]; ++i) {
+    for (int j = 0; j < itm.noDims[0]; ++j) {
+      out_mat->at<int16_t>(i, j) = static_cast<int16_t>(
+          itm_data[i * itm.noDims[0] + j] * (numeric_limits<int16_t>::max() / 4)
+      );
+    }
+  }
 }
 
 bool Input::HasMoreImages() {
@@ -96,13 +128,7 @@ bool Input::ReadNextFrame() {
   return true;
 }
 
-//void Input::GetItmImages(ITMUChar4Image *rgb, ITMShortImage *raw_depth) {
-//  // The left frame is the RGB input to our system.
-//  CvToItm(left_frame_color_buf_, rgb);
-//  CvToItm(depth_buf_, raw_depth);
-//}
-
-void Input::GetCvImages(cv::Mat3b **rgb, cv::Mat_<uint16_t> **raw_depth) {
+void Input::GetCvImages(cv::Mat3b **rgb, cv::Mat1s **raw_depth) {
   *rgb = &left_frame_color_buf_;
   *raw_depth = &depth_buf_;
 }
