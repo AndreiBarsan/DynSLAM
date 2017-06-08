@@ -16,13 +16,9 @@ struct TrackFrame {
   int frame_idx;
   InstanceView instance_view;
 
-  // Only active if inside a Track. TODO(andrei): Implement.
-  TrackFrame* previous;
-  TrackFrame* next;
-
  public:
   TrackFrame(int frame_idx, const InstanceView& instance_view)
-      : frame_idx(frame_idx), instance_view(instance_view), previous(nullptr), next(nullptr) {}
+      : frame_idx(frame_idx), instance_view(instance_view) {}
 };
 
 /// \brief A detected object's track through multiple frames.
@@ -43,9 +39,8 @@ class Track {
   virtual ~Track() { }
 
   /// \brief Evaluates how well this new frame would fit the existing track.
-  /// \returns A goodness score between 0 and 1, where 0 means the new frame
-  /// would not match
-  /// this track at all, and 1 would be a perfect match.
+  /// \returns A goodness score between 0 and 1, where 0 means the new frame would not match this
+  /// track at all, and 1 would be a perfect match.
   float ScoreMatch(const TrackFrame& new_frame) const;
 
   void AddFrame(const TrackFrame& new_frame) { frames_.push_back(new_frame); }
@@ -68,8 +63,7 @@ class Track {
   int GetId() const { return id_; }
 
   /// \brief Draws a visual representation of this feature track.
-  /// \example For an object first seen in frame 11, then in frames 12, 13, and
-  /// 16, this
+  /// \example For an object first seen in frame 11, then in frames 12, 13, and 16, this
   /// representation would look as follows:
   ///    [                                 11 12 13      16]
   std::string GetAsciiArt() const;
@@ -88,6 +82,8 @@ class Track {
   /// contained in this track's frames is good enough for a 3D reconstruction.
   // TODO(andrei): Consider delegating this task to a separate (highly configurable) class.
   bool EligibleForReconstruction() const {
+    // TODO(andrei): Moonshot---use a classifier to do this based on, e.g., track length, some
+    // pose info, frame sizes, etc. Main challenge: how to get training data?
     // For now, use this simple heuristic: at least k frames in track.
     return GetSize() >= 7;
   }
