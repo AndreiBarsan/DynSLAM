@@ -313,9 +313,11 @@ protected:
     });
 
     // This is used for the free view camera. The focal lengths are not used in rendering, BUT they
-    // impact the sensitivity of the free view camera.
+    // impact the sensitivity of the free view camera. The smaller they are, the faster the camera
+    // responds to input.
+    float cam_focal_length = 50.0f;
     proj_ = pangolin::ProjectionMatrix(width_, height_,
-                                       1000, 1000,
+                                       cam_focal_length, cam_focal_length,
                                        width_ / 2, height_ / 2,
                                        0.1, 1000);
     pane_cam_ = new pangolin::OpenGlRenderState(

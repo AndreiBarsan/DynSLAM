@@ -117,6 +117,10 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
         (void*) mask_pixels
     );
     auto mask = make_shared<Mask>(bounding_box, mask_cv_mat);
+
+    // TODO(andrei): Consider maintaining some overlap--we could use the 1.2 mask for sending info
+    // to the reconstruction and e.g., 1.0 for sending it to the static map. However, the ambiguous
+    // band could maybe be flagged with a lower update weight.
     float mask_rescale_factor = 1.075f;
     mask->Rescale(mask_rescale_factor);
     detections.emplace_back(class_probability, class_id, mask, this->dataset_used);

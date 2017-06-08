@@ -115,6 +115,7 @@ public:
     string map_fpath = utils::Format("mesh_out/%s/static-%s-%d-mesh.obj",
                                      dataset_name.c_str(),
                                      depth_name.c_str());
+    cout << "Saving full static map to: " << map_fpath << endl;
     static_scene_->SaveSceneToMesh(map_fpath.c_str());
   }
 
