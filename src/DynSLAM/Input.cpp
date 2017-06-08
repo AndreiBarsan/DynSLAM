@@ -13,12 +13,24 @@ bool Input::HasMoreImages() {
 }
 
 bool Input::ReadNextFrame() {
-  left_frame_gray_buf_ = cv::imread(GetFrameName(dataset_folder_, config_.left_gray_folder, config_.fname_format, frame_idx_),
+  left_frame_gray_buf_ = cv::imread(GetFrameName(dataset_folder_,
+                                                 config_.left_gray_folder,
+                                                 config_.fname_format,
+                                                 frame_idx_),
                                     CV_LOAD_IMAGE_UNCHANGED);
-  right_frame_gray_buf_ = cv::imread(GetFrameName(dataset_folder_, config_.right_gray_folder, config_.fname_format, frame_idx_),
+  right_frame_gray_buf_ = cv::imread(GetFrameName(dataset_folder_,
+                                                  config_.right_gray_folder,
+                                                  config_.fname_format,
+                                                  frame_idx_),
                                      CV_LOAD_IMAGE_UNCHANGED);
-  left_frame_color_buf_ = cv::imread(GetFrameName(dataset_folder_, config_.left_color_folder, config_.fname_format, frame_idx_));
-  right_frame_color_buf_ = cv::imread(GetFrameName(dataset_folder_, config_.right_color_folder, config_.fname_format, frame_idx_));
+  left_frame_color_buf_ = cv::imread(GetFrameName(dataset_folder_,
+                                                  config_.left_color_folder,
+                                                  config_.fname_format,
+                                                  frame_idx_));
+  right_frame_color_buf_ = cv::imread(GetFrameName(dataset_folder_,
+                                                   config_.right_color_folder,
+                                                   config_.fname_format,
+                                                   frame_idx_));
 
   // Sanity checks to ensure the dimensions from the calibration file and the actual image
   // dimensions correspond.
