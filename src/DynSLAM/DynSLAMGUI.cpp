@@ -47,6 +47,126 @@ using namespace dynslam::utils;
 static const int kUiWidth = 300;
 static const float kPlotTimeIncrement = 0.1f;
 
+class DSHandler3D : public pangolin::Handler3D {
+ public:
+  DSHandler3D(pangolin::OpenGlRenderState &cam_state) : Handler3D(cam_state) {}
+
+  DSHandler3D(pangolin::OpenGlRenderState &cam_state,
+              pangolin::AxisDirection enforce_up,
+              float trans_scale,
+              float zoom_fraction) : Handler3D(cam_state, enforce_up, trans_scale, zoom_fraction) {}
+
+  void Keyboard(pangolin::View &view, unsigned char key, int x, int y, bool pressed) override {
+    pangolin::Handler3D::Keyboard(view, key, x, y, pressed);
+  }
+
+  void MouseMotion(pangolin::View &view, int x, int y, int button_state) override {
+//    pangolin::Handler3D::MouseMotion(view, x, y, button_state);
+    // Hack: copied Handler3D's method and modified it directly. There has to be a better way to
+    // make this nicer...
+    using namespace pangolin;
+
+    const GLprecision rf = 0.01;
+    const float delta[2] = { (float)x - last_pos[0], (float)y - last_pos[1] };
+    const float mag = delta[0]*delta[0] + delta[1]*delta[1];
+
+    if( mag < 50.0f*50.0f )
+    {
+      OpenGlMatrix& mv = cam_state->GetModelViewMatrix();
+      const GLprecision* up = AxisDirectionVector[enforce_up];
+      GLprecision T_nc[3*4];
+      LieSetIdentity(T_nc);
+      bool rotation_changed = false;
+
+      if( button_state == MouseButtonMiddle )
+      {
+        // Middle Drag: Rotate around view
+
+        // Try to correct for different coordinate conventions.
+        GLprecision aboutx = -rf * delta[1];
+        GLprecision abouty = rf * delta[0];
+        OpenGlMatrix& pm = cam_state->GetProjectionMatrix();
+        abouty *= -pm.m[2 * 4 + 3];
+
+        Rotation<>(T_nc, aboutx, abouty, (GLprecision)0.0);
+      }else if( button_state == MouseButtonLeft )
+      {
+        // Left Drag: in plane translate
+        if( ValidWinDepth(last_z) )
+        {
+          GLprecision np[3];
+          PixelUnproject(view, x, y, last_z, np);
+          float kDragSpeedupFactor = 2.5f;
+//          const GLprecision t[] = { np[0] - rot_center[0], np[1] - rot_center[1], 0};
+          const GLprecision t[] = { (-np[0] + rot_center[0]) * 100 * kDragSpeedupFactor * tf,
+                                    ( np[1] - rot_center[1]) * 100 * kDragSpeedupFactor * tf,
+                                    0};
+          LieSetTranslation<>(T_nc,t);
+          std::copy(np,np+3,rot_center);
+        }else{
+//          const GLprecision t[] = { -10*delta[0]*tf, 10*delta[1]*tf, 0};
+          const GLprecision t[] = {  10*delta[0]*tf, 10*delta[1]*tf, 0};    // Removed a -
+          LieSetTranslation<>(T_nc,t);
+        }
+      }
+      else if( button_state == MouseButtonRight)
+      {
+        GLprecision aboutx = -rf * delta[1];
+        GLprecision abouty = -rf * delta[0];
+
+        if(enforce_up) {
+          // Special case if view direction is parallel to up vector
+          const GLprecision updotz = mv.m[2]*up[0] + mv.m[6]*up[1] + mv.m[10]*up[2];
+          if(updotz > 0.98) aboutx = std::min(aboutx, (GLprecision)0.0);
+          if(updotz <-0.98) aboutx = std::max(aboutx, (GLprecision)0.0);
+          // Module rotation around y so we don't spin too fast!
+          abouty *= (1-0.6*fabs(updotz));
+        }
+
+        // Right Drag: object centric rotation
+        GLprecision T_2c[3*4];
+        Rotation<>(T_2c, aboutx, abouty, (GLprecision)0.0);
+        GLprecision mrotc[3];
+        MatMul<3,1>(mrotc, rot_center, (GLprecision)-1.0);
+        LieApplySO3<>(T_2c+(3*3),T_2c,mrotc);
+        GLprecision T_n2[3*4];
+        LieSetIdentity<>(T_n2);
+        LieSetTranslation<>(T_n2,rot_center);
+        LieMulSE3(T_nc, T_n2, T_2c );
+        rotation_changed = true;
+      }
+
+      LieMul4x4bySE3<>(mv.m,T_nc,mv.m);
+
+      if(enforce_up != AxisNone && rotation_changed) {
+        EnforceUpT_cw(mv.m, up);
+      }
+    }
+
+    last_pos[0] = (float)x;
+    last_pos[1] = (float)y;
+  }
+
+  void Mouse(pangolin::View &view,
+             pangolin::MouseButton button,
+             int x,
+             int y,
+             bool pressed,
+             int button_state) override {
+    // We flip the logic related to the right button being pressed: we want regular zoom when no
+    // button is pressed, and direction-sensitive zoom if the RMB is pressed.
+    if (button_state & pangolin::MouseButtonRight) {
+      button_state &= ~(pangolin::MouseButtonRight);
+    }
+    else {
+      button_state |= pangolin::MouseButtonRight;
+    }
+
+    pangolin::Handler3D::Mouse(view, button, x, y, pressed, button_state);
+  }
+
+};
+
 /// TODO-LOW(andrei): Consider using QT or wxWidgets. Pangolin is limited in terms of the widgets it
 /// supports. It doesn't even seem to support multiline text, or any reasonable way to display plain
 /// labels or lists or anything... Might be better not to worry too much about this, since
@@ -232,6 +352,10 @@ public:
     }
   }
 
+//  cv::Vec2f PixelsToGl(int x_px, int y_px, ) {
+//
+//  }
+
   /// \brief Renders a simple preview of the scene flow information onto the currently active pane.
   void PreviewSparseSF(const SparseSceneFlow &flow, float panel_width, float panel_height) {
     pangolin::GlFont &font = pangolin::GlFont::I();
@@ -314,8 +438,9 @@ protected:
 
     // This is used for the free view camera. The focal lengths are not used in rendering, BUT they
     // impact the sensitivity of the free view camera. The smaller they are, the faster the camera
-    // responds to input.
-    float cam_focal_length = 50.0f;
+    // responds to input (ideally, you should use the translation and zoom scales to control this,
+    // though).
+    float cam_focal_length = 250.0f;
     proj_ = pangolin::ProjectionMatrix(width_, height_,
                                        cam_focal_length, cam_focal_length,
                                        width_ / 2, height_ / 2,
@@ -341,13 +466,24 @@ protected:
 
     segment_view_ = pangolin::Display("segment").SetAspect(aspect_ratio);
     object_view_ = pangolin::Display("object").SetAspect(aspect_ratio);
-    object_reconstruction_view_ = pangolin::Display("object_3d").SetAspect(aspect_ratio)
-        .SetHandler(new pangolin::Handler3D(*instance_cam_));
+    float camera_translation_scale = 0.01f;
+    float camera_zoom_scale = 0.01f;
 
-    // Storing pointers to these objects prevents a series of strange issues. The objects remain
-    // under Pangolin's management, so they don't need to be deleted by the current class.
+    object_reconstruction_view_ = pangolin::Display("object_3d").SetAspect(aspect_ratio)
+        .SetHandler(new DSHandler3D(
+            *instance_cam_,
+            pangolin::AxisY,
+            camera_translation_scale,
+            camera_zoom_scale
+        ));
+
+    // These objects remain under Pangolin's management, so they don't need to be deleted by the
+    // current class.
     main_view_ = &(pangolin::Display("main").SetAspect(aspect_ratio));
-    main_view_->SetHandler(new pangolin::Handler3D(*pane_cam_));
+    main_view_->SetHandler(new DSHandler3D(*pane_cam_,
+                                           pangolin::AxisY,
+                                           camera_translation_scale,
+                                           camera_zoom_scale));
 
     detail_views_ = &(pangolin::Display("detail"));
 

@@ -96,12 +96,13 @@ class DepthProvider {
         // This is an important factor for the quality of the resulting maps. Too big, and our map
         // will be very noisy; too small, and we only map the road and a couple of meters of the
         // sidewalks.
-        const int32_t kMaxDepthMeters = 12;
+        const int32_t kMaxDepthMeters = 15;
+        int32_t min_depth = 0.5 * kMetersToMillimeters;
 
         // TODO(andrei): Log min/max/mean depth and other stats, and verify whether the disparities
         // produced by dispnet are consistent across frames.
 
-        if (depth_mm > kMaxDepthMeters * kMetersToMillimeters || depth_mm < 0) {
+        if (depth_mm > kMaxDepthMeters * kMetersToMillimeters || depth_mm < min_depth) {
           depth_mm = std::numeric_limits<int16_t>::max();
         }
 

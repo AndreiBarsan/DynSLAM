@@ -229,7 +229,11 @@ void InstanceReconstructor::ProcessReconstructions() {
     // TODO(andrei): This seems like the place to shove in the scene flow data.
 
     cout << endl << endl << "Start instance integration for #" << track.GetId() << endl;
+
+    // TODO(andrei): We shouldn't do any tracking inside the instances IMHO.
+    cerr << "Not accounting for gaps in track!" << endl;
     instance_driver.Track();
+
     try {
       // TODO(andrei): See above and also fix here.
       instance_driver.Integrate();

@@ -64,7 +64,7 @@ ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix, bool fli
 class InfiniTamDriver : public ITMMainEngine {
 public:
   // TODO(andrei): We may need to add another layer of abstraction above the drivers to get the best
-  // modularity possible (driver+inpu+custom settings combos).
+  // modularity possible (driver+input+custom settings combos).
 
   InfiniTamDriver(
       const ITMLibSettings *settings,
