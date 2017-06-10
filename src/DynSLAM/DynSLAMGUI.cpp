@@ -16,6 +16,7 @@
 #include "../pfmLib/ImageIOpfm.h"
 #include "PrecomputedDepthProvider.h"
 #include "InstRecLib/VisoSparseSFProvider.h"
+#include "DSHandler3D.h"
 
 // Commandline arguments using gflags
 DEFINE_string(dataset_root, "", "The root folder of the dataset to use.");
@@ -45,132 +46,8 @@ using namespace dynslam;
 using namespace dynslam::utils;
 
 static const int kUiWidth = 300;
-static const float kPlotTimeIncrement = 0.1f;
 
-class DSHandler3D : public pangolin::Handler3D {
- public:
-  DSHandler3D(pangolin::OpenGlRenderState &cam_state) : Handler3D(cam_state) {}
-
-  DSHandler3D(pangolin::OpenGlRenderState &cam_state,
-              pangolin::AxisDirection enforce_up,
-              float trans_scale,
-              float zoom_fraction) : Handler3D(cam_state, enforce_up, trans_scale, zoom_fraction) {}
-
-  void Keyboard(pangolin::View &view, unsigned char key, int x, int y, bool pressed) override {
-    pangolin::Handler3D::Keyboard(view, key, x, y, pressed);
-  }
-
-  void MouseMotion(pangolin::View &view, int x, int y, int button_state) override {
-//    pangolin::Handler3D::MouseMotion(view, x, y, button_state);
-    // Hack: copied Handler3D's method and modified it directly. There has to be a better way to
-    // make this nicer...
-    using namespace pangolin;
-
-    const GLprecision rf = 0.01;
-    const float delta[2] = { (float)x - last_pos[0], (float)y - last_pos[1] };
-    const float mag = delta[0]*delta[0] + delta[1]*delta[1];
-
-    if( mag < 50.0f*50.0f )
-    {
-      OpenGlMatrix& mv = cam_state->GetModelViewMatrix();
-      const GLprecision* up = AxisDirectionVector[enforce_up];
-      GLprecision T_nc[3*4];
-      LieSetIdentity(T_nc);
-      bool rotation_changed = false;
-
-      if( button_state == MouseButtonMiddle )
-      {
-        // Middle Drag: Rotate around view
-
-        // Try to correct for different coordinate conventions.
-        GLprecision aboutx = -rf * delta[1];
-        GLprecision abouty = rf * delta[0];
-        OpenGlMatrix& pm = cam_state->GetProjectionMatrix();
-        abouty *= -pm.m[2 * 4 + 3];
-
-        Rotation<>(T_nc, aboutx, abouty, (GLprecision)0.0);
-      }else if( button_state == MouseButtonLeft )
-      {
-        // Left Drag: in plane translate
-        if( ValidWinDepth(last_z) )
-        {
-          GLprecision np[3];
-          PixelUnproject(view, x, y, last_z, np);
-          float kDragSpeedupFactor = 2.5f;
-//          const GLprecision t[] = { np[0] - rot_center[0], np[1] - rot_center[1], 0};
-          const GLprecision t[] = { (-np[0] + rot_center[0]) * 100 * kDragSpeedupFactor * tf,
-                                    ( np[1] - rot_center[1]) * 100 * kDragSpeedupFactor * tf,
-                                    0};
-          LieSetTranslation<>(T_nc,t);
-          std::copy(np,np+3,rot_center);
-        }else{
-//          const GLprecision t[] = { -10*delta[0]*tf, 10*delta[1]*tf, 0};
-          const GLprecision t[] = {  10*delta[0]*tf, 10*delta[1]*tf, 0};    // Removed a -
-          LieSetTranslation<>(T_nc,t);
-        }
-      }
-      else if( button_state == MouseButtonRight)
-      {
-        GLprecision aboutx = -rf * delta[1];
-        GLprecision abouty = -rf * delta[0];
-
-        if(enforce_up) {
-          // Special case if view direction is parallel to up vector
-          const GLprecision updotz = mv.m[2]*up[0] + mv.m[6]*up[1] + mv.m[10]*up[2];
-          if(updotz > 0.98) aboutx = std::min(aboutx, (GLprecision)0.0);
-          if(updotz <-0.98) aboutx = std::max(aboutx, (GLprecision)0.0);
-          // Module rotation around y so we don't spin too fast!
-          abouty *= (1-0.6*fabs(updotz));
-        }
-
-        // Right Drag: object centric rotation
-        GLprecision T_2c[3*4];
-        Rotation<>(T_2c, aboutx, abouty, (GLprecision)0.0);
-        GLprecision mrotc[3];
-        MatMul<3,1>(mrotc, rot_center, (GLprecision)-1.0);
-        LieApplySO3<>(T_2c+(3*3),T_2c,mrotc);
-        GLprecision T_n2[3*4];
-        LieSetIdentity<>(T_n2);
-        LieSetTranslation<>(T_n2,rot_center);
-        LieMulSE3(T_nc, T_n2, T_2c );
-        rotation_changed = true;
-      }
-
-      LieMul4x4bySE3<>(mv.m,T_nc,mv.m);
-
-      if(enforce_up != AxisNone && rotation_changed) {
-        EnforceUpT_cw(mv.m, up);
-      }
-    }
-
-    last_pos[0] = (float)x;
-    last_pos[1] = (float)y;
-  }
-
-  void Mouse(pangolin::View &view,
-             pangolin::MouseButton button,
-             int x,
-             int y,
-             bool pressed,
-             int button_state) override {
-    // We flip the logic related to the right button being pressed: we want regular zoom when no
-    // button is pressed, and direction-sensitive zoom if the RMB is pressed.
-    if (button_state & pangolin::MouseButtonRight) {
-      button_state &= ~(pangolin::MouseButtonRight);
-    }
-    else {
-      button_state |= pangolin::MouseButtonRight;
-    }
-
-    pangolin::Handler3D::Mouse(view, button, x, y, pressed, button_state);
-  }
-
-};
-
-/// TODO-LOW(andrei): Consider using QT or wxWidgets. Pangolin is limited in terms of the widgets it
-/// supports. It doesn't even seem to support multiline text, or any reasonable way to display plain
-/// labels or lists or anything... Might be better not to worry too much about this, since
-/// there isn't that much time...
+/// \brief The main GUI and entry point for DynSLAM.
 class PangolinGui {
 public:
   PangolinGui(DynSlam *dyn_slam, Input *input)
@@ -251,33 +128,31 @@ public:
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
       if (display_raw_previews_->Get()) {
-        LoadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
+        UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
       }
       else {
-        LoadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_);
+        UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_);
       }
       pane_texture_->RenderToViewport(true);
 
       if (dyn_slam_->GetCurrentFrameNo() > 1) {
-        PreviewSparseSF(dyn_slam_->GetLatestFlow(),
-                        rgb_view_.GetBounds().w,
-                        rgb_view_.GetBounds().h);
+        PreviewSparseSF(dyn_slam_->GetLatestFlow(), rgb_view_);
       }
 
       depth_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
       if (display_raw_previews_->Get()) {
-        LoadCvTexture(*(dyn_slam_->GetDepthPreview()), *pane_texture_, false, GL_SHORT);
+        UploadCvTexture(*(dyn_slam_->GetDepthPreview()), *pane_texture_, false, GL_SHORT);
       }
       else {
-        LoadCvTexture(*(dyn_slam_->GetStaticDepthPreview()), *pane_texture_, false, GL_SHORT);
+        UploadCvTexture(*(dyn_slam_->GetStaticDepthPreview()), *pane_texture_, false, GL_SHORT);
       }
       pane_texture_->RenderToViewport(true);
 
       segment_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
       if (nullptr != dyn_slam_->GetSegmentationPreview()) {
-        LoadCvTexture(*dyn_slam_->GetSegmentationPreview(), *pane_texture_);
+        UploadCvTexture(*dyn_slam_->GetSegmentationPreview(), *pane_texture_);
         pane_texture_->RenderToViewport(true);
         DrawInstanceLables();
       }
@@ -316,6 +191,21 @@ public:
     }
   }
 
+  // TODO(andrei): Use eigen, since it can improve interop between some of the things quite well.
+  /// \brief Converts the pixel coordinates into [-1, +1]-style OpenGL coordinates.
+  /// \note The GL coordinates range from (-1.0, -1.0) in the bottom-left, to (+1.0, +1.0) in the
+  ///       top-right.
+  cv::Vec2f PixelsToGl(float x_px, float y_px, const pangolin::View &view) {
+    float view_w = view.GetBounds().w;
+    float view_h = view.GetBounds().h;
+    float gl_x = (x_px - view_w) / view_w;
+    // We need the opposite sign here since pixel coordinates are assumed to have the origin in the
+    // top-left, while the GL origin is in the bottom-left.
+    float gl_y = (view_h - y_px) / view_h;
+
+    return cv::Vec2f(gl_x, gl_y);
+  }
+
   /// \brief Renders informative labels regardin the currently active bounding boxes.
   /// Meant to be rendered over the segmentation preview window pane.
   void DrawInstanceLables() {
@@ -331,52 +221,34 @@ public:
 
       InstanceDetection latest_detection = track.GetLastFrame().instance_view.GetInstanceDetection();
       const auto &bbox = latest_detection.mask->GetBoundingBox();
-
-      // Drawing the text requires converting from pixel coordinates to GL coordinates, which
-      // range from (-1.0, -1.0) in the bottom-left, to (+1.0, +1.0) in the top-right.
-      float panel_width = segment_view_.GetBounds().w;
-      float panel_height = segment_view_.GetBounds().h;
-
-      float bbox_left = bbox.r.x0 - panel_width;
-      float bbox_top = panel_height - bbox.r.y0 + font.Height();
-
-      float gl_x = bbox_left / panel_width;
-      float gl_y = bbox_top / panel_height;
+      cv::Vec2f gl_pos = PixelsToGl(bbox.r.x0, bbox.r.y0 - font.Height(), segment_view_);
 
       stringstream info_label;
       info_label << latest_detection.GetClassName() << "#" << track.GetId()
                  << "@" << setprecision(2)
                  << latest_detection.class_probability;
       glColor3f(1.0f, 0.0f, 0.0f);
-      font.Text(info_label.str()).Draw(gl_x, gl_y, 0);
+      font.Text(info_label.str()).Draw(gl_pos[0], gl_pos[1], 0);
     }
   }
 
-//  cv::Vec2f PixelsToGl(int x_px, int y_px, ) {
-//
-//  }
-
   /// \brief Renders a simple preview of the scene flow information onto the currently active pane.
-  void PreviewSparseSF(const SparseSceneFlow &flow, float panel_width, float panel_height) {
+  void PreviewSparseSF(const SparseSceneFlow &flow, const pangolin::View &view) {
     pangolin::GlFont &font = pangolin::GlFont::I();
     font.Text("libviso2 scene flow preview").Draw(-0.98f, 0.89f);
 
     // We don't need z-checks since we're rendering UI stuff.
     glDisable(GL_DEPTH_TEST);
     for(const Matcher::p_match &match : flow.matches) {
-      // TODO(andrei): uv-to-gl coordinate transformation utility.
-      float gl_x = (match.u1c - panel_width) / panel_width;
-      float gl_y = (panel_height - match.v1c) / panel_height;
-      float gl_x_old = (match.u1p - panel_width) / panel_width;
-      float gl_y_old = (panel_height - match.v1p) / panel_height;
+      cv::Vec2f gl_pos = PixelsToGl(match.u1c, match.v1c, view);
+      cv::Vec2f gl_pos_old = PixelsToGl(match.u1p, match.v1p, view);
 
-      float delta_x = gl_x - gl_x_old;
-      float delta_y = gl_y - gl_y_old;
-      float magnitude = sqrt(delta_x * delta_x + delta_y * delta_y) * 15.0f;
+      cv::Vec2f delta = gl_pos - gl_pos_old;
+      float magnitude = 15.0f * static_cast<float>(cv::norm(delta));
 
       glColor4f(max(0.2f, min(1.0f, magnitude)), 0.4f, 0.4f, 1.0f);
-      pangolin::glDrawCross(gl_x, gl_y, 0.025f);
-      pangolin::glDrawLine(gl_x_old, gl_y_old, gl_x, gl_y);
+      pangolin::glDrawCross(gl_pos[0], gl_pos[1], 0.025f);
+      pangolin::glDrawLine(gl_pos_old[0], gl_pos_old[1], gl_pos[0], gl_pos[1]);
     }
 
     glEnable(GL_DEPTH_TEST);
@@ -518,7 +390,6 @@ protected:
 
   void SetupDummyImage() {
     dummy_img_ = cv::imread("../data/george.jpg");
-//    cv::flip(dummy_img_, dummy_img_, kCvFlipVertical);
     const int george_width = dummy_img_.cols;
     const int george_height = dummy_img_.rows;
     this->dummy_image_texture_ = new pangolin::GlTexture(
@@ -635,7 +506,7 @@ private:
 
   /// \brief Prepares the contents of an OpenCV Mat object for rendering with Pangolin (OpenGL).
   /// Does not actually render the texture.
-  static void LoadCvTexture(
+  static void UploadCvTexture(
       const cv::Mat &mat,
       pangolin::GlTexture &texture,
       bool color = true,
