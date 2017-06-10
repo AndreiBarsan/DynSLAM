@@ -112,7 +112,7 @@ public:
     cout << cudaGetErrorName(err) << endl << cudaGetErrorString(err) << endl << endl;
 
     system(utils::Format("mkdir -p mesh_out/%s", dataset_name.c_str()).c_str());
-    string map_fpath = utils::Format("mesh_out/%s/static-%s-%d-mesh.obj",
+    string map_fpath = utils::Format("mesh_out/%s/static-%s-mesh.obj",
                                      dataset_name.c_str(),
                                      depth_name.c_str());
     cout << "Saving full static map to: " << map_fpath << endl;
