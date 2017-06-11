@@ -38,28 +38,25 @@ class DepthProvider {
                        const StereoCalibration &calibration,
                        cv::Mat1s &out_depth) {
     if(input_is_depth_) {
+      // Our input is designated as direct depth, not just disparity.
       DisparityMapFromStereo(left, right, out_depth);
       return;
     }
 
-    // TODO(andrei): Consider reusing this buffer.
-    cv::Mat out_disparity;
-    DisparityMapFromStereo(left, right, out_disparity);
-
-    // ...and this one?
-    out_depth = cv::Mat1s(out_disparity.size(), CV_16SC1);
+    // We need to compute disparity from stereo, and then depth from disparity.
+    DisparityMapFromStereo(left, right, out_disparity_);
 
     // This should be templated in a nicer fashion...
-    if (out_disparity.type() == CV_32FC1) {
-      DepthFromDisparityMap<float>(out_disparity, calibration, out_depth);
+    if (out_disparity_.type() == CV_32FC1) {
+      DepthFromDisparityMap<float>(out_disparity_, calibration, out_depth);
     }
-    else if (out_disparity.type() == CV_16SC1) {
-      DepthFromDisparityMap<uint16_t>(out_disparity, calibration, out_depth);
+    else if (out_disparity_.type() == CV_16SC1) {
+      DepthFromDisparityMap<uint16_t>(out_disparity_, calibration, out_depth);
     }
     else {
       throw std::runtime_error(utils::Format(
-          "Unknown data type for disparity matrix [%s]. Supported are CV_32FC1 and CV_16UC1.",
-          utils::Type2Str(out_disparity.type()).c_str()
+          "Unknown data type for disparity matrix [%s]. Supported are CV_32FC1 and CV_16SC1.",
+          utils::Type2Str(out_disparity_.type()).c_str()
       ));
     }
   }
@@ -75,34 +72,40 @@ class DepthProvider {
     return (calibration.baseline_meters * calibration.focal_length_px) / disparity_px;
   }
 
-  // TODO(andrei): This can be sped up trivially using CUDA.
+  // TODO-LOW(andrei): This can be sped up trivially using CUDA.
   /// \brief Computes a depth map from a disparity map using the `DepthFromDisparity` function at
   /// every pixel.
+  /// \tparam T The type of the elements in the disparity input.
+  /// \param disparity The disparity map.
+  /// \param calibration The stereo calibration parameters used to compute depth from disparity.
+  /// \param out_depth The output depth map, which gets populated by this method.
+  /// \param min_depth_m The minimum depth, in meters, which is not considered too noisy.
+  /// \param max_depth_m The maximum depth, in meters, which is not considered too noisy.
   template<typename T>
   void DepthFromDisparityMap(const cv::Mat_<T> &disparity,
                              const StereoCalibration &calibration,
-                             cv::Mat1s &out_depth) {
+                             cv::Mat1s &out_depth,
+                             float min_depth_m = 0.5,
+                             float max_depth_m = 15
+  ) {
     assert(disparity.size() == out_depth.size());
 
     for(int i = 0; i < disparity.rows; ++i) {
       for(int j = 0; j < disparity.cols; ++j) {
-        // BURN THE WITCH
         T disp = disparity.template at<T>(i, j);
 
-        double kMetersToMillimeters = 1000.0;
+        float kMetersToMillimeters = 1000.0;
         int32_t depth_mm = static_cast<int32_t>(kMetersToMillimeters * DepthFromDisparity(disp, calibration));
 
-        // TODO(andrei): Pass this as a parameter.
-        // This is an important factor for the quality of the resulting maps. Too big, and our map
-        // will be very noisy; too small, and we only map the road and a couple of meters of the
-        // sidewalks.
-        const int32_t kMaxDepthMeters = 15;
-        int32_t min_depth = 0.5 * kMetersToMillimeters;
+        // The max depth is an important factor for the quality of the resulting maps. Too big, and
+        // our map will be very noisy; too small, and we only map the road and a couple of meters of
+        // the sidewalks.
+        int32_t min_depth = static_cast<int32_t>(min_depth_m * kMetersToMillimeters);
 
         // TODO(andrei): Log min/max/mean depth and other stats, and verify whether the disparities
         // produced by dispnet are consistent across frames.
 
-        if (depth_mm > kMaxDepthMeters * kMetersToMillimeters || depth_mm < min_depth) {
+        if (depth_mm > max_depth_m * kMetersToMillimeters || depth_mm < min_depth) {
           depth_mm = std::numeric_limits<int16_t>::max();
         }
 
@@ -121,6 +124,8 @@ class DepthProvider {
   /// \brief If true, then assume the read maps are depth maps, instead of disparity maps.
   /// In this case, the depth from disparity computation is no longer performed.
   bool input_is_depth_;
+  /// \brief Buffer in which the disparity map gets saved at every frame.
+  cv::Mat out_disparity_;
 };
 
 } // namespace dynslam

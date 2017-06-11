@@ -11,8 +11,7 @@ extern const std::string kDispNetName;
 extern const std::string kPrecomputedElas;
 
 /// \brief Reads precomputed disparity (default) or depth maps from a folder.
-/// The depth maps are expected to be grayscale, and in 8 or 16-bit format if 'hdr_depth_' if
-/// false, and in 32-bit PFM format otherwise.
+/// The depth maps are expected to be grayscale, and in short 16-bit or float 32-bit format.
 class PrecomputedDepthProvider : public DepthProvider {
  public:
   virtual ~PrecomputedDepthProvider() {}
