@@ -108,12 +108,16 @@ public:
   void SaveStaticMap(const std::string &dataset_name, const std::string &depth_name) {
     // TODO(andrei): This sometimes indicates some error; find out what it means.
     auto err = cudaGetLastError();
-    cout << cudaSuccess << " is success. We have: " << err << "." << endl;
-    cout << cudaGetErrorName(err) << endl << cudaGetErrorString(err) << endl << endl;
+    if (err != cudaSuccess) {
+      cerr << cudaSuccess << " is success. We have: " << err << "." << endl;
+      cerr << cudaGetErrorName(err) << endl << cudaGetErrorString(err) << endl << endl;
+    }
 
-    system(utils::Format("mkdir -p mesh_out/%s", dataset_name.c_str()).c_str());
-    string map_fpath = utils::Format("mesh_out/%s/static-%s-mesh.obj",
+    string today_folder = utils::GetDate();
+    system(utils::Format("mkdir -p mesh_out/%s/%s", dataset_name.c_str(), today_folder.c_str()).c_str());
+    string map_fpath = utils::Format("mesh_out/%s/%s/static-%s-mesh.obj",
                                      dataset_name.c_str(),
+                                     today_folder.c_str(),
                                      depth_name.c_str());
     cout << "Saving full static map to: " << map_fpath << endl;
     static_scene_->SaveSceneToMesh(map_fpath.c_str());
@@ -121,11 +125,14 @@ public:
 
   void SaveDynamicObject(const std::string &dataset_name, const std::string &depth_name, int object_id) {
     cout << "Saving mesh for object #" << object_id << "'s reconstruction..." << endl;
-    // TODO(andrei): Make this more cross-platform and more secure.
-    system(utils::Format("mkdir -p mesh_out/%s", dataset_name.c_str()).c_str());
+    string today_folder = utils::GetDate();
 
-    string instance_fpath = utils::Format("mesh_out/%s/instance-%s-%d-mesh.obj",
+    // TODO(andrei): Make this more cross-platform and more secure.
+    system(utils::Format("mkdir -p mesh_out/%s/%s", dataset_name.c_str(), today_folder.c_str()).c_str());
+
+    string instance_fpath = utils::Format("mesh_out/%s/%s/instance-%s-%d-mesh.obj",
                                           dataset_name.c_str(),
+                                          today_folder.c_str(),
                                           depth_name.c_str(),
                                           object_id);
     instance_reconstructor_->SaveObjectToMesh(object_id, instance_fpath);

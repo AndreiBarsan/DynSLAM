@@ -65,6 +65,17 @@ std::string Type2Str(int type) {
   return r;
 }
 
+std::string GetDate() {
+  time_t rawtime;
+  tm * timeinfo;
+  char today_s[200];
+  time (&rawtime);
+  timeinfo = localtime (&rawtime);
+  strftime(today_s, 200, "%Y-%m-%d",timeinfo);
+
+  return std::string(today_s);
+}
+
 Timers Timers::instance_;
 
 int64_t GetTimeMs() {
