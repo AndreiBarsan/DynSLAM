@@ -384,7 +384,8 @@ protected:
 
     // Internally, InfiniTAM stores these as RGBA, but we discard the alpha when we upload the
     // textures for visualization (hence the 'GL_RGB' specification).
-    this->pane_texture_ = new pangolin::GlTexture(width_, height_, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+    this->pane_texture_ = new pangolin::GlTexture(width_, height_, GL_RGB, false, 0, GL_RGB,
+                                                  GL_UNSIGNED_BYTE);
     cout << "Pangolin UI setup complete." << endl;
   }
 
@@ -553,6 +554,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
 
   Input::Config input_config = Input::KittiOdometryConfig();
+//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
   *input_out = new Input(
@@ -565,7 +567,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       // areas of the static map such as foliage and fences, dispnet's smoothness is more of a
       // liability than an asset.
       // TODO(andrei): Make sure you normalize dispnet's depth range when using it, since it seems
-      // to be inconsistent across frames.
+      // to be inconsistent across frames (though it shouldn't be...).
       // TODO(andrei): Carefully read the dispnet paper.
       new PrecomputedDepthProvider(dataset_root + "/" + input_config.depth_folder,
                                    input_config.depth_fname_format,

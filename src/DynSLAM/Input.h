@@ -82,7 +82,10 @@ class Input {
         depth_provider_(depth_provider),
         frame_idx_(0),
         calibration_(calibration),
-        stereo_calibration_(stereo_calibration) {}
+        stereo_calibration_(stereo_calibration),
+        depth_buf_(static_cast<int>(calibration.intrinsics_d.sizeY),
+                   static_cast<int>(calibration.intrinsics_d.sizeX))
+  {}
 
   bool HasMoreImages();
 

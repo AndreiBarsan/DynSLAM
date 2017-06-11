@@ -58,13 +58,13 @@ void ItmToCv(const ITMShortImage &itm, cv::Mat1s *out_mat);
 void ItmToCv(const ITMFloatImage &itm, cv::Mat1s *out_mat);
 
 
-ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix, bool flip_ud = true, bool fix_roll = true);
+ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix);
 
 /// \brief Interfaces between DynSLAM and InfiniTAM.
 class InfiniTamDriver : public ITMMainEngine {
 public:
-  // TODO(andrei): We may need to add another layer of abstraction above the drivers to get the best
-  // modularity possible (driver+input+custom settings combos).
+  // TODO-LOW(andrei): We may need to add another layer of abstraction above the drivers to get the
+  // best modularity possible (driver+input+custom settings combos).
 
   InfiniTamDriver(
       const ITMLibSettings *settings,
