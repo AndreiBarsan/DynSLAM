@@ -317,10 +317,16 @@ protected:
                                        cam_focal_length, cam_focal_length,
                                        width_ / 2, height_ / 2,
                                        0.1, 1000);
+
+    // TODO(andrei): Set based on initial camera pose, to account for starting the reconstruction
+    // from a mid-frame, instead of the first one.
     pane_cam_ = new pangolin::OpenGlRenderState(
         proj_,
         pangolin::ModelViewLookAt(0, 0, 0,
                                   0, 0, -1,
+        // -Y is up.
+//        pangolin::ModelViewLookAt(0, -7.5, 290,
+//                                  0, -7.5, 289,
                                   pangolin::AxisY));
 
     // TODO(andrei): Set dynamically based on where instances are detected (non-trivial).
@@ -329,6 +335,8 @@ protected:
         pangolin::ModelViewLookAt(
           0.0, 0.0, 0.75,
           -1.5, 0.0, -1.0,
+//            0, -7.5, 290,
+//            0, -7.5, 289,
           pangolin::AxisY)
     );
 
@@ -557,6 +565,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 //  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
+  int frame_offset = 270;
+
   *input_out = new Input(
       dataset_root,
       input_config,
@@ -571,9 +581,11 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       // TODO(andrei): Carefully read the dispnet paper.
       new PrecomputedDepthProvider(dataset_root + "/" + input_config.depth_folder,
                                    input_config.depth_fname_format,
-                                   input_config.read_depth),
+                                   input_config.read_depth,
+                                   frame_offset),
       itm_calibration,
-      stereo_calibration);
+      stereo_calibration,
+      frame_offset);
 
   // [RIP] I lost a couple of hours debugging a bug caused by the fact that InfiniTAM still works
   // even when there is a discrepancy between the size of the depth/rgb inputs, as specified in the
@@ -581,6 +593,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 
   ITMLibSettings *settings = new ITMLibSettings();
   settings->groundTruthPoseFpath = dataset_root + "/" + input_config.odometry_fname;
+  settings->groundTruthPoseOffset = frame_offset;
 
   drivers::InfiniTamDriver *driver = new InfiniTamDriver(
       settings,
@@ -590,7 +603,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 
   const string seg_folder = dataset_root + "/" + input_config.segmentation_folder;
   auto segmentation_provider =
-      new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder);
+      new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder, frame_offset);
 
   VisualOdometryStereo::parameters sf_params;
   sf_params.base = baseline_m;

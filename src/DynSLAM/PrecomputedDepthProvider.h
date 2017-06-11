@@ -17,12 +17,13 @@ class PrecomputedDepthProvider : public DepthProvider {
   virtual ~PrecomputedDepthProvider() {}
 
   PrecomputedDepthProvider(const std::string &folder,
-                         const std::string &fname_format,
-                         bool input_is_depth = false)
+                           const std::string &fname_format,
+                           bool input_is_depth = false,
+                           int frame_offset = 0)
       : DepthProvider(input_is_depth),
-        folder(folder),
-        fname_format(fname_format),
-        frame_idx(0) {}
+        folder_(folder),
+        fname_format_(fname_format),
+        frame_idx_(frame_offset) {}
 
   virtual void DisparityMapFromStereo(const cv::Mat &left,
                                       const cv::Mat &right,
@@ -34,11 +35,11 @@ class PrecomputedDepthProvider : public DepthProvider {
   const std::string& GetName() const override;
 
  private:
-  std::string folder;
+  std::string folder_;
   /// \brief The printf-style format of the frame filenames, such as "frame-%04d.png" for frames
   /// which are called "frame-0000.png"-"frame-9999.png".
-  std::string fname_format;
-  int frame_idx;
+  std::string fname_format_;
+  int frame_idx_;
 };
 
 } // namespace dynslam
