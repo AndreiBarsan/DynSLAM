@@ -108,6 +108,9 @@ class Timer {
   std::vector<int64_t> laps_;
 };
 
+/// \brief Returns a filename-friendly date string, such as '2017-01-01'.
+std::string GetDate();
+
 /// \brief Helper for easily timing things. NOT thread-safe.
 class Timers {
  private:

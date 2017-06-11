@@ -298,6 +298,8 @@ protected:
     pangolin::RegisterKeyPressCallback('n', [this]() {
       *(this->autoplay_) = false;
       this->ProcessFrame();
+
+      ORcudaSafeCall(cudaDeviceSynchronize());
     });
     pangolin::Var<function<void(void)>> save_object("ui.Save Active Object", [this]() {
       dyn_slam_->SaveDynamicObject(dyn_slam_input_->GetName(),
