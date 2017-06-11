@@ -561,8 +561,9 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   float focal_length_px = 707.0912f;
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
 
-  Input::Config input_config = Input::KittiOdometryConfig();
+//  Input::Config input_config = Input::KittiOdometryConfig();
 //  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+  Input::Config input_config = Input::KittiConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
   int frame_offset = 270;
@@ -670,7 +671,7 @@ int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
 //  const string dataset_root = FLAGS_dataset_root;
-  const string dataset_root = "/home/barsana/datasets/kitti/2011_09_26/2011_09_26_drive_0005_sync/";
+  const string dataset_root = "/home/barsana/datasets/kitti/2011_09_30/2011_09_30_drive_0020_sync/";
 
   if (dataset_root.empty()) {
     cerr << "Please specify a dataset to work with. The --dataset_root=<path> flag must be set."

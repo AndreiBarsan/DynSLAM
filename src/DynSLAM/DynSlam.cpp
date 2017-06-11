@@ -53,7 +53,7 @@ void DynSlam::ProcessFrame(Input *input) {
   input->GetCvStereoGray(&left_gray, &right_gray);
 
   utils::Tic("Semantic segmentation");
-  auto segmentationResult = segmentation_provider_->SegmentFrame(*input_rgb_image_);
+//  auto segmentationResult = segmentation_provider_->SegmentFrame(*input_rgb_image_);
   utils::Toc();
 
   utils::Tic("Visual Odometry");
