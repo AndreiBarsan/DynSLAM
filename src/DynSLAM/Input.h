@@ -76,11 +76,12 @@ class Input {
         const Config &config,
         DepthProvider *depth_provider,
         const ITMLib::Objects::ITMRGBDCalib &calibration,
-        const StereoCalibration &stereo_calibration)
+        const StereoCalibration &stereo_calibration,
+        int frame_offset = 0)
       : dataset_folder_(dataset_folder),
         config_(config),
         depth_provider_(depth_provider),
-        frame_idx_(0),
+        frame_idx_(frame_offset),
         calibration_(calibration),
         stereo_calibration_(stereo_calibration),
         depth_buf_(static_cast<int>(calibration.intrinsics_d.sizeY),

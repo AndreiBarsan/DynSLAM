@@ -106,13 +106,6 @@ public:
   }
 
   void SaveStaticMap(const std::string &dataset_name, const std::string &depth_name) {
-    // TODO(andrei): This sometimes indicates some error; find out what it means.
-    auto err = cudaGetLastError();
-    if (err != cudaSuccess) {
-      cerr << cudaSuccess << " is success. We have: " << err << "." << endl;
-      cerr << cudaGetErrorName(err) << endl << cudaGetErrorString(err) << endl << endl;
-    }
-
     string today_folder = utils::GetDate();
     system(utils::Format("mkdir -p mesh_out/%s/%s", dataset_name.c_str(), today_folder.c_str()).c_str());
     string map_fpath = utils::Format("mesh_out/%s/%s/static-%s-mesh.obj",

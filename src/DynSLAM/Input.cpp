@@ -52,10 +52,12 @@ bool Input::ReadNextFrame() {
     return false;
   }
 
+  utils::Tic("Depth from stereo");
   depth_provider_->DepthFromStereo(left_frame_color_buf_,
                                    right_frame_color_buf_,
                                    stereo_calibration_,
                                    depth_buf_);
+  utils::Toc();
 
   const auto &depth_size = GetDepthSize();
   if (depth_buf_.rows != depth_size.height || depth_buf_.cols != depth_size.width) {

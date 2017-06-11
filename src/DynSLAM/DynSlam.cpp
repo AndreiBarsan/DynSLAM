@@ -52,7 +52,19 @@ void DynSlam::ProcessFrame(Input *input) {
   cv::Mat1b *left_gray, *right_gray;
   input->GetCvStereoGray(&left_gray, &right_gray);
 
+  utils::Tic("Semantic segmentation");
+  auto segmentationResult = segmentation_provider_->SegmentFrame(*input_rgb_image_);
+  utils::Toc();
+
+  utils::Tic("Visual Odometry");
+  static_scene_->Track();
+  utils::Toc();
+
   utils::Tic("Sparse Scene Flow");
+  // TODO(andrei): Pass egomotion here, so that SF computation is relative to egomotion (so most
+  // SF values, such as those associated with the road or buildings would become close to zero).
+  // Look at libviso2 source code for inspiration on the relation between egomotion and SF. How do
+  // they extract egomotion from the SF?
   sparse_sf_provider_->ComputeSparseSF(
       make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
       make_pair(left_gray, right_gray)
@@ -65,10 +77,6 @@ void DynSlam::ProcessFrame(Input *input) {
   static_scene_->UpdateView(*input_rgb_image_, *input_raw_depth_image_);
   utils::Toc();
 
-  utils::Tic("Semantic segmentation");
-  auto segmentationResult = segmentation_provider_->SegmentFrame(*input_rgb_image_);
-  utils::Toc();
-
   // Split the scene up into instances, and fuse each instance independently.
   utils::Tic("Instance tracking and reconstruction");
   instance_reconstructor_->ProcessFrame(static_scene_->GetView(), *segmentationResult);
@@ -77,10 +85,20 @@ void DynSlam::ProcessFrame(Input *input) {
   // Perform the tracking after the segmentation, so that we may in the future leverage semantic
   // information to enhance tracking.
   utils::Tic("Static map fusion");
-  static_scene_->Track();
   static_scene_->Integrate();
   static_scene_->PrepareNextStep();
-  ITMSafeCall(cudaThreadSynchronize());
+
+  // Final sanity check after the frame is processed: individual components should check for errors.
+  // If something slips through and gets here, it's bad and we want to stop execution.
+  ITMSafeCall(cudaDeviceSynchronize());
+  cudaError_t last_error = cudaGetLastError();
+  if (last_error != cudaSuccess) {
+    cerr << "A CUDA error slipped undetected from a component of DynSLAM!" << endl;
+
+    // Trigger the regular error response.
+    ITMSafeCall(last_error);
+  }
+
   utils::Toc();
 
   current_frame_no_++;
