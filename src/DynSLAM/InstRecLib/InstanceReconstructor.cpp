@@ -111,7 +111,6 @@ void InstanceReconstructor::ProcessFrame(
 
   // Associate this frame's detection(s) with those from previous frames.
   this->instance_tracker_->ProcessInstanceViews(frame_idx_, new_instance_views);
-
   this->ProcessReconstructions();
 
   main_view->rgb->UpdateDeviceFromHost();
@@ -201,8 +200,9 @@ void InstanceReconstructor::ProcessReconstructions() {
         InfiniTamDriver &reconstruction = *(track.GetReconstruction());
 
         reconstruction.SetView(frame.instance_view.GetView());
-        // TODO account for gaps in the track!
+        // TODO(andrei): Account for gaps in the track!
         reconstruction.Track();
+
         try {
           reconstruction.Integrate();
         }
