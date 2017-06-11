@@ -6,9 +6,8 @@ namespace dynslam {
 using namespace std;
 
 bool Input::HasMoreImages() {
-  string next_fpath = GetFrameName(
-      dataset_folder_, config_.left_gray_folder, config_.fname_format,
-      frame_idx_);
+  string next_fpath =
+      GetFrameName(dataset_folder_, config_.left_gray_folder, config_.fname_format, frame_idx_);
   return utils::FileExists(next_fpath);
 }
 
@@ -54,9 +53,9 @@ bool Input::ReadNextFrame() {
   }
 
   depth_provider_->DepthFromStereo(left_frame_color_buf_,
-                                 right_frame_color_buf_,
-                                 stereo_calibration_,
-                                 depth_buf_);
+                                   right_frame_color_buf_,
+                                   stereo_calibration_,
+                                   depth_buf_);
 
   const auto &depth_size = GetDepthSize();
   if (depth_buf_.rows != depth_size.height || depth_buf_.cols != depth_size.width) {
