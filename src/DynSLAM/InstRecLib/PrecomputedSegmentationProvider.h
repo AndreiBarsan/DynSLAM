@@ -15,8 +15,11 @@ namespace segmentation {
 /// on-the-fly.
 class PrecomputedSegmentationProvider : public SegmentationProvider {
  public:
-  PrecomputedSegmentationProvider(const std::string &seg_folder)
-      : seg_folder_(seg_folder), frame_idx_(0), dataset_used(&kPascalVoc2012), last_seg_preview_(nullptr) {
+  PrecomputedSegmentationProvider(const std::string &seg_folder, int frame_offset = 0)
+      : seg_folder_(seg_folder),
+        frame_idx_(frame_offset),
+        dataset_used(&kPascalVoc2012),
+        last_seg_preview_(nullptr) {
   }
 
   ~PrecomputedSegmentationProvider() override { delete last_seg_preview_; }
