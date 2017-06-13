@@ -61,9 +61,9 @@ class VisoSparseSFProvider : public SparseSFProvider {
         current_view.first->rows,
         current_view.first->cols
     };
-    Tic("Viso2 frame processing");
+//    Tic("Viso2 frame processing");
     bool viso2_success = stereo_vo->process(left_bytes, right_bytes, dims);
-    Toc();
+//    Toc();
 
     if (! viso2_success) {
       // TODO(andrei): In the long run, handle these failures more gracefully.
@@ -75,12 +75,12 @@ class VisoSparseSFProvider : public SparseSFProvider {
       // compiler isn't guaranteed to optimize away the two copies this call implies).
       // TODO(andrei): Don't read this right after the first frame. SF needs at least 2 frames before
       // it can compute the motion estimates.
-      Tic("get matches");
+//      Tic("get matches");
       latest_flow_.matches = stereo_vo->getMatches();
       matches_available_ = true;
       cout << "viso2 success! " << latest_flow_.matches.size() << " matches found." << endl;
       cout << "               " << stereo_vo->getNumberOfInliers() << " inliers" << endl;
-      Toc();
+//      Toc();
     }
   }
 
