@@ -5,6 +5,7 @@
 #include <cstdarg>
 #include <cstring>
 #include <memory>
+#include <sys/time.h>
 
 namespace dynslam {
 namespace utils {

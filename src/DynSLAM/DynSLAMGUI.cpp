@@ -607,10 +607,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 
   VisualOdometryStereo::parameters sf_params;
   sf_params.base = baseline_m;
-//  sf_params.ransac_iters = 50;
-//  sf_params.match.refinement = 0;
-  sf_params.match.nms_n = 3;    // Optimal from KITTI leaderboard; default is also 3.
-  sf_params.match.half_resolution = 0;
+  sf_params.match.nms_n = 3;    // Optimal from KITTI leaderboard: 3 (also the default)
+  sf_params.match.half_resolution = 1;
   sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;
   sf_params.calib.cv = itm_calibration.intrinsics_rgb.projectionParamsSimple.py;
   sf_params.calib.f  = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx; // TODO should we average fx and fy?
