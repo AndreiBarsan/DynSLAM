@@ -561,11 +561,11 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   float focal_length_px = 707.0912f;
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
 
-  Input::Config input_config = Input::KittiOdometryConfig();
-//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+  //Input::Config input_config = Input::KittiOdometryConfig();
+  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
-  int frame_offset = 270;
+  int frame_offset = 0;
 
   *input_out = new Input(
       dataset_root,
@@ -609,6 +609,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   sf_params.base = baseline_m;
 //  sf_params.ransac_iters = 50;
 //  sf_params.match.refinement = 0;
+  sf_params.match.nms_n = 3;    // Optimal from KITTI leaderboard; default is also 3.
+  sf_params.match.half_resolution = 0;
   sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;
   sf_params.calib.cv = itm_calibration.intrinsics_rgb.projectionParamsSimple.py;
   sf_params.calib.f  = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx; // TODO should we average fx and fy?
