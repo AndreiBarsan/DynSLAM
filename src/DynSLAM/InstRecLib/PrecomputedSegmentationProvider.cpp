@@ -32,7 +32,8 @@ using namespace dynslam::utils;
 /// \note The numpy file is already organized in 2D (as many lines as rows, etc.), so the given
 /// width and height are simply used as an additional sanity check.
 uint8_t *ReadMask(std::istream &np_txt_in, const int width, const int height) {
-  // TODO(andrei): Is this stupidly slow?
+  // TODO(andrei): Is this stupidly slow? Maybe, but -O3 seems to make a big difference, here,
+  // at least compared to something like -Og.
   // TODO(andrei): Move to general utils or to IO library.
   int lines_read = 0;
   string line_buf;

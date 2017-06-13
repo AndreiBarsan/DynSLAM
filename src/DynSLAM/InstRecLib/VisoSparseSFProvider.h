@@ -26,13 +26,11 @@ class VisoSparseSFProvider : public SparseSFProvider {
     delete stereo_vo;
   }
 
-  // TODO do we still need to path both? It seems viso keeps track of them internally anyway.
+  // TODO do we still need to pass both? It seems viso keeps track of them internally anyway.
   void ComputeSparseSF(const ViewPair &_,
                        const ViewPair &current_view) override {
     using namespace std;
     using namespace dynslam::utils;
-
-    cout << "Computing sparse scene flow using libviso2 (TODO)..." << endl;
 
     // TODO(andrei): Is this safe? What if OpenCV represents the images differently?
     uint8_t *left_bytes = current_view.first->data;
@@ -69,8 +67,7 @@ class VisoSparseSFProvider : public SparseSFProvider {
 
     if (! viso2_success) {
       // TODO(andrei): In the long run, handle these failures more gracefully.
-//      throw runtime_error("viso2 could not estimate egomotion and scene flow!");
-//      cerr << "viso2 could not estimate egomotion and scene flow! (OK for first frame)" << endl;
+      cerr << "viso2 could not estimate egomotion and scene flow! (OK for first frame)" << endl;
       matches_available_ = false;
     }
     else {
@@ -82,6 +79,7 @@ class VisoSparseSFProvider : public SparseSFProvider {
       latest_flow_.matches = stereo_vo->getMatches();
       matches_available_ = true;
       cout << "viso2 success! " << latest_flow_.matches.size() << " matches found." << endl;
+      cout << "               " << stereo_vo->getNumberOfInliers() << " inliers" << endl;
       Toc();
     }
   }
