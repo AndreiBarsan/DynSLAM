@@ -14,8 +14,8 @@ const string kDispNetName = "precomputed-dispnet";
 const string kPrecomputedElas = "precomputed-elas";
 
 void PrecomputedDepthProvider::DisparityMapFromStereo(const cv::Mat &left,
-                                                    const cv::Mat &right,
-                                                    cv::Mat &out_disparity
+                                                      const cv::Mat &right,
+                                                      cv::Mat &out_disparity
 ) {
   // For testing, in the beginning we directly read depth (not disparity) maps from the disk.
   string depth_fpath = this->folder_ + "/" + utils::Format(this->fname_format_, this->frame_idx_);
@@ -28,6 +28,13 @@ void PrecomputedDepthProvider::DisparityMapFromStereo(const cv::Mat &left,
   } else {
     // Other formats we work with (png, pgm, etc.) can be read by OpenCV just fine.
     out_disparity = cv::imread(depth_fpath, CV_LOAD_IMAGE_UNCHANGED);
+  }
+
+  if (out_disparity.cols == 0 || out_disparity.rows == 0) {
+    throw runtime_error(utils::Format(
+        "Could not read precomputed depth map from file [%s]. Please check that the file exists, "
+        "and is a readable, valid, image.",
+        depth_fpath.c_str()));
   }
 
   this->frame_idx_++;
