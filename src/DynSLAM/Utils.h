@@ -1,12 +1,11 @@
 #ifndef DYNSLAM_UTILS_H
 #define DYNSLAM_UTILS_H
 
+#include <map>
 #include <string>
 #include <sys/stat.h>
-
-#include <highgui.h>
-#include <sys/time.h>
 #include <stack>
+#include <vector>
 
 #include "DepthProvider.h"
 
