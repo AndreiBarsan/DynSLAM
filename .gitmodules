@@ -13,3 +13,6 @@
 [submodule "src/libviso2"]
 	path = src/libviso2
 	url = https://github.com/AndreiBarsan/libviso2-mirror
+[submodule "src/eigen"]
+	path = src/eigen
+	url = https://github.com/RLovelett/eigen

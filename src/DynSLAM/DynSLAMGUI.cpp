@@ -1,6 +1,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <sys/time.h>
 
@@ -17,6 +18,7 @@
 #include "PrecomputedDepthProvider.h"
 #include "InstRecLib/VisoSparseSFProvider.h"
 #include "DSHandler3D.h"
+
 
 // Commandline arguments using gflags
 DEFINE_string(dataset_root, "", "The root folder of the dataset to use.");
@@ -454,8 +456,13 @@ protected:
         static_cast<float>(free_gpu_gb) * 10.0f    // Mini-hack to make the scales better
     );
 
+    Tic("DynSLAM frame");
     // Main workhorse function of the underlying SLAM system.
     dyn_slam_->ProcessFrame(this->dyn_slam_input_);
+    int64_t frame_time_ms = Toc(true);
+    float fps = 1000.0f / static_cast<float>(frame_time_ms);
+    cout << "[Frame time: " << frame_time_ms << "ms @ " << setprecision(4) << fps << " FPS]"
+         << endl << endl;
   }
 
 private:
@@ -561,7 +568,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   float focal_length_px = 707.0912f;
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
 
-  //Input::Config input_config = Input::KittiOdometryConfig();
+//  Input::Config input_config = Input::KittiOdometryConfig();
   Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 

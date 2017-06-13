@@ -32,9 +32,8 @@ using namespace dynslam::utils;
 /// \note The numpy file is already organized in 2D (as many lines as rows, etc.), so the given
 /// width and height are simply used as an additional sanity check.
 uint8_t *ReadMask(std::istream &np_txt_in, const int width, const int height) {
-  // TODO(andrei): Is this stupidly slow? Maybe, but -O3 seems to make a big difference, here,
-  // at least compared to something like -Og.
-  // TODO(andrei): Move to general utils or to IO library.
+  // TODO(andrei): This code is very slow---it takes ~16ms just to read in a single mask. In practice
+  // it's OK, since the end goal is to do live interop with the Caffe segmentation tool anyway.
   int lines_read = 0;
   string line_buf;
   uint8_t *mask_data = new uint8_t[height * width];
@@ -110,7 +109,10 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
            &bounding_box.r.x1, &bounding_box.r.y1, &class_probability, &class_id);
 
     // Process the mask file. The mask area covers the edges of the bounding box, too.
+    dynslam::utils::Tic("Read mask and convert");
+    dynslam::utils::Tic("Read mask");
     uint8_t *mask_pixels = ReadMask(mask_in, bounding_box.GetWidth(), bounding_box.GetHeight());
+    dynslam::utils::Toc();
     cv::Mat *mask_cv_mat = new cv::Mat(
         bounding_box.GetHeight(),
         bounding_box.GetWidth(),
@@ -118,11 +120,12 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
         (void*) mask_pixels
     );
     auto mask = make_shared<Mask>(bounding_box, mask_cv_mat);
+    dynslam::utils::Toc();
 
     // TODO(andrei): Consider maintaining some overlap--we could use the 1.2 mask for sending info
     // to the reconstruction and e.g., 1.0 for sending it to the static map. However, the ambiguous
     // band could maybe be flagged with a lower update weight.
-    float mask_rescale_factor = 1.075f;
+    float mask_rescale_factor = 1.1f;
     mask->Rescale(mask_rescale_factor);
     detections.emplace_back(class_probability, class_id, mask, this->dataset_used);
 

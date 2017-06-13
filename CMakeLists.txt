@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(DynSLAM)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 macro(CANONIFY_BOOL var)
   if (${var})
@@ -14,13 +14,14 @@ macro(CANONIFY_BOOL var)
   endif()
 endmacro()
 
+# We use Eigen for generic matrix support and linear algebra routines.
+find_package(Eigen3 REQUIRED)
 find_package(GLUT REQUIRED)
 find_package(OpenGL REQUIRED)
 
 find_package(CUDA QUIET)
 CANONIFY_BOOL(CUDA_FOUND)
 message(STATUS "CUDA found: " ${CUDA_FOUND})
-
 # TODO(andrei): Is this optional any more?
 OPTION(WITH_CUDA "Build with CUDA support?" ${CUDA_FOUND})
 
@@ -71,6 +72,7 @@ find_package(OpenCV REQUIRED)
 # TODO(andrei): See pangolin's 'external' folder for neat ways of bringing in dependencies
 # from GitHub and building them if necessary.
 
+include_directories(${EIGEN3_INCLUDE_DIR})
 include_directories(${Viso2_INCLUDE_DIRS})
 include_directories(${Pangolin_INCLUDE_DIRS})
 include_directories(${OpenCV_INCLUDE_DIRS})
