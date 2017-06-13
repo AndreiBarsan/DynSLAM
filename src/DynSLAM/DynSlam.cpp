@@ -73,7 +73,6 @@ void DynSlam::ProcessFrame(Input *input) {
 
   utils::Tic("Input preprocessing");
   input->GetCvImages(&input_rgb_image_, &input_raw_depth_image_);
-
   static_scene_->UpdateView(*input_rgb_image_, *input_raw_depth_image_);
   utils::Toc();
 
