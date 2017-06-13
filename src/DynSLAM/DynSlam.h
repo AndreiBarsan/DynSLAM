@@ -106,11 +106,9 @@ public:
   }
 
   void SaveStaticMap(const std::string &dataset_name, const std::string &depth_name) {
-    string today_folder = utils::GetDate();
-    system(utils::Format("mkdir -p mesh_out/%s/%s", dataset_name.c_str(), today_folder.c_str()).c_str());
-    string map_fpath = utils::Format("mesh_out/%s/%s/static-%s-mesh.obj",
-                                     dataset_name.c_str(),
-                                     today_folder.c_str(),
+    string target_folder = EnsureDumpFolderExists(dataset_name);
+    string map_fpath = utils::Format("%s/static-%s-mesh.obj",
+                                     target_folder.c_str(),
                                      depth_name.c_str());
     cout << "Saving full static map to: " << map_fpath << endl;
     static_scene_->SaveSceneToMesh(map_fpath.c_str());
@@ -118,14 +116,9 @@ public:
 
   void SaveDynamicObject(const std::string &dataset_name, const std::string &depth_name, int object_id) {
     cout << "Saving mesh for object #" << object_id << "'s reconstruction..." << endl;
-    string today_folder = utils::GetDate();
-
-    // TODO(andrei): Make this more cross-platform and more secure.
-    system(utils::Format("mkdir -p mesh_out/%s/%s", dataset_name.c_str(), today_folder.c_str()).c_str());
-
-    string instance_fpath = utils::Format("mesh_out/%s/%s/instance-%s-%d-mesh.obj",
-                                          dataset_name.c_str(),
-                                          today_folder.c_str(),
+    string target_folder = EnsureDumpFolderExists(dataset_name);
+    string instance_fpath = utils::Format("%s/instance-%s-%06d-mesh.obj",
+                                          target_folder.c_str(),
                                           depth_name.c_str(),
                                           object_id);
     instance_reconstructor_->SaveObjectToMesh(object_id, instance_fpath);
@@ -163,6 +156,20 @@ private:
     static_scene_->GetImage(out_image_, image_type);
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
+
+  /// \brief Returns a path to the folder where the dataset's meshes should be dump, creating it
+  ///        using a naive system call if it does not exist.
+  std::string EnsureDumpFolderExists(const string& dataset_name) {
+    // TODO-LOW(andrei): Make this more cross-platform and more secure.
+    string today_folder = utils::GetDate();
+    string target_folder = "mesh_out/" + dataset_name + "/" + today_folder;
+    if(system(utils::Format("mkdir -p '%s'", target_folder).c_str())) {
+      throw runtime_error(utils::Format("Could not create directory: %s", target_folder.c_str()));
+    }
+
+    return target_folder;
+  }
+
 };
 
 }
