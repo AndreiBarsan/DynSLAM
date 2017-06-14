@@ -225,7 +225,7 @@ public:
     for (const auto &pair: instanceTracker.GetActiveTracks()) {
       Track &track = instanceTracker.GetTrack(pair.first);
       // Nothing to do for tracks with we didn't see this frame.
-      if (track.GetLastFrame().frame_idx != dyn_slam_->GetCurrentFrameNo() - 1) {
+      if (track.GetLastFrame().frame_idx != dyn_slam_->GetCurrentFrameNo() - 2) { // TODO(andrei): Why this index gap of 2?
         continue;
       }
 

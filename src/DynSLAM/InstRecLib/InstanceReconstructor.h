@@ -10,6 +10,7 @@
 #include "InstanceTracker.h"
 
 #include "../InfiniTamDriver.h"
+#include "SparseSFProvider.h"
 
 namespace dynslam {
   class DynSlam;
@@ -36,7 +37,8 @@ class InstanceReconstructor {
   /// \param main_view The original InfiniTAM view of the scene. Gets mutated!
   /// \param segmentation_result The output of the view's semantic segmentation.
   void ProcessFrame(ITMLib::Objects::ITMView *main_view,
-                    const segmentation::InstanceSegmentationResult &segmentation_result);
+                    const segmentation::InstanceSegmentationResult &segmentation_result,
+                    const SparseSceneFlow &scene_flow);
 
   const InstanceTracker &GetInstanceTracker() const { return *instance_tracker_; }
 

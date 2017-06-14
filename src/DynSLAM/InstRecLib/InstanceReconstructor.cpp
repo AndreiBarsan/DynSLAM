@@ -1,9 +1,6 @@
 
-
 #include "InstanceReconstructor.h"
 #include "InstanceView.h"
-
-#include <vector>
 
 namespace instreclib {
 namespace reconstruction {
@@ -15,9 +12,13 @@ using namespace ITMLib::Objects;
 
 // TODO(andrei): Implement this in CUDA. It should be easy.
 template <typename DEPTH_T>
-void ProcessSilhouette_CPU(Vector4u *sourceRGB, DEPTH_T *sourceDepth, Vector4u *destRGB,
-                           DEPTH_T *destDepth, Vector2i sourceDims,
-                           const InstanceDetection &detection) {
+void ProcessSilhouette_CPU(Vector4u *sourceRGB,
+                           DEPTH_T *sourceDepth,
+                           Vector4u *destRGB,
+                           DEPTH_T *destDepth,
+                           Vector2i sourceDims,
+                           const InstanceDetection &detection,
+                           const SparseSceneFlow &scene_flow) {
   // Blanks out the detection's silhouette in the 'source' frames, and writes its pixels into the
   // output frames. Initially, the dest frames will be the same size as the source ones, but this
   // is wasteful in terms of memory: we should use bbox+1-sized buffers in the future, since most
@@ -38,6 +39,17 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB, DEPTH_T *sourceDepth, Vector4u *
 
   memset(destRGB, 0, frame_width * frame_height * sizeof(*sourceRGB));
   memset(destDepth, 0, frame_width * frame_height * sizeof(DEPTH_T));
+
+  // Instead of expensively doing a per-pixel for every SF vector (ouch!), we just use the bounding
+  // boxes, since we'll be using those vectors for RANSAC anyway. In the future, we could maybe
+  // use some sort of hashing/sparse matrix for the scene flow and support per-pixel stuff.
+  for(const auto &match : scene_flow.matches) {
+    int fx = static_cast<int>(match.u1c);
+    int fy = static_cast<int>(match.v1c);
+    if (bbox.ContainsPoint(fx, fy)) {
+      cout << "Vector matched: " << fx << ", " << fy << endl;
+    }
+  }
 
   for (int row = 0; row < box_height; ++row) {
     for (int col = 0; col < box_width; ++col) {
@@ -72,7 +84,9 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB, DEPTH_T *sourceDepth, Vector4u *
 
 void InstanceReconstructor::ProcessFrame(
     ITMLib::Objects::ITMView *main_view,
-    const segmentation::InstanceSegmentationResult &segmentation_result) {
+    const segmentation::InstanceSegmentationResult &segmentation_result,
+    const SparseSceneFlow &scene_flow
+) {
   // TODO(andrei): Perform this slicing 100% on the GPU.
   main_view->rgb->UpdateHostFromDevice();
   main_view->depth->UpdateHostFromDevice();
@@ -99,8 +113,13 @@ void InstanceReconstructor::ProcessFrame(
       auto rgb_segment_h = view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
       auto depth_segment_h = view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
-      ProcessSilhouette_CPU(rgb_data_h, depth_data_h, rgb_segment_h, depth_segment_h,
-                            main_view->rgb->noDims, instance_detection);
+      ProcessSilhouette_CPU(rgb_data_h,
+                            depth_data_h,
+                            rgb_segment_h,
+                            depth_segment_h,
+                            main_view->rgb->noDims,
+                            instance_detection,
+                            scene_flow);
 
       view->rgb->UpdateDeviceFromHost();
       view->depth->UpdateDeviceFromHost();

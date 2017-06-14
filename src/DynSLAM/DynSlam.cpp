@@ -69,6 +69,9 @@ void DynSlam::ProcessFrame(Input *input) {
       make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
       make_pair(left_gray, right_gray)
   );
+  if (!sparse_sf_provider_->FlowAvailable() && current_frame_no_ > 0) {
+    cerr << "Warning: could not compute scene flow." << endl;
+  }
   utils::Toc();
 
   utils::Tic("Input preprocessing");
@@ -78,7 +81,14 @@ void DynSlam::ProcessFrame(Input *input) {
 
   // Split the scene up into instances, and fuse each instance independently.
   utils::Tic("Instance tracking and reconstruction");
-  instance_reconstructor_->ProcessFrame(static_scene_->GetView(), *segmentationResult);
+  if (sparse_sf_provider_->FlowAvailable()) {
+    // We need flow information in order to correctly determine which objects are moving, so we
+    // can't do this when no scene flow is available (i.e., in the first frame, unless an error
+    // occurs).
+    instance_reconstructor_->ProcessFrame(static_scene_->GetView(),
+                                          *segmentationResult,
+                                          sparse_sf_provider_->GetFlow());
+  }
   utils::Toc();
 
   // Perform the tracking after the segmentation, so that we may in the future leverage semantic
