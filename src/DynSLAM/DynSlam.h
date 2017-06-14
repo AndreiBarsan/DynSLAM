@@ -163,7 +163,7 @@ private:
     // TODO-LOW(andrei): Make this more cross-platform and more secure.
     string today_folder = utils::GetDate();
     string target_folder = "mesh_out/" + dataset_name + "/" + today_folder;
-    if(system(utils::Format("mkdir -p '%s'", target_folder).c_str())) {
+    if(system(utils::Format("mkdir -p '%s'", target_folder.c_str()).c_str())) {
       throw runtime_error(utils::Format("Could not create directory: %s", target_folder.c_str()));
     }
 

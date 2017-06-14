@@ -78,8 +78,8 @@ class VisoSparseSFProvider : public SparseSFProvider {
 //      Tic("get matches");
       latest_flow_.matches = stereo_vo->getMatches();
       matches_available_ = true;
-      cout << "viso2 success! " << latest_flow_.matches.size() << " matches found." << endl;
-      cout << "               " << stereo_vo->getNumberOfInliers() << " inliers" << endl;
+//      cout << "viso2 success! " << latest_flow_.matches.size() << " matches found." << endl;
+//      cout << "               " << stereo_vo->getNumberOfInliers() << " inliers" << endl;
 //      Toc();
     }
   }
