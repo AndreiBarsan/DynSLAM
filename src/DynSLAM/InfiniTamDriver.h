@@ -8,7 +8,6 @@
 
 #include <pangolin/pangolin.h>
 #include "../InfiniTAM/InfiniTAM/ITMLib/Engine/ITMMainEngine.h"
-#include "ImageSourceEngine.h"
 #include "Input.h"
 
 namespace dynslam {

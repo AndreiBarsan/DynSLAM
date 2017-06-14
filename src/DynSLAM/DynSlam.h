@@ -2,7 +2,6 @@
 #define DYNSLAM_DYNSLAM_H
 
 #include <pangolin/display/opengl_render_state.h>
-#include "ImageSourceEngine.h"
 
 #include "InfiniTamDriver.h"
 #include "InstRecLib/InstanceReconstructor.h"
