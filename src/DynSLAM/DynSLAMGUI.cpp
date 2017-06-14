@@ -455,6 +455,7 @@ protected:
 
   /// \brief Advances to the next input frame, and integrates it into the map.
   void ProcessFrame() {
+    cout << endl << "[Starting frame " << dyn_slam_->GetCurrentFrameNo() + 1 << "]" << endl;
     active_object_count_ = dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount();
 
     size_t free_gpu_memory_bytes;
@@ -473,8 +474,9 @@ protected:
     dyn_slam_->ProcessFrame(this->dyn_slam_input_);
     int64_t frame_time_ms = Toc(true);
     float fps = 1000.0f / static_cast<float>(frame_time_ms);
-    cout << "[Frame time: " << frame_time_ms << "ms @ " << setprecision(4) << fps << " FPS]"
-         << endl << endl;
+    cout << "[Finished frame " << dyn_slam_->GetCurrentFrameNo() << " in " << frame_time_ms
+         << "ms @ " << setprecision(4) << fps << " FPS (approx.)]"
+         << endl;
   }
 
 private:
@@ -584,7 +586,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 //  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
-  int frame_offset = 0;
+  int frame_offset = 75;
 
   *input_out = new Input(
       dataset_root,

@@ -91,7 +91,7 @@ void InstanceReconstructor::ProcessFrame(
       // check this, since the field is private.
       bool use_gpu = true;
 
-      // TODO(andrei): Release these objects! They leak now.
+      // The ITMView takes ownership of this.
       ITMRGBDCalib *calibration = new ITMRGBDCalib;
       *calibration = *main_view->calib;
 
@@ -112,9 +112,6 @@ void InstanceReconstructor::ProcessFrame(
   // Associate this frame's detection(s) with those from previous frames.
   this->instance_tracker_->ProcessInstanceViews(frame_idx_, new_instance_views);
   this->ProcessReconstructions();
-
-  // XXX: remove
-  ITMSafeCall(cudaGetLastError());
 
   // Update the GPU image after we've (if applicable) removed the dynamic objects from it.
   main_view->rgb->UpdateDeviceFromHost();
@@ -231,8 +228,6 @@ void InstanceReconstructor::ProcessReconstructions() {
 
     // TODO(andrei): Figure out a good estimate for the coord frame for the object.
     // TODO(andrei): This seems like the place to shove in the scene flow data.
-
-    cout << endl << endl << "Start instance integration for #" << track.GetId() << endl;
 
     // TODO(andrei): We shouldn't do any tracking inside the instances IMHO.
     cerr << "Not accounting for gaps in track!" << endl;
