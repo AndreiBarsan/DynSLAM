@@ -47,6 +47,7 @@ void InstanceTracker::PruneTracks(int current_frame_idx) {
         // error).
         it->second.GetReconstruction()->SetView(nullptr);
       }
+
       it = id_to_active_track_.erase(it);
     } else {
       ++it;

@@ -109,10 +109,10 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
            &bounding_box.r.x1, &bounding_box.r.y1, &class_probability, &class_id);
 
     // Process the mask file. The mask area covers the edges of the bounding box, too.
-    dynslam::utils::Tic("Read mask and convert");
-    dynslam::utils::Tic("Read mask");
+//    dynslam::utils::Tic("Read mask and convert");
+//    dynslam::utils::Tic("Read mask");
     uint8_t *mask_pixels = ReadMask(mask_in, bounding_box.GetWidth(), bounding_box.GetHeight());
-    dynslam::utils::Toc();
+//    dynslam::utils::Toc();
     cv::Mat *mask_cv_mat = new cv::Mat(
         bounding_box.GetHeight(),
         bounding_box.GetWidth(),
@@ -120,7 +120,7 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
         (void*) mask_pixels
     );
     auto mask = make_shared<Mask>(bounding_box, mask_cv_mat);
-    dynslam::utils::Toc();
+//    dynslam::utils::Toc();
 
     // TODO(andrei): Consider maintaining some overlap--we could use the 1.2 mask for sending info
     // to the reconstruction and e.g., 1.0 for sending it to the static map. However, the ambiguous

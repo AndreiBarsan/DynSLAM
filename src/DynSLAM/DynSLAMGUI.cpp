@@ -309,6 +309,10 @@ protected:
       *(this->autoplay_) = false;
       this->ProcessFrame();
     });
+    pangolin::RegisterKeyPressCallback('a', [this]() {
+      *(this->autoplay_) = ! *(this->autoplay_);
+    });
+    pangolin::RegisterKeyPressCallback('q', [this]() { pangolin::QuitAll(); });
     pangolin::Var<function<void(void)>> save_object("ui.Save Active Object", [this]() {
       dyn_slam_->SaveDynamicObject(dyn_slam_input_->GetName(),
                                    dyn_slam_input_->GetDepthProvider()->GetName(),

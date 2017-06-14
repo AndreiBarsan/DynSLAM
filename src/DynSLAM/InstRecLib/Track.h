@@ -25,18 +25,14 @@ struct TrackFrame {
 /// Modeled as a series of detections, contained in the 'frames' field. Note that there can be
 /// gaps in this list, due to frames where this particular object was not detected.
 class Track {
- private:
-  /// \brief A unique identifier for this particular track.
-  int id_;
-  std::vector<TrackFrame> frames_;
-
-  /// \brief A pointer to a 3D reconstruction of the object in this track.
-  /// Is set to `nullptr` if no reconstruction is available.
-  std::shared_ptr<dynslam::drivers::InfiniTamDriver> reconstruction;
-
  public:
   Track(int id) : id_(id), reconstruction(nullptr) {}
-  virtual ~Track() { }
+
+  virtual ~Track() {
+    if (reconstruction.get() != nullptr) {
+      fprintf(stderr, "Deleting track [%d] and its associated reconstruction!\n", id_);
+    }
+  }
 
   /// \brief Evaluates how well this new frame would fit the existing track.
   /// \returns A goodness score between 0 and 1, where 0 means the new frame would not match this
@@ -87,6 +83,15 @@ class Track {
     // For now, use this simple heuristic: at least k frames in track.
     return GetSize() >= 7;
   }
+
+ private:
+  /// \brief A unique identifier for this particular track.
+  int id_;
+  std::vector<TrackFrame> frames_;
+
+  /// \brief A pointer to a 3D reconstruction of the object in this track.
+  /// Is set to `nullptr` if no reconstruction is available.
+  std::shared_ptr<dynslam::drivers::InfiniTamDriver> reconstruction;
 };
 
 }  // namespace reconstruction

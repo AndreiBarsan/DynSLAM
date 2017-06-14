@@ -113,6 +113,10 @@ void InstanceReconstructor::ProcessFrame(
   this->instance_tracker_->ProcessInstanceViews(frame_idx_, new_instance_views);
   this->ProcessReconstructions();
 
+  // XXX: remove
+  ITMSafeCall(cudaGetLastError());
+
+  // Update the GPU image after we've (if applicable) removed the dynamic objects from it.
   main_view->rgb->UpdateDeviceFromHost();
   main_view->depth->UpdateDeviceFromHost();
 
@@ -197,9 +201,9 @@ void InstanceReconstructor::ProcessReconstructions() {
 
       // If we already have some frames, integrate them into the new volume.
       for(int i = 0; i < static_cast<int>(track.GetSize()) - 1; ++i) {
+//      for(int i = 0; i < 1; ++i) {
         TrackFrame &frame = track.GetFrame(i);
         InfiniTamDriver &reconstruction = *(track.GetReconstruction());
-
         reconstruction.SetView(frame.instance_view.GetView());
         // TODO(andrei): Account for gaps in the track!
         reconstruction.Track();
@@ -216,7 +220,9 @@ void InstanceReconstructor::ProcessReconstructions() {
                << error.what() << endl << "Will continue regular operation." << endl;
         }
 
+//        /*
         reconstruction.PrepareNextStep();
+        // */
       }
     } else {
       cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
@@ -224,6 +230,7 @@ void InstanceReconstructor::ProcessReconstructions() {
 
     // We now fuse the current frame into the reconstruction volume.
     InfiniTamDriver &instance_driver = *track.GetReconstruction();
+    //*
     instance_driver.SetView(track.GetLastFrame().instance_view.GetView());
 
     // TODO(andrei): Figure out a good estimate for the coord frame for the object.
@@ -245,9 +252,49 @@ void InstanceReconstructor::ProcessReconstructions() {
     }
 
     instance_driver.PrepareNextStep();
+     //*/
 
     cout << "Finished instance integration." << endl << endl;
   }
+}
+
+void InstanceReconstructor::SaveObjectToMesh(int object_id, const string &fpath) {
+  // TODO nicer error handling
+  if(! instance_tracker_->HasTrack(object_id)) {
+    throw std::runtime_error("Unknown track");
+  }
+
+  const Track& track = instance_tracker_->GetTrack(object_id);
+
+  if(! track.HasReconstruction()) {
+    throw std::runtime_error("Track exists but has no reconstruction.");
+  }
+
+  // TODO(andrei): Wrap this meshing code inside a nice utility.
+  // Begin ITM-specific meshing code
+  const ITMLibSettings *settings = track.GetReconstruction()->GetSettings();
+  auto *meshing_engine = new ITMMeshingEngine_CUDA<ITMVoxel, ITMVoxelIndex>(
+      settings->sdfLocalBlockNum);
+  track.GetReconstruction()->GetScene();
+
+  MemoryDeviceType deviceType = (settings->deviceType == ITMLibSettings::DEVICE_CUDA
+                                 ? MEMORYDEVICE_CUDA
+                                 : MEMORYDEVICE_CPU);
+  ITMMesh *mesh = new ITMMesh(deviceType, settings->sdfLocalBlockNum);
+
+  cudaError_t err = cudaGetLastError();
+  if (err != cudaSuccess) {
+    cerr << "Warning: we seem to have inherited an error here. Meshing should work OK but you "
+         << "should look into this..." << endl;
+  }
+
+  meshing_engine->MeshScene(mesh, track.GetReconstruction()->GetScene());
+  mesh->WriteOBJ(fpath.c_str());
+//    mesh->WriteSTL(fpath.c_str());
+
+  // TODO(andrei): This is obviously wasteful!
+  delete mesh;
+  delete meshing_engine;
 }
 
 }  // namespace reconstruction
