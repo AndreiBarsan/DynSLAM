@@ -201,7 +201,6 @@ void InstanceReconstructor::ProcessReconstructions() {
 
       // If we already have some frames, integrate them into the new volume.
       for(int i = 0; i < static_cast<int>(track.GetSize()) - 1; ++i) {
-//      for(int i = 0; i < 1; ++i) {
         TrackFrame &frame = track.GetFrame(i);
         InfiniTamDriver &reconstruction = *(track.GetReconstruction());
         reconstruction.SetView(frame.instance_view.GetView());
@@ -220,9 +219,7 @@ void InstanceReconstructor::ProcessReconstructions() {
                << error.what() << endl << "Will continue regular operation." << endl;
         }
 
-//        /*
         reconstruction.PrepareNextStep();
-        // */
       }
     } else {
       cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
@@ -230,7 +227,6 @@ void InstanceReconstructor::ProcessReconstructions() {
 
     // We now fuse the current frame into the reconstruction volume.
     InfiniTamDriver &instance_driver = *track.GetReconstruction();
-    //*
     instance_driver.SetView(track.GetLastFrame().instance_view.GetView());
 
     // TODO(andrei): Figure out a good estimate for the coord frame for the object.
@@ -252,8 +248,6 @@ void InstanceReconstructor::ProcessReconstructions() {
     }
 
     instance_driver.PrepareNextStep();
-     //*/
-
     cout << "Finished instance integration." << endl << endl;
   }
 }
