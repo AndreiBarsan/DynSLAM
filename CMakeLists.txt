@@ -83,8 +83,7 @@ add_subdirectory(src/DynSLAM/InstRecLib)
 
 # TODO(andrei): Make dynslam a library, and link the GUI with it.
 set(DYNSLAM_SOURCES
-    src/DynSLAM/ImageSourceEngine.cpp
-    src/DynSLAM/Utils.cpp
+        src/DynSLAM/Utils.cpp
     src/DynSLAM/DynSlam.cpp
     src/DynSLAM/InfiniTamDriver.cpp
     src/DynSLAM/Input.cpp
