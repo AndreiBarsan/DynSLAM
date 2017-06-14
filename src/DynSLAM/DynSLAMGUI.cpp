@@ -26,6 +26,14 @@ DEFINE_string(dataset_root, "", "The root folder of the dataset to use.");
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
 // issue.
 
+// TODO(andrei): Consider making the libviso module implement two interfaces
+// with the same underlying engine: visual odometry and sparse scene flow. You
+// could then feed this sparse flow (prolly wrapped inside an Eigen matrix or
+// something) into the instance reconstruction, which would then associate it
+// with instances, and run the more refined tracker, etc. In the first stage we
+// should get the coarse dynamic object pose estimation going, and then add the
+// refinement.
+
 // Handle SIGSEGV and its friends by printing sensible stack traces with code snippets.
 // TODO(andrei): this is a hack, please remove or depend on backward directly.
 backward::SignalHandling sh;
