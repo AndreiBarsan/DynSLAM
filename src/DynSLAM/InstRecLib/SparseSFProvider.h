@@ -6,16 +6,20 @@
 #include <opencv/cv.h>
 #include "../../libviso2/src/matcher.h"
 
+#include <Eigen/Dense>
+
 namespace instreclib {
 
 using ViewPair = std::pair<cv::Mat1b*, cv::Mat1b*>;
 
-/// \brief Contains the result of a (sparse) scene flow estimation.
+/// \brief Contains the result of a (sparse) scene flow estimation (tuples of matches in the
+/// left/right current/past frames (not 3D vectors yet).
 /// Currently only supports libviso2-style data.
 class SparseSceneFlow {
  public:
-  // TODO(andrei): It would probably be best to use either custom structs or an Eigen matrix here.
   std::vector<Matcher::p_match> matches;
+
+//  Eigen::Matrix<float, Eigen::Dynamic, 8> matches;
 };
 
 /// \brief Interface for components which can compute sparse scene flow from a scene view.
