@@ -146,7 +146,7 @@ public:
       pane_texture_->RenderToViewport(true);
 
       if (dyn_slam_->GetCurrentFrameNo() > 1) {
-        PreviewSparseSF(dyn_slam_->GetLatestFlow(), rgb_view_);
+        PreviewSparseSF(dyn_slam_->GetLatestFlow().matches, rgb_view_);
       }
 
       depth_view_.Activate();
@@ -168,10 +168,20 @@ public:
       }
 
       object_view_.Activate();
-      glColor3f(1.0, 1.0, 1.0);
+      glColor4f(1.0, 1.0, 1.0, 1.0f);
       pane_texture_->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
                              GL_RGBA, GL_UNSIGNED_BYTE);
       pane_texture_->RenderToViewport(true);
+
+      auto &tracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
+      if (dyn_slam_->GetCurrentFrameNo() > 0) {
+        // TODO-LOW(andrei): This is bonkers. Add some helpers!
+        if (tracker.HasTrack(visualized_object_idx_)) {
+          const auto &track = tracker.GetTrack(visualized_object_idx_);
+          const auto &instance_flow = track.GetLastFrame().instance_view.GetFlow();
+          PreviewSparseSF(instance_flow, object_view_);
+        }
+      }
 
       object_reconstruction_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
@@ -201,17 +211,16 @@ public:
     }
   }
 
-  // TODO(andrei): Use eigen, since it can improve interop between some of the things quite well.
   /// \brief Converts the pixel coordinates into [-1, +1]-style OpenGL coordinates.
   /// \note The GL coordinates range from (-1.0, -1.0) in the bottom-left, to (+1.0, +1.0) in the
   ///       top-right.
-  cv::Vec2f PixelsToGl(float x_px, float y_px, const pangolin::View &view) {
+  cv::Vec2f PixelsToGl(Eigen::Vector2f px, const pangolin::View &view) {
     float view_w = view.GetBounds().w;
     float view_h = view.GetBounds().h;
-    float gl_x = (x_px - view_w) / view_w;
+    float gl_x = (px(0) - view_w) / view_w;
     // We need the opposite sign here since pixel coordinates are assumed to have the origin in the
     // top-left, while the GL origin is in the bottom-left.
-    float gl_y = (view_h - y_px) / view_h;
+    float gl_y = (view_h - px(1)) / view_h;
 
     return cv::Vec2f(gl_x, gl_y);
   }
@@ -231,7 +240,8 @@ public:
 
       InstanceDetection latest_detection = track.GetLastFrame().instance_view.GetInstanceDetection();
       const auto &bbox = latest_detection.mask->GetBoundingBox();
-      cv::Vec2f gl_pos = PixelsToGl(bbox.r.x0, bbox.r.y0 - font.Height(), segment_view_);
+      cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(bbox.r.x0, bbox.r.y0 - font.Height()),
+                                    segment_view_);
 
       stringstream info_label;
       info_label << latest_detection.GetClassName() << "#" << track.GetId()
@@ -243,15 +253,15 @@ public:
   }
 
   /// \brief Renders a simple preview of the scene flow information onto the currently active pane.
-  void PreviewSparseSF(const SparseSceneFlow &flow, const pangolin::View &view) {
+  void PreviewSparseSF(const vector<RawFlow> &flow, const pangolin::View &view) {
     pangolin::GlFont &font = pangolin::GlFont::I();
     font.Text("libviso2 scene flow preview").Draw(-0.98f, 0.89f);
 
     // We don't need z-checks since we're rendering UI stuff.
     glDisable(GL_DEPTH_TEST);
-    for(const Matcher::p_match &match : flow.matches) {
-      cv::Vec2f gl_pos = PixelsToGl(match.u1c, match.v1c, view);
-      cv::Vec2f gl_pos_old = PixelsToGl(match.u1p, match.v1p, view);
+    for(const RawFlow &match : flow) {
+      cv::Vec2f gl_pos = PixelsToGl(match.curr_left, view);
+      cv::Vec2f gl_pos_old = PixelsToGl(match.prev_left, view);
 
       cv::Vec2f delta = gl_pos - gl_pos_old;
       float magnitude = 15.0f * static_cast<float>(cv::norm(delta));
@@ -586,12 +596,12 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 //  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
-  int frame_offset = 75;
+  int frame_offset = 85;
 
   *input_out = new Input(
       dataset_root,
       input_config,
-      // TODO(andrei): ¿Por qué no los dos? Maybe it's worth investigating to use the more
+      // TODO(andrei): Why not both elas and dispnet? Maybe it's worth investigating to use the more
       // conservative, sharper libelas depth maps for the main map, but the smoother ones produced
       // by dispnet for the objects. This may be a good idea since libelas tends to screw up when
       // faced with reflective surfaces, but dispnet is more robust to that. Similarly, for certain
@@ -629,7 +639,9 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   VisualOdometryStereo::parameters sf_params;
   sf_params.base = baseline_m;
   sf_params.match.nms_n = 3;    // Optimal from KITTI leaderboard: 3 (also the default)
-  sf_params.match.half_resolution = 1;
+  sf_params.match.half_resolution = 0;
+  sf_params.match.multi_stage = 1;    // Default = 1 (= 0 => much slower)
+  sf_params.match.refinement = 1;   // Default = 1 (per-pixel); 2 = sub-pixel, slower
   sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;
   sf_params.calib.cv = itm_calibration.intrinsics_rgb.projectionParamsSimple.py;
   sf_params.calib.f  = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx; // TODO should we average fx and fy?

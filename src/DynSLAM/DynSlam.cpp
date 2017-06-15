@@ -87,7 +87,8 @@ void DynSlam::ProcessFrame(Input *input) {
     // occurs).
     instance_reconstructor_->ProcessFrame(static_scene_->GetView(),
                                           *segmentationResult,
-                                          sparse_sf_provider_->GetFlow());
+                                          sparse_sf_provider_->GetFlow(),
+                                          *sparse_sf_provider_);
   }
   utils::Toc();
 

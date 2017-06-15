@@ -1,6 +1,7 @@
 
 #include "InstanceReconstructor.h"
 #include "InstanceView.h"
+#include "../../libviso2/src/viso.h"
 
 namespace instreclib {
 namespace reconstruction {
@@ -17,6 +18,7 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
                            Vector4u *destRGB,
                            DEPTH_T *destDepth,
                            Vector2i sourceDims,
+                           vector<RawFlow> &instance_flow_vectors,  // expressed in the current left camera's frame
                            const InstanceDetection &detection,
                            const SparseSceneFlow &scene_flow) {
   // Blanks out the detection's silhouette in the 'source' frames, and writes its pixels into the
@@ -40,14 +42,21 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
   memset(destRGB, 0, frame_width * frame_height * sizeof(*sourceRGB));
   memset(destDepth, 0, frame_width * frame_height * sizeof(DEPTH_T));
 
+  // Keep track of the minimum depth in the frame, so we can use it as a heuristic when
+  // reconstructing instances.
+  float min_depth = numeric_limits<float>::max();
+
   // Instead of expensively doing a per-pixel for every SF vector (ouch!), we just use the bounding
   // boxes, since we'll be using those vectors for RANSAC anyway. In the future, we could maybe
   // use some sort of hashing/sparse matrix for the scene flow and support per-pixel stuff.
   for(const auto &match : scene_flow.matches) {
-    int fx = static_cast<int>(match.u1c);
-    int fy = static_cast<int>(match.v1c);
+    // TODO(andrei): Store old motion of car in track and use to initialize RANSAC under a constant
+    // motion assumption.
+    int fx = static_cast<int>(match.curr_left(0));
+    int fy = static_cast<int>(match.curr_left(1));
+
     if (bbox.ContainsPoint(fx, fy)) {
-      cout << "Vector matched: " << fx << ", " << fy << endl;
+      instance_flow_vectors.push_back(match);
     }
   }
 
@@ -75,8 +84,13 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
         sourceRGB[frame_idx].b = 0;
         sourceRGB[frame_idx].a = 0;
 
-        destDepth[frame_idx] = sourceDepth[frame_idx];
+        float depth = sourceDepth[frame_idx];
+        destDepth[frame_idx] = depth;
         sourceDepth[frame_idx] = 0.0f;
+
+        if (depth < min_depth) {
+          min_depth = depth;
+        }
       }
     }
   }
@@ -85,7 +99,8 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
 void InstanceReconstructor::ProcessFrame(
     ITMLib::Objects::ITMView *main_view,
     const segmentation::InstanceSegmentationResult &segmentation_result,
-    const SparseSceneFlow &scene_flow
+    const SparseSceneFlow &scene_flow,
+    const SparseSFProvider &ssf_provider
 ) {
   // TODO(andrei): Perform this slicing 100% on the GPU.
   main_view->rgb->UpdateHostFromDevice();
@@ -113,18 +128,43 @@ void InstanceReconstructor::ProcessFrame(
       auto rgb_segment_h = view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
       auto depth_segment_h = view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
+      vector<RawFlow> instance_raw_flow;
       ProcessSilhouette_CPU(rgb_data_h,
                             depth_data_h,
                             rgb_segment_h,
                             depth_segment_h,
                             main_view->rgb->noDims,
+                            instance_raw_flow,
                             instance_detection,
                             scene_flow);
 
       view->rgb->UpdateDeviceFromHost();
       view->depth->UpdateDeviceFromHost();
 
-      new_instance_views.emplace_back(instance_detection, view);
+      uint32_t kMinFlowVectorsForPoseEst = 10;   // TODO experiment and set proper value
+      size_t flow_count = instance_raw_flow.size();
+      if (instance_raw_flow.size() >= kMinFlowVectorsForPoseEst) {
+        vector<double> instance_motion_delta = ssf_provider.ExtractMotion(instance_raw_flow);
+        if (instance_motion_delta.size() != 6) {
+          // track information not available yet; idea: we could move this computation into the
+          // track object, and use data from many more frames (if available).
+          cerr << "Could not compute instance delta motion from " << flow_count << " matches." << endl;
+        } else {
+          cout << "Successfully estimated the relative instance pose from " << flow_count
+               << " matches." << endl;
+          Matrix delta_mx = VisualOdometry::transformationVectorToMatrix(instance_motion_delta);
+          cout << delta_mx << endl;
+
+          // TODO(andrei): Prof Geiger: compare this to the current egomotion (or to ID if egomotion
+          // removed). If close to egomotion (compare correctly! absolute translation l2 + rodrigues
+          // rotation repr.), then the object is static; we set the relative motion to id and BAM! done.
+        }
+      }
+      else {
+        cout << "Only " << flow_count << " scene flow points. Not estimating relative pose." << endl;
+      }
+
+      new_instance_views.emplace_back(instance_detection, view, instance_raw_flow);
     }
   }
 
