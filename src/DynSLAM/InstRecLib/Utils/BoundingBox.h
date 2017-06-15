@@ -39,8 +39,8 @@ struct BoundingBox {
   }
 
   bool ContainsPoint(const int x, const int y) const {
-    return (x >= this->r.x0 && x <= this->r.x1 && y >= this->r.y0 &&
-            y <= this->r.y1);
+    return (x >= this->r.x0 && x <= this->r.x1 &&
+            y >= this->r.y0 && y <= this->r.y1);
   }
 
   bool Intersects(const BoundingBox& other) const;

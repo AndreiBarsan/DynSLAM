@@ -19,11 +19,11 @@ namespace instreclib {
 class VisoSparseSFProvider : public SparseSFProvider {
  public:
   VisoSparseSFProvider(VisualOdometryStereo::parameters &stereo_vo_params)
-    : stereo_vo(new VisualOdometryStereo(stereo_vo_params)),
+    : stereo_vo_(new VisualOdometryStereo(stereo_vo_params)),
       matches_available_(false) { }
 
   virtual ~VisoSparseSFProvider() {
-    delete stereo_vo;
+    delete stereo_vo_;
   }
 
   // TODO do we still need to pass both? It seems viso keeps track of them internally anyway.
@@ -62,7 +62,7 @@ class VisoSparseSFProvider : public SparseSFProvider {
         current_view.first->cols
     };
 //    Tic("Viso2 frame processing");
-    bool viso2_success = stereo_vo->process(left_bytes, right_bytes, dims);
+    bool viso2_success = stereo_vo_->process(left_bytes, right_bytes, dims);
 //    Toc();
 
     if (! viso2_success) {
@@ -75,12 +75,21 @@ class VisoSparseSFProvider : public SparseSFProvider {
       // compiler isn't guaranteed to optimize away the two copies this call implies).
       // TODO(andrei): Don't read this right after the first frame. SF needs at least 2 frames before
       // it can compute the motion estimates.
-//      Tic("get matches");
-      latest_flow_.matches = stereo_vo->getMatches();
+      Tic("get matches");
+
+      // Just marshal the data from the viso-specific format to DynSLAM format.
+      std::vector<RawFlow> flow;
+      for (const Matcher::p_match &match : stereo_vo_->getRawMatches()) {
+        flow.emplace_back(match.u1c, match.v1c, match.i1c, match.u2c, match.v2c, match.i2c,
+                          match.u1p, match.v1p, match.i1p, match.u2p, match.v2p, match.i2p);
+      }
+      SparseSceneFlow new_flow = {flow};
+      latest_flow_ = new_flow;
+
       matches_available_ = true;
 //      cout << "viso2 success! " << latest_flow_.matches.size() << " matches found." << endl;
-//      cout << "               " << stereo_vo->getNumberOfInliers() << " inliers" << endl;
-//      Toc();
+//      cout << "               " << stereo_vo_->getNumberOfInliers() << " inliers" << endl;
+      Toc();
     }
   }
 
@@ -93,8 +102,20 @@ class VisoSparseSFProvider : public SparseSFProvider {
     return latest_flow_;
   }
 
+  std::vector<double> ExtractMotion(const std::vector<RawFlow> &flow) const override {
+    // TODO-LOW(andrei): Extract helper method for this.
+    std::vector<Matcher::p_match> flow_viso;
+    for(const RawFlow &f : flow) {
+      flow_viso.push_back(Matcher::p_match(f.prev_left(0), f.prev_left(1), f.prev_left_idx,
+                                           f.prev_right(0), f.prev_right(1), f.prev_right_idx,
+                                           f.curr_left(0), f.curr_left(1), f.curr_left_idx,
+                                           f.curr_right(0), f.curr_right(1), f.curr_right_idx));
+    }
+    return stereo_vo_->estimateMotion(flow_viso);
+  }
+
  private:
-  VisualOdometryStereo *stereo_vo;
+  VisualOdometryStereo *stereo_vo_;
   bool matches_available_;
   SparseSceneFlow latest_flow_;
 };

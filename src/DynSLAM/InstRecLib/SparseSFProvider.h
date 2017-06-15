@@ -12,14 +12,37 @@ namespace instreclib {
 
 using ViewPair = std::pair<cv::Mat1b*, cv::Mat1b*>;
 
+struct RawFlow {
+  Eigen::Vector2f curr_left;
+  // Feature index used by the underlying scene flow system for matching (e.g., in libviso2).
+  int32_t curr_left_idx;
+  Eigen::Vector2f curr_right;
+  int32_t curr_right_idx;
+
+  Eigen::Vector2f prev_left;
+  int32_t prev_left_idx;
+  Eigen::Vector2f prev_right;
+  int32_t prev_right_idx;
+
+  RawFlow(float c_left_x,  float c_left_y,  int c_left_idx,
+          float c_right_x, float c_right_y, int c_right_idx,
+          float p_left_x,  float p_left_y,  int p_left_idx,
+          float p_right_x, float p_right_y, int p_right_idx)
+      : curr_left(c_left_x, c_left_y),
+        curr_left_idx(c_left_idx),
+        curr_right(c_right_x, c_right_y),
+        curr_right_idx(c_right_idx),
+        prev_left(p_left_x, p_left_y),
+        prev_left_idx(p_left_idx),
+        prev_right(p_right_x, p_right_y),
+        prev_right_idx(p_right_idx) { }
+};
+
 /// \brief Contains the result of a (sparse) scene flow estimation (tuples of matches in the
 /// left/right current/past frames (not 3D vectors yet).
-/// Currently only supports libviso2-style data.
 class SparseSceneFlow {
  public:
-  std::vector<Matcher::p_match> matches;
-
-//  Eigen::Matrix<float, Eigen::Dynamic, 8> matches;
+  std::vector<RawFlow> matches;
 };
 
 /// \brief Interface for components which can compute sparse scene flow from a scene view.
@@ -32,6 +55,9 @@ class SparseSFProvider {
   /// \brief Returns the latest scene flow information computed using 'ComputeSparseSF'.
   /// \note This will not be available until at least two frames have been processed.
   virtual SparseSceneFlow& GetFlow() = 0;
+
+  // Hacky proxy for using viso's sf utilities for motion estimation in the inst. rec.
+  virtual std::vector<double> ExtractMotion(const std::vector<RawFlow> &flow) const = 0;
 };
 
 }  // namespace instreclib
