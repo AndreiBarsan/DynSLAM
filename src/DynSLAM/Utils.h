@@ -12,6 +12,35 @@
 namespace dynslam {
 namespace utils {
 
+/// \brief Very, VERY simple optional object wrapper.
+template<typename T>
+class Option {
+ public:
+  Option() : value_(nullptr) { }
+  Option(T *value) : value_(value) { }
+
+  bool IsPresent() const {
+    return value_ != nullptr;
+  }
+
+  T& operator*() {
+    assert(IsPresent() && "Cannot dereference an empty optional!");
+    return *value_;
+  }
+
+  const T& operator*() const {
+    assert(IsPresent() && "Cannot dereference an empty optional!");
+    return *value_;
+  }
+
+  virtual ~Option() {
+    delete value_;
+  }
+
+ private:
+  T *value_;
+};
+
 bool EndsWith(const std::string &value, const std::string &ending);
 
 /// \brief Streamlined 'sprintf' functionality for C++.
