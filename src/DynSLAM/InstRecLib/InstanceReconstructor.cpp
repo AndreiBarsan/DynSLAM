@@ -7,8 +7,11 @@ namespace instreclib {
 namespace reconstruction {
 
 using namespace std;
+
+using namespace dynslam::utils;
 using namespace instreclib::segmentation;
 using namespace instreclib::utils;
+
 using namespace ITMLib::Objects;
 
 // TODO(andrei): Implement this in CUDA. It should be easy.
@@ -143,12 +146,18 @@ void InstanceReconstructor::ProcessFrame(
 
       uint32_t kMinFlowVectorsForPoseEst = 10;   // TODO experiment and set proper value
       size_t flow_count = instance_raw_flow.size();
+      Option<Eigen::Matrix4d> *motion_delta;
+
+      // TODO(andrei): Consider doing these computations in the tracker, or lazily, only when the
+      // system decides to start reconstructing something, maybe?
+
       if (instance_raw_flow.size() >= kMinFlowVectorsForPoseEst) {
         vector<double> instance_motion_delta = ssf_provider.ExtractMotion(instance_raw_flow);
         if (instance_motion_delta.size() != 6) {
           // track information not available yet; idea: we could move this computation into the
           // track object, and use data from many more frames (if available).
           cerr << "Could not compute instance delta motion from " << flow_count << " matches." << endl;
+          motion_delta = new Option<Eigen::Matrix4d>();
         } else {
           cout << "Successfully estimated the relative instance pose from " << flow_count
                << " matches." << endl;
@@ -158,13 +167,19 @@ void InstanceReconstructor::ProcessFrame(
           // TODO(andrei): Prof Geiger: compare this to the current egomotion (or to ID if egomotion
           // removed). If close to egomotion (compare correctly! absolute translation l2 + rodrigues
           // rotation repr.), then the object is static; we set the relative motion to id and BAM! done.
+
+          motion_delta = new Option<Eigen::Matrix4d>(new Eigen::Matrix4d(delta_mx.val[0]));
         }
       }
       else {
         cout << "Only " << flow_count << " scene flow points. Not estimating relative pose." << endl;
+        motion_delta = new Option<Eigen::Matrix4d>();
       }
 
-      new_instance_views.emplace_back(instance_detection, view, instance_raw_flow);
+      new_instance_views.emplace_back(instance_detection,
+                                      view,
+                                      instance_raw_flow,
+                                      shared_ptr<Option<Eigen::Matrix4d>>(motion_delta));
     }
   }
 
