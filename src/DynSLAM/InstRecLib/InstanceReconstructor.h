@@ -38,7 +38,9 @@ class InstanceReconstructor {
   /// \param segmentation_result The output of the view's semantic segmentation.
   void ProcessFrame(ITMLib::Objects::ITMView *main_view,
                     const segmentation::InstanceSegmentationResult &segmentation_result,
-                    const SparseSceneFlow &scene_flow);
+                    // TODO(andrei): Organize these args better.
+                    const SparseSceneFlow &scene_flow,
+                    const SparseSFProvider &ssf_provider);
 
   const InstanceTracker &GetInstanceTracker() const { return *instance_tracker_; }
 
