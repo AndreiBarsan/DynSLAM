@@ -276,7 +276,7 @@ void InstanceReconstructor::ProcessReconstructions() {
         InfiniTamDriver &reconstruction = *(track.GetReconstruction());
         reconstruction.SetView(frame.instance_view.GetView());
         // TODO(andrei): Account for gaps in the track!
-        reconstruction.Track();
+//        reconstruction.Track();
 
         try {
           reconstruction.Integrate();
@@ -305,7 +305,7 @@ void InstanceReconstructor::ProcessReconstructions() {
 
     // TODO(andrei): We shouldn't do any tracking inside the instances IMHO.
     cerr << "Not accounting for gaps in track!" << endl;
-    instance_driver.Track();
+//    instance_driver.Track();
 
     try {
       // TODO(andrei): See above and also fix here.

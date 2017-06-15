@@ -122,6 +122,23 @@ public:
           );
         }
 
+        struct timeval tp;
+        gettimeofday(&tp, NULL);
+        double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+        double time_scale = 500.0;
+        double r = 1;
+        double a = sin(time_ms / time_scale) * r;
+        double cc = cos(time_ms / time_scale) * r;
+
+//        cout << (sin(time_ms/time_scale) * 10) << endl;
+//        instance_cam_->SetModelViewMatrix(
+//        pangolin::ModelViewLookAt(
+//            -3.0 + a, -1.00,  12.75,
+//            -3.0, -1.10,  10.00,
+//            pangolin::AxisY)
+//        );
+
+
         const unsigned char *preview = dyn_slam_->GetObjectRaycastFreeViewPreview(
             visualized_object_idx_,
             pane_cam_->GetModelViewMatrix());
@@ -353,14 +370,11 @@ protected:
 //                                  0, -7.5, 289,
                                   pangolin::AxisY));
 
-    // TODO(andrei): Set dynamically based on where instances are detected (non-trivial).
     instance_cam_ = new pangolin::OpenGlRenderState(
         proj_,
         pangolin::ModelViewLookAt(
-          0.0, 0.0, 0.75,
-          -1.5, 0.0, -1.0,
-//            0, -7.5, 290,
-//            0, -7.5, 289,
+          -3.0, -1.00,  12.75,
+          -3.0, -1.00,  10.0,
           pangolin::AxisY)
     );
 
