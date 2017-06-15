@@ -103,6 +103,12 @@ public:
     this->trackingController->Track(this->trackingState, this->view);
   }
 
+  // TODO(andrei): Document better.
+  // Use this to explicitly set tracking state, e.g., when reconstructing individ. instances.
+  void SetPose(Matrix4f new_pose) {
+
+  }
+
   void Integrate() {
     this->denseMapper->ProcessFrame(
       // We already generate our new view when splitting the input based on the segmentation.
