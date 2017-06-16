@@ -81,18 +81,22 @@ public:
         rgb_itm_(new ITMUChar4Image(img_size_rgb, true, true)),
         raw_depth_itm_(new ITMShortImage(img_size_d, true, true)),
         rgb_cv_(new cv::Mat3b(img_size_rgb.height, img_size_rgb.width)),
-        raw_depth_cv_(new cv::Mat1s(img_size_d.height, img_size_d.width))
-  { }
+        raw_depth_cv_(new cv::Mat1s(img_size_d.height, img_size_d.width)),
+        last_egomotion_(new Eigen::Matrix4f)
+  {
+    last_egomotion_->setIdentity();
+  }
 
   virtual ~InfiniTamDriver() {
     delete rgb_itm_;
     delete raw_depth_itm_;
     delete rgb_cv_;
     delete raw_depth_cv_;
+    delete last_egomotion_;
   }
 
-  // TODO(andrei): I was passing a Mat4b but didnt even get a warning. Is that normal? I was
-  // expecting a little more type safety...
+  // TODO(andrei): I was passing a Mat4b as rgb, which caused a nasty bug, but didn't even get a
+  // warning. Is that normal? I was expecting a little more type safety...
   void UpdateView(const cv::Mat3b &rgb_image, const cv::Mat_<uint16_t> &raw_depth_image);
 
   // used by the instance reconstruction
@@ -106,23 +110,21 @@ public:
   }
 
   void Track() {
-    // Consider leveraging sparse scene flow here, for dynamic instances, maybe?
+    // TODO(andrei): Compute the latest relative motion in a more direct manner.
+    Matrix4f old_pose = this->trackingState->pose_d->GetInvM();
+    Matrix4f old_pose_inv;
+    old_pose.inv(old_pose_inv);
     this->trackingController->Track(this->trackingState, this->view);
+
+    Matrix4f new_pose = this->trackingState->pose_d->GetInvM();
+    *(this->last_egomotion_) = ItmToEigen(old_pose_inv * new_pose);
   }
 
   // TODO(andrei): Document better.
   // Use this to explicitly set tracking state, e.g., when reconstructing individ. instances.
-  void SetPose(Eigen::Matrix4f new_pose) {
-//    this->trackingState->pose_d->SetInvM(EigenToItm(new_pose));
-//    this->trackingState->requiresFullRendering = true;
-
-    this->trackingController->Track(this->trackingState, this->view);
-    // XXX hack
-    cout << "Pose before set: " << endl << this->trackingState->pose_d->GetInvM() << endl;
+  void SetPose(const Eigen::Matrix4f &new_pose) {
+    *(this->last_egomotion_) = ItmToEigen(this->trackingState->pose_d->GetInvM()).inverse() * new_pose;
     this->trackingState->pose_d->SetInvM(EigenToItm(new_pose));
-    cout << "Pose after set:  " << endl << this->trackingState->pose_d->GetInvM() << endl
-                                                                                  << endl;
-
   }
 
   void Integrate() {
@@ -170,12 +172,22 @@ public:
     return ItmToEigen(trackingState->pose_d->GetInvM());
   }
 
+  /// \brief Returns the transform from the previous frame to the current.
+  Eigen::Matrix4f GetLastEgomotion() const {
+    return *last_egomotion_;
+  }
+
+  // Necessary for having Eigen types as fields.
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
  private:
   ITMUChar4Image *rgb_itm_;
   ITMShortImage  *raw_depth_itm_;
 
   cv::Mat3b *rgb_cv_;
   cv::Mat1s *raw_depth_cv_;
+
+  Eigen::Matrix4f *last_egomotion_;
 };
 
 } // namespace drivers

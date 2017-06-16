@@ -136,5 +136,5 @@ void InfiniTamDriver::UpdateView(const cv::Mat3b &rgb_image,
                                 settings->modelSensorNoise);
 }
 
-} // namespace drivers}
+} // namespace drivers
 } // namespace dynslam

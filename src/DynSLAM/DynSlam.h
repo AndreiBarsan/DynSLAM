@@ -132,7 +132,16 @@ public:
     return sparse_sf_provider_->GetFlow();
   }
 
+  /// \brief Returns the most recent egomotion computed by the primary tracker.
+  /// Composing these transforms from the first frame is equivalent to the `GetPose()` method, which
+  /// returns the absolute current pose.
+  Eigen::Matrix4f GetLastEgomotion() const {
+    return static_scene_->GetLastEgomotion();
+  }
+
   /// \brief Returns the current pose of the camera in the coordinate frame used by the tracker.
+  /// For the KITTI dataset (and the KITTI-odometry one) this represents the center of the left
+  /// camera.
   Eigen::Matrix4f GetPose() const {
     return static_scene_->GetPose();
   }
