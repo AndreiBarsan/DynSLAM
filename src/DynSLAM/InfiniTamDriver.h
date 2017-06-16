@@ -113,7 +113,16 @@ public:
   // TODO(andrei): Document better.
   // Use this to explicitly set tracking state, e.g., when reconstructing individ. instances.
   void SetPose(Eigen::Matrix4f new_pose) {
+//    this->trackingState->pose_d->SetInvM(EigenToItm(new_pose));
+//    this->trackingState->requiresFullRendering = true;
+
+    this->trackingController->Track(this->trackingState, this->view);
+    // XXX hack
+    cout << "Pose before set: " << endl << this->trackingState->pose_d->GetInvM() << endl;
     this->trackingState->pose_d->SetInvM(EigenToItm(new_pose));
+    cout << "Pose after set:  " << endl << this->trackingState->pose_d->GetInvM() << endl
+                                                                                  << endl;
+
   }
 
   void Integrate() {
