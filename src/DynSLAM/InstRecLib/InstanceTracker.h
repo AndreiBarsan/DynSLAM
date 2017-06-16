@@ -69,7 +69,11 @@ class InstanceTracker {
 
   /// \brief Associates the new detections with existing tracks, or creates new ones.
   /// \param new_detections The instances detected in the current frame.
-  void ProcessInstanceViews(int frame_idx, const std::vector<InstanceView>& new_detections);
+  void ProcessInstanceViews(
+      int frame_idx,
+      const std::vector<InstanceView>& new_detections,
+      const Eigen::Matrix4f current_camera_pose
+  );
 
   /// \see track_count_
   int GetTotalTrackCount() const { return track_count_; }

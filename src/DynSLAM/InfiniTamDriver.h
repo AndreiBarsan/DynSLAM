@@ -3,12 +3,15 @@
 #ifndef DYNSLAM_INFINITAMDRIVER_H
 #define DYNSLAM_INFINITAMDRIVER_H
 
-#include <opencv/cv.h>
 #include <iostream>
 
+#include <opencv/cv.h>
 #include <pangolin/pangolin.h>
+#include <Eigen/Core>
+
 #include "../InfiniTAM/InfiniTAM/ITMLib/Engine/ITMMainEngine.h"
 #include "Input.h"
+#include "../libviso2/src/matrix.h"
 
 namespace dynslam {
 namespace drivers {
@@ -56,6 +59,10 @@ void ItmToCv(const ITMShortImage &itm, cv::Mat1s *out_mat);
 /// \brief Converts an InfiniTAM float depth image into an OpenCV mat.
 void ItmToCv(const ITMFloatImage &itm, cv::Mat1s *out_mat);
 
+/// \brief Converts an InfiniTAM 4x4 matrix to an Eigen object.
+Eigen::Matrix4f ItmToEigen(const Matrix4f &itm_matrix);
+
+Matrix4f EigenToItm(const Eigen::Matrix4f &eigen_matrix);
 
 ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix);
 
@@ -105,8 +112,8 @@ public:
 
   // TODO(andrei): Document better.
   // Use this to explicitly set tracking state, e.g., when reconstructing individ. instances.
-  void SetPose(Matrix4f new_pose) {
-
+  void SetPose(Eigen::Matrix4f new_pose) {
+    this->trackingState->pose_d->SetInvM(EigenToItm(new_pose));
   }
 
   void Integrate() {
@@ -148,6 +155,10 @@ public:
   /// This may not be the full original depth frame due to, e.g., masking.
   const cv::Mat1s* GetDepthPreview() const {
     return raw_depth_cv_;
+  }
+
+  Eigen::Matrix4f GetPose() const {
+    return ItmToEigen(trackingState->pose_d->GetInvM());
   }
 
  private:
