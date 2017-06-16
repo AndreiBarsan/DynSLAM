@@ -97,10 +97,13 @@ Eigen::Matrix4f ItmToEigen(const Matrix4f &itm_matrix) {
 }
 
 Matrix4f EigenToItm(const Eigen::Matrix4f &eigen_matrix) {
-  return Matrix4f(eigen_matrix(0, 0), eigen_matrix(0, 1), eigen_matrix(0, 2), eigen_matrix(0, 3),
-                  eigen_matrix(1, 0), eigen_matrix(1, 1), eigen_matrix(1, 2), eigen_matrix(1, 3),
-                  eigen_matrix(2, 0), eigen_matrix(2, 1), eigen_matrix(2, 2), eigen_matrix(2, 3),
-                  eigen_matrix(3, 0), eigen_matrix(3, 1), eigen_matrix(3, 2), eigen_matrix(3, 3));
+  // Note the ordering, which is necessary since the input to the ITM matrix must be given in
+  // column-major format.
+  Matrix4f res(eigen_matrix(0, 0), eigen_matrix(1, 0), eigen_matrix(2, 0), eigen_matrix(3, 0),
+               eigen_matrix(0, 1), eigen_matrix(1, 1), eigen_matrix(2, 1), eigen_matrix(3, 1),
+               eigen_matrix(0, 2), eigen_matrix(1, 2), eigen_matrix(2, 2), eigen_matrix(3, 2),
+               eigen_matrix(0, 3), eigen_matrix(1, 3), eigen_matrix(2, 3), eigen_matrix(3, 3));
+  return res;
 }
 
 void InfiniTamDriver::GetImage(ITMUChar4Image *out,

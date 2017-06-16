@@ -92,6 +92,10 @@ void DynSlam::ProcessFrame(Input *input) {
         sparse_sf_provider_->GetFlow(),
         *sparse_sf_provider_);
   }
+  else {
+    cerr << "TODO we still want to scrub all suspicious stuff from the first frame, just in case."
+         << endl;
+  }
   utils::Toc();
 
   // Perform the tracking after the segmentation, so that we may in the future leverage semantic
@@ -99,7 +103,9 @@ void DynSlam::ProcessFrame(Input *input) {
   utils::Tic("Static map fusion");
   static_scene_->Integrate();
   static_scene_->PrepareNextStep();
+  utils::Toc();
 
+  utils::Tic("Final error check");
   // Final sanity check after the frame is processed: individual components should check for errors.
   // If something slips through and gets here, it's bad and we want to stop execution.
   ITMSafeCall(cudaDeviceSynchronize());
@@ -110,7 +116,6 @@ void DynSlam::ProcessFrame(Input *input) {
     // Trigger the regular error response.
     ITMSafeCall(last_error);
   }
-
   utils::Toc();
 
   current_frame_no_++;

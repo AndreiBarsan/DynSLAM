@@ -68,8 +68,8 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
     for (int col = 0; col < box_width; ++col) {
       int frame_row = row + bbox.r.y0;
       int frame_col = col + bbox.r.x0;
-      // TODO(andrei): Are the CPU-specific InfiniTAM functions doing this in a
-      // nicer way?
+      // TODO(andrei): Are the CPU-specific InfiniTAM functions doing this in a nicer way, or are
+      // they also just looping like crazy?
 
       if (frame_row < 0 || frame_row >= frame_height ||
           frame_col < 0 || frame_col >= frame_width) {
@@ -98,6 +98,8 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
       }
     }
   }
+
+  // TODO(andrei): Store min depth somewhere.
 }
 
 void InstanceReconstructor::ProcessFrame(
@@ -146,13 +148,18 @@ void InstanceReconstructor::ProcessFrame(
       view->rgb->UpdateDeviceFromHost();
       view->depth->UpdateDeviceFromHost();
 
-      uint32_t kMinFlowVectorsForPoseEst = 10;   // TODO experiment and set proper value
+      uint32_t kMinFlowVectorsForPoseEst = 10;   // TODO experiment and set proper value;
+      // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
+      // we're being a little paranoid).
       size_t flow_count = instance_raw_flow.size();
       Option<Eigen::Matrix4d> *motion_delta;
 
       // TODO(andrei): Consider doing these computations in the tracker, or lazily, only when the
       // system decides to start reconstructing something, maybe?
 
+      // TODO(andrei): Since we're not doing egomotion computation, the nr of inputs is much lower
+      // than in the full viso case => fewer RANSAC iterations than the default should be OK,
+      // especially if we then use a direct method for refinement.
       if (instance_raw_flow.size() >= kMinFlowVectorsForPoseEst) {
         vector<double> instance_motion_delta = ssf_provider.ExtractMotion(instance_raw_flow);
         if (instance_motion_delta.size() != 6) {
@@ -260,8 +267,6 @@ void InstanceReconstructor::ProcessReconstructions() {
       // Make the ground truth tracker start from the current frame, and not from the default
       // 0th frame.
       settings->groundTruthPoseOffset += track.GetStartTime();
-      // TODO(andrei): Do the same once you support proper tracking, since you will need to
-      // initialize the instance's "tracker" with some pose, or change the tracker used, etc.
 
       // Lowering this can slightly increase the quality of the object's reconstruction, but at the
       // cost of additional memory.
@@ -281,6 +286,8 @@ void InstanceReconstructor::ProcessReconstructions() {
         // TODO(andrei): Account for gaps in the track!
 //        reconstruction.Track();
 
+        cout << "Integrating instance frame #" << i << "..." << endl;
+        cout << frame.camera_pose << endl;
         reconstruction.SetPose(frame.camera_pose);
 
         try {

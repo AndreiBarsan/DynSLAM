@@ -610,8 +610,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 //  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
-//  int frame_offset = 85;
-  int frame_offset = 0;
+  int frame_offset = 85;
+//  int frame_offset = 0;
 
   *input_out = new Input(
       dataset_root,
