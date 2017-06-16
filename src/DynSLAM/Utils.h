@@ -7,6 +7,8 @@
 #include <stack>
 #include <vector>
 
+#include <Eigen/Core>
+
 #include "DepthProvider.h"
 
 namespace dynslam {
@@ -37,9 +39,25 @@ class Option {
     delete value_;
   }
 
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
  private:
   T *value_;
 };
+
+template<typename T>
+std::ostream& operator<<(std::ostream &out, const Option<T> &option) {
+  out << "Option(";
+  if (option.IsPresent()) {
+    out << *option;
+  }
+  else {
+    out << "empty";
+  }
+  out << ")";
+  return out;
+}
+
 
 bool EndsWith(const std::string &value, const std::string &ending);
 

@@ -114,6 +114,8 @@ class VisoSparseSFProvider : public SparseSFProvider {
     return stereo_vo_->estimateMotion(flow_viso);
   }
 
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
  private:
   VisualOdometryStereo *stereo_vo_;
   bool matches_available_;
