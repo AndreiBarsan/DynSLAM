@@ -15,10 +15,12 @@ namespace reconstruction {
 struct TrackFrame {
   int frame_idx;
   InstanceView instance_view;
+  /// \brief The camera pose at the time when this frame was observed.
+  Eigen::Matrix4f camera_pose;
 
  public:
-  TrackFrame(int frame_idx, const InstanceView& instance_view)
-      : frame_idx(frame_idx), instance_view(instance_view) {}
+  TrackFrame(int frame_idx, const InstanceView& instance_view, const Eigen::Matrix4f camera_pose)
+      : frame_idx(frame_idx), instance_view(instance_view), camera_pose(camera_pose) {}
 };
 
 /// \brief A detected object's track through multiple frames.

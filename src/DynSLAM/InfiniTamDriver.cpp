@@ -2,6 +2,8 @@
 
 #include "InfiniTamDriver.h"
 
+#include <Eigen/Core>
+
 namespace dynslam {
 namespace drivers {
 
@@ -83,6 +85,22 @@ void ItmToCv(const ITMFloatImage &itm, cv::Mat1s *out_mat) {
       );
     }
   }
+}
+
+Eigen::Matrix4f ItmToEigen(const Matrix4f &itm_matrix) {
+  Eigen::Matrix4f res;
+  res << itm_matrix.at(0, 0), itm_matrix(1, 0), itm_matrix.at(2, 0), itm_matrix.at(3, 0),
+    itm_matrix.at(0, 1), itm_matrix.at(1, 1), itm_matrix.at(2, 1), itm_matrix.at(3, 1),
+    itm_matrix.at(0, 2), itm_matrix.at(1, 2), itm_matrix.at(2, 2), itm_matrix.at(3, 2),
+    itm_matrix.at(0, 3), itm_matrix.at(1, 3), itm_matrix.at(2, 3), itm_matrix.at(3, 3);
+  return res;
+}
+
+Matrix4f EigenToItm(const Eigen::Matrix4f &eigen_matrix) {
+  return Matrix4f(eigen_matrix(0, 0), eigen_matrix(0, 1), eigen_matrix(0, 2), eigen_matrix(0, 3),
+                  eigen_matrix(1, 0), eigen_matrix(1, 1), eigen_matrix(1, 2), eigen_matrix(1, 3),
+                  eigen_matrix(2, 0), eigen_matrix(2, 1), eigen_matrix(2, 2), eigen_matrix(2, 3),
+                  eigen_matrix(3, 0), eigen_matrix(3, 1), eigen_matrix(3, 2), eigen_matrix(3, 3));
 }
 
 void InfiniTamDriver::GetImage(ITMUChar4Image *out,

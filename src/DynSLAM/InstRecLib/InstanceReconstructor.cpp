@@ -1,6 +1,7 @@
 
 #include "InstanceReconstructor.h"
 #include "InstanceView.h"
+#include "../DynSlam.h"
 #include "../../libviso2/src/viso.h"
 
 namespace instreclib {
@@ -100,6 +101,7 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
 }
 
 void InstanceReconstructor::ProcessFrame(
+    const dynslam::DynSlam* dyn_slam,
     ITMLib::Objects::ITMView *main_view,
     const segmentation::InstanceSegmentationResult &segmentation_result,
     const SparseSceneFlow &scene_flow,
@@ -184,7 +186,7 @@ void InstanceReconstructor::ProcessFrame(
   }
 
   // Associate this frame's detection(s) with those from previous frames.
-  this->instance_tracker_->ProcessInstanceViews(frame_idx_, new_instance_views);
+  this->instance_tracker_->ProcessInstanceViews(frame_idx_, new_instance_views, dyn_slam->GetPose());
   this->ProcessReconstructions();
 
   // Update the GPU image after we've (if applicable) removed the dynamic objects from it.
@@ -222,6 +224,7 @@ ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) 
 
   return tracks.at(idx).GetLastFrame().instance_view.GetView()->depth;
 }
+
 void InstanceReconstructor::ProcessReconstructions() {
   // TODO loop through keys only since we want to do all track accesses through the instance tracker for constness reasons
   for (auto &pair : instance_tracker_->GetActiveTracks()) {
@@ -278,6 +281,8 @@ void InstanceReconstructor::ProcessReconstructions() {
         // TODO(andrei): Account for gaps in the track!
 //        reconstruction.Track();
 
+        reconstruction.SetPose(frame.camera_pose);
+
         try {
           reconstruction.Integrate();
         }
@@ -304,8 +309,8 @@ void InstanceReconstructor::ProcessReconstructions() {
     // TODO(andrei): This seems like the place to shove in the scene flow data.
 
     // TODO(andrei): We shouldn't do any tracking inside the instances IMHO.
-    cerr << "Not accounting for gaps in track!" << endl;
-//    instance_driver.Track();
+    cerr << "Not accounting for gaps in the track for dynamic objects!" << endl;
+    instance_driver.SetPose(track.GetLastFrame().camera_pose);
 
     try {
       // TODO(andrei): See above and also fix here.
