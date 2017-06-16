@@ -18,9 +18,11 @@ struct TrackFrame {
   /// \brief The camera pose at the time when this frame was observed.
   Eigen::Matrix4f camera_pose;
 
- public:
   TrackFrame(int frame_idx, const InstanceView& instance_view, const Eigen::Matrix4f camera_pose)
       : frame_idx(frame_idx), instance_view(instance_view), camera_pose(camera_pose) {}
+
+  // Necessary for having Eigen types as fields.
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 };
 
 /// \brief A detected object's track through multiple frames.
@@ -83,7 +85,7 @@ class Track {
     // TODO(andrei): Moonshot---use a classifier to do this based on, e.g., track length, some
     // pose info, frame sizes, etc. Main challenge: how to get training data?
     // For now, use this simple heuristic: at least k frames in track.
-    return GetSize() >= 7;
+    return GetSize() >= 1;
   }
 
  private:

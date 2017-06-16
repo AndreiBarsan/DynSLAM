@@ -165,19 +165,23 @@ void InstanceReconstructor::ProcessFrame(
         if (instance_motion_delta.size() != 6) {
           // track information not available yet; idea: we could move this computation into the
           // track object, and use data from many more frames (if available).
-          cerr << "Could not compute instance delta motion from " << flow_count << " matches." << endl;
+//          cerr << "Could not compute instance delta motion from " << flow_count << " matches." << endl;
           motion_delta = new Option<Eigen::Matrix4d>();
         } else {
-          cout << "Successfully estimated the relative instance pose from " << flow_count
-               << " matches." << endl;
+//          cout << "Successfully estimated the relative instance pose from " << flow_count
+//               << " matches." << endl;
           Matrix delta_mx = VisualOdometry::transformationVectorToMatrix(instance_motion_delta);
-          cout << delta_mx << endl;
 
           // TODO(andrei): Prof Geiger: compare this to the current egomotion (or to ID if egomotion
           // removed). If close to egomotion (compare correctly! absolute translation l2 + rodrigues
           // rotation repr.), then the object is static; we set the relative motion to id and BAM! done.
 
-          motion_delta = new Option<Eigen::Matrix4d>(new Eigen::Matrix4d(delta_mx.val[0]));
+          // TODO(andrei): Make this a utility. The '~' transposes the matrix...
+          auto *md_mat = new Eigen::Matrix4d((~delta_mx).val[0]);
+          motion_delta = new Option<Eigen::Matrix4d>(md_mat);
+
+          cout << "Delta mx, post conversion to Eigen::Matrix:" << endl;
+          cout << *motion_delta << endl;
         }
       }
       else {
@@ -243,6 +247,8 @@ void InstanceReconstructor::ProcessReconstructions() {
     }
 
     if (! track.HasReconstruction()) {
+      // TODO(andrei): Consider comparing object motion relative to camera---if close to none, then
+      // no point in reconstructing, and we can just merge the object into the map.
       bool eligible = track.EligibleForReconstruction();
 
       if (! eligible) {
@@ -278,17 +284,31 @@ void InstanceReconstructor::ProcessReconstructions() {
           driver->GetView()->rgb->noDims,
           driver->GetView()->rgb->noDims);
 
+      Eigen::Matrix4f inv_first_pose = track.GetFrame(0).camera_pose.inverse();
+      cout << "Begin initialization"
+          << " | Initial pose:" << endl << track.GetFrame(0).camera_pose
+          << " | Its inverse:" << endl << inv_first_pose << endl;
+
       // If we already have some frames, integrate them into the new volume.
       for(int i = 0; i < static_cast<int>(track.GetSize()) - 1; ++i) {
         TrackFrame &frame = track.GetFrame(i);
         InfiniTamDriver &reconstruction = *(track.GetReconstruction());
         reconstruction.SetView(frame.instance_view.GetView());
-        // TODO(andrei): Account for gaps in the track!
-//        reconstruction.Track();
 
-        cout << "Integrating instance frame #" << i << "..." << endl;
-        cout << frame.camera_pose << endl;
-        reconstruction.SetPose(frame.camera_pose);
+        // TODO(andrei): This accounts for gaps in tracks for static objects, but not for dynamic
+        // ones.
+        Eigen::Matrix4d rel_dyn_pose;
+        if(frame.instance_view.HasRelativePose()) {
+          rel_dyn_pose = frame.instance_view.GetRelativePose();
+        }
+        else {
+          rel_dyn_pose.setIdentity();
+//          cerr << "No relative pose; aborting (hacky solution for testing)." << endl;
+        }
+        Eigen::Matrix4f rel_dyn_pose_f = rel_dyn_pose.cast<float>();
+
+        Eigen::Matrix4f rel_pose = inv_first_pose * rel_dyn_pose_f * frame.camera_pose;
+        reconstruction.SetPose(rel_pose);
 
         try {
           reconstruction.Integrate();
@@ -313,11 +333,26 @@ void InstanceReconstructor::ProcessReconstructions() {
     instance_driver.SetView(track.GetLastFrame().instance_view.GetView());
 
     // TODO(andrei): Figure out a good estimate for the coord frame for the object.
-    // TODO(andrei): This seems like the place to shove in the scene flow data.
+
+    const TrackFrame &c_frame = track.GetLastFrame();
 
     // TODO(andrei): We shouldn't do any tracking inside the instances IMHO.
     cerr << "Not accounting for gaps in the track for dynamic objects!" << endl;
-    instance_driver.SetPose(track.GetLastFrame().camera_pose);
+    Eigen::Matrix4f inv_first_pose = track.GetFrame(0).camera_pose.inverse();
+
+    // TODO(andrei): Reduce code duplication.
+    Eigen::Matrix4d rel_dyn_pose;
+    if(c_frame.instance_view.HasRelativePose()) {
+      rel_dyn_pose = c_frame.instance_view.GetRelativePose();
+      cout << "Relative pose (new frame integration): " << endl << rel_dyn_pose << endl;
+    }
+    else {
+      rel_dyn_pose.setIdentity();
+      cout << "No Relative pose available (new frame integration). Used Identity." << endl;
+    }
+    Eigen::Matrix4f rel_dyn_pose_f = rel_dyn_pose.cast<float>();
+
+    instance_driver.SetPose(inv_first_pose * rel_dyn_pose_f * c_frame.camera_pose);
 
     try {
       // TODO(andrei): See above and also fix here.
