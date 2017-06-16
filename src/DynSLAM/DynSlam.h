@@ -126,10 +126,15 @@ public:
          << instance_fpath << "]." << endl;
   }
 
-  // Variants would solve this nicely, but they are C++17-only...
+  // Variants would solve this nicely, but they are C++17-only... TODO(andrei): Use Option<>.
   // Will error out if no flow information is available.
   const SparseSceneFlow& GetLatestFlow() {
     return sparse_sf_provider_->GetFlow();
+  }
+
+  /// \brief Returns the current pose of the camera in the coordinate frame used by the tracker.
+  Eigen::Matrix4f GetPose() const {
+    return static_scene_->GetPose();
   }
 
 private:

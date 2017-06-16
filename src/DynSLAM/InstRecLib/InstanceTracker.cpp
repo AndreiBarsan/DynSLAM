@@ -10,11 +10,14 @@ namespace reconstruction {
 using namespace std;
 using namespace instreclib::segmentation;
 
-void InstanceTracker::ProcessInstanceViews(int frame_idx, const vector<InstanceView> &new_views) {
+void InstanceTracker::ProcessInstanceViews(int frame_idx,
+                                           const vector<InstanceView> &new_views,
+                                           const Eigen::Matrix4f current_camera_pose
+) {
   // 0. Convert the instance segmentation result (`new_views`) into track frame objects.
   list<TrackFrame> new_track_frames;
   for (const InstanceView &view : new_views) {
-    new_track_frames.emplace_back(frame_idx, view);
+    new_track_frames.emplace_back(frame_idx, view, current_camera_pose);
   }
 
   // 1. Try to find a matching track for every new frame.

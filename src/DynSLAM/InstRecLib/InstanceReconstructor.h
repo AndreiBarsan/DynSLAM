@@ -21,6 +21,7 @@ namespace reconstruction {
 
 using namespace dynslam::drivers;
 
+// TODO(andrei): Refactor this class once its functionality is defined better.
 /// \brief Pipeline component responsible for reconstructing the individual object instances.
 class InstanceReconstructor {
  public:
@@ -34,13 +35,16 @@ class InstanceReconstructor {
   ///
   /// This is the ``meat'' of the reconstruction engine.
   ///
+  /// \param dyn_slam The owner of this component.
   /// \param main_view The original InfiniTAM view of the scene. Gets mutated!
   /// \param segmentation_result The output of the view's semantic segmentation.
-  void ProcessFrame(ITMLib::Objects::ITMView *main_view,
-                    const segmentation::InstanceSegmentationResult &segmentation_result,
-                    // TODO(andrei): Organize these args better.
-                    const SparseSceneFlow &scene_flow,
-                    const SparseSFProvider &ssf_provider);
+  void ProcessFrame(
+      const dynslam::DynSlam* dyn_slam,
+      ITMLib::Objects::ITMView *main_view,
+      const segmentation::InstanceSegmentationResult &segmentation_result,
+      // TODO(andrei): Organize these args better.
+      const SparseSceneFlow &scene_flow,
+      const SparseSFProvider &ssf_provider);
 
   const InstanceTracker &GetInstanceTracker() const { return *instance_tracker_; }
 
