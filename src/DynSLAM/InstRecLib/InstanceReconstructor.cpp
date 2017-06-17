@@ -179,9 +179,6 @@ void InstanceReconstructor::ProcessFrame(
           // TODO(andrei): Make this a utility. The '~' transposes the matrix...
           auto *md_mat = new Eigen::Matrix4d((~delta_mx).val[0]);
           motion_delta = new Option<Eigen::Matrix4d>(md_mat);
-
-          cout << "Delta mx, post conversion to Eigen::Matrix:" << endl;
-          cout << *motion_delta << endl;
         }
       }
       else {
@@ -241,7 +238,7 @@ void InstanceReconstructor::ProcessReconstructions() {
   for (auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
 
-    if( track.GetLastFrame().frame_idx != frame_idx_) {
+    if( track.GetLastFrame().frame_idx != frame_idx_ || track.GetId() != 1) {
       // If we don't have any new information in this track, there's nothing to fuse.
       continue;
     }
@@ -305,6 +302,12 @@ void InstanceReconstructor::ProcessReconstructions() {
           rel_dyn_pose.setIdentity();
 //          cerr << "No relative pose; aborting (hacky solution for testing)." << endl;
         }
+        cerr << "This is not correct. You need to project all the frames back into the coordinate"
+            " frame of the first reconstructed frame of this instance!" << endl;
+        cerr << "Currently, your first frame looks OK, since there's nothign to misalign it with. "
+                "Then, the next one aligns well, because its relative pose is also its absolute "
+                "pose WRT the first frame. Only from the third frame on, does instance "
+                "reconstruction fuck up because of this issue.";
         Eigen::Matrix4f rel_dyn_pose_f = rel_dyn_pose.cast<float>();
 
         Eigen::Matrix4f rel_pose = inv_first_pose * rel_dyn_pose_f * frame.camera_pose;
@@ -342,6 +345,7 @@ void InstanceReconstructor::ProcessReconstructions() {
 
     // TODO(andrei): Reduce code duplication.
     Eigen::Matrix4d rel_dyn_pose;
+    cout << "Track " << track.GetId() << " at frame " << c_frame.frame_idx << ": ";
     if(c_frame.instance_view.HasRelativePose()) {
       rel_dyn_pose = c_frame.instance_view.GetRelativePose();
       cout << "Relative pose (new frame integration): " << endl << rel_dyn_pose << endl;
