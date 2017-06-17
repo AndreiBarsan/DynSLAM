@@ -76,5 +76,31 @@ string Track::GetAsciiArt() const {
   return out.str();
 }
 
+Eigen::Matrix4d Track::GetLastFrameRelPose() const {
+  // Skip the original very distant frames with no relative pose info.
+  Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+  bool found_good_pose = false;
+
+  for (size_t i = 5; i < frames_.size(); ++i) {
+    if(frames_[i].instance_view.HasRelativePose()) {
+      found_good_pose = true;
+//      cout << "Track #" << id_ << ": Good pose at frame " << i << " (" << frames_[i].frame_idx << ")." << endl;
+
+      Eigen::Matrix4d rel_pose = frames_[i].instance_view.GetRelativePose();
+      pose = rel_pose * pose;
+    }
+    else {
+      if (found_good_pose) {
+        cerr << "Found good pose followed by an estimation error at i=" << i <<". Giving up!" << endl;
+        return Eigen::Matrix4d::Identity();
+      }
+    }
+  }
+
+  cout << "Returning relative pose for frame [" << (frames_.size() - 1) << "]." << endl
+       << pose << endl;
+  return pose;
+}
+
 }  // namespace reconstruction
 }  // namespace instreclib

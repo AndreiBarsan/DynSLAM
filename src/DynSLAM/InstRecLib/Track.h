@@ -88,6 +88,9 @@ class Track {
     return GetSize() >= 1;
   }
 
+  /// \brief Returns the relative pose of the most recent frame w.r.t. the first one.
+  Eigen::Matrix4d GetLastFrameRelPose() const;
+
  private:
   /// \brief A unique identifier for this particular track.
   int id_;
