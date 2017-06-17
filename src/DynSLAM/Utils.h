@@ -39,6 +39,10 @@ class Option {
     delete value_;
   }
 
+  static Option<T> Empty() {
+    return Option<T>();
+  }
+
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
  private:

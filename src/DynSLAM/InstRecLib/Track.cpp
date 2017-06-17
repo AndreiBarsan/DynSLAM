@@ -5,7 +5,9 @@
 
 namespace instreclib {
 namespace reconstruction {
+
 using namespace std;
+using namespace dynslam::utils;
 using namespace instreclib::segmentation;
 using namespace instreclib::utils;
 
@@ -76,30 +78,31 @@ string Track::GetAsciiArt() const {
   return out.str();
 }
 
-Eigen::Matrix4d Track::GetLastFrameRelPose() const {
+Option<Eigen::Matrix4d> Track::GetLastFrameRelPose() const {
   // Skip the original very distant frames with no relative pose info.
-  Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+  Eigen::Matrix4d *pose = new Eigen::Matrix4d;
+  pose->setIdentity();
   bool found_good_pose = false;
 
-  for (size_t i = 5; i < frames_.size(); ++i) {
+  for (size_t i = 1; i < frames_.size(); ++i) {
     if(frames_[i].instance_view.HasRelativePose()) {
       found_good_pose = true;
 //      cout << "Track #" << id_ << ": Good pose at frame " << i << " (" << frames_[i].frame_idx << ")." << endl;
 
       Eigen::Matrix4d rel_pose = frames_[i].instance_view.GetRelativePose();
-      pose = rel_pose * pose;
+      *pose = rel_pose * (*pose);
     }
     else {
       if (found_good_pose) {
         cerr << "Found good pose followed by an estimation error at i=" << i <<". Giving up!" << endl;
-        return Eigen::Matrix4d::Identity();
+        return Option<Eigen::Matrix4d>::Empty();
       }
     }
   }
 
   cout << "Returning relative pose for frame [" << (frames_.size() - 1) << "]." << endl
-       << pose << endl;
-  return pose;
+       << *pose << endl;
+  return Option<Eigen::Matrix4d>(pose);
 }
 
 }  // namespace reconstruction

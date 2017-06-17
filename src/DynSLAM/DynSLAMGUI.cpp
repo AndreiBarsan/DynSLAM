@@ -283,8 +283,9 @@ public:
       cv::Vec2f delta = gl_pos - gl_pos_old;
       float magnitude = 15.0f * static_cast<float>(cv::norm(delta));
 
-      glColor4f(max(0.2f, min(1.0f, magnitude)), 0.4f, 0.4f, 1.0f);
+      glColor4f(0.3f, 0.3f, 0.9f, 1.0f);
       pangolin::glDrawCross(gl_pos[0], gl_pos[1], 0.025f);
+      glColor4f(max(0.2f, min(1.0f, magnitude)), 0.4f, 0.4f, 1.0f);
       pangolin::glDrawLine(gl_pos_old[0], gl_pos_old[1], gl_pos[0], gl_pos[1]);
     }
 
@@ -610,7 +611,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 //  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
-  int frame_offset = 85;
+  int frame_offset = 85; // for odo seq 02
+//  int frame_offset = 4015;         // Clear dynamic object in odometry sequence 08.
 //  int frame_offset = 0;
 
   *input_out = new Input(
@@ -657,6 +659,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   sf_params.match.half_resolution = 0;
   sf_params.match.multi_stage = 1;    // Default = 1 (= 0 => much slower)
   sf_params.match.refinement = 1;   // Default = 1 (per-pixel); 2 = sub-pixel, slower
+  sf_params.ransac_iters = 15000;    // Default = 200; added more to see if it helps instance reconstruction
+//  sf_params.ransac_iters = 2500;    // Default = 200; added more to see if it helps instance reconstruction
   sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;
   sf_params.calib.cv = itm_calibration.intrinsics_rgb.projectionParamsSimple.py;
   sf_params.calib.f  = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx; // TODO should we average fx and fy?

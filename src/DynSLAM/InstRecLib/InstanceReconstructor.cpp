@@ -51,6 +51,8 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
   float min_depth = numeric_limits<float>::max();
   const float kInvalidDepth = -1.0f;
 
+  map<pair<int, int>, RawFlow> coord_to_flow;
+
   // Instead of expensively doing a per-pixel for every SF vector (ouch!), we just use the bounding
   // boxes, since we'll be using those vectors for RANSAC anyway. In the future, we could maybe
   // use some sort of hashing/sparse matrix for the scene flow and support per-pixel stuff.
@@ -61,7 +63,8 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
     int fy = static_cast<int>(match.curr_left(1));
 
     if (bbox.ContainsPoint(fx, fy)) {
-      instance_flow_vectors.push_back(match);
+//      instance_flow_vectors.push_back(match);
+      coord_to_flow.emplace(pair<pair<int, int>, RawFlow>(pair<int, int>(fx, fy), match));
     }
   }
 
@@ -70,7 +73,7 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
       int frame_row = row + bbox.r.y0;
       int frame_col = col + bbox.r.x0;
       // TODO(andrei): Are the CPU-specific InfiniTAM functions doing this in a nicer way, or are
-      // they also just looping like crazy?
+      // they also just looping?
 
       if (frame_row < 0 || frame_row >= frame_height ||
           frame_col < 0 || frame_col >= frame_width) {
@@ -96,6 +99,11 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
         if (depth != kInvalidDepth && depth < min_depth) {
           min_depth = depth;
         }
+
+        const auto pp = pair<int, int>(frame_col, frame_row);
+        if (coord_to_flow.find(pp) != coord_to_flow.cend()) {
+          instance_flow_vectors.push_back(coord_to_flow.find(pp)->second);
+        }
       }
     }
   }
@@ -109,7 +117,7 @@ Option<Eigen::Matrix4d>* EstimateInstanceMotion(
     const vector<RawFlow> &instance_raw_flow,
     const SparseSFProvider &ssf_provider
 ) {
-  uint32_t kMinFlowVectorsForPoseEst = 16;   // TODO experiment and set proper value;
+  uint32_t kMinFlowVectorsForPoseEst = 25;   // TODO experiment and set proper value;
   // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
   // we're being a little paranoid).
   size_t flow_count = instance_raw_flow.size();
@@ -251,7 +259,7 @@ void InstanceReconstructor::ProcessReconstructions() {
   for (auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
 
-    if( track.GetLastFrame().frame_idx != frame_idx_ || track.GetId() != 1) {
+    if(track.GetLastFrame().frame_idx != frame_idx_ || (track.GetId() != 3 && track.GetId() != 1)) {
       // If we don't have any new information in this track, there's nothing to fuse.
       continue;
     }
@@ -277,16 +285,12 @@ void InstanceReconstructor::ProcessReconstructions() {
       // TODO(andrei): Set this limit based on some physical specification, such as 10m x 10m x
       // 10m.
 //      settings->sdfLocalBlockNum = 2500;
-      settings->sdfLocalBlockNum = 10000;
+      settings->sdfLocalBlockNum = 5000;
       // We don't want to create an (expensive) meshing engine for every instance.
       settings->createMeshingEngine = false;
       // Make the ground truth tracker start from the current frame, and not from the default
       // 0th frame.
-      settings->groundTruthPoseOffset += track.GetStartTime();
-
-      // Lowering this can slightly increase the quality of the object's reconstruction, but at the
-      // cost of additional memory.
-//      settings->sceneParams.voxelSize = 0.0025f;
+//      settings->groundTruthPoseOffset += track.GetStartTime();
 
       track.GetReconstruction() = make_shared<InfiniTamDriver>(
           settings,
@@ -296,7 +300,7 @@ void InstanceReconstructor::ProcessReconstructions() {
 
       Eigen::Matrix4f inv_first_pose = track.GetFrame(0).camera_pose.inverse();
       cout << "Begin initialization"
-          << " | Initial pose:" << endl << track.GetFrame(0).camera_pose
+          << " | Initial pose:" << endl << track.GetFrame(0).camera_pose << endl
           << " | Its inverse:" << endl << inv_first_pose << endl;
 
       // If we already have some frames, integrate them into the new volume.
@@ -312,7 +316,7 @@ void InstanceReconstructor::ProcessReconstructions() {
           rel_dyn_pose = frame.instance_view.GetRelativePose();
         }
         else {
-          rel_dyn_pose.setIdentity();
+//          rel_dyn_pose.setIdentity();
 //          cerr << "No relative pose; aborting (hacky solution for testing)." << endl;
         }
         cerr << "This is not correct. You need to project all the frames back into the coordinate"
@@ -348,41 +352,29 @@ void InstanceReconstructor::ProcessReconstructions() {
     InfiniTamDriver &instance_driver = *track.GetReconstruction();
     instance_driver.SetView(track.GetLastFrame().instance_view.GetView());
 
-    // TODO(andrei): Figure out a good estimate for the coord frame for the object.
-
     const TrackFrame &c_frame = track.GetLastFrame();
-
-    // TODO(andrei): We shouldn't do any tracking inside the instances IMHO.
-    cerr << "Not accounting for gaps in the track for dynamic objects!" << endl;
     Eigen::Matrix4f inv_first_pose = track.GetFrame(0).camera_pose.inverse();
 
     // TODO(andrei): Reduce code duplication.
-//    Eigen::Matrix4d rel_dyn_pose;
-//    cout << "Track " << track.GetId() << " at frame " << c_frame.frame_idx << ": ";
-    if(c_frame.instance_view.HasRelativePose()) {
-//      rel_dyn_pose = c_frame.instance_view.GetRelativePose();
-//      cout << "Relative pose (new frame integration): " << endl << rel_dyn_pose << endl;
-    }
-    else {
-//      rel_dyn_pose.setIdentity();
-//      cout << "No Relative pose available (new frame integration). Used Identity." << endl;
-    }
-    Eigen::Matrix4d rel_dyn_pose = track.GetLastFrameRelPose();
-    Eigen::Matrix4f rel_dyn_pose_f = rel_dyn_pose.cast<float>();
+    Option<Eigen::Matrix4d> rel_dyn_pose = track.GetLastFrameRelPose();
+    if (rel_dyn_pose.IsPresent()) {
+      // Only fuse the information if the relative pose could be established.
+      Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
 
-    instance_driver.SetPose(inv_first_pose * rel_dyn_pose_f.inverse() * c_frame.camera_pose);
+      instance_driver.SetPose(rel_dyn_pose_f.inverse() * c_frame.camera_pose);
 
-    try {
-      // TODO(andrei): See above and also fix here.
-      instance_driver.Integrate();
-    }
-    catch(std::runtime_error &error) {
-      cerr << "Caught runtime error while integrating new data into an instance volume: "
-           << error.what() << endl << "Will continue regular operation." << endl;
-    }
+      try {
+        // TODO(andrei): See above and also fix here.
+        instance_driver.Integrate();
+      }
+      catch (std::runtime_error &error) {
+        cerr << "Caught runtime error while integrating new data into an instance volume: "
+             << error.what() << endl << "Will continue regular operation." << endl;
+      }
 
-    instance_driver.PrepareNextStep();
-    cout << "Finished instance integration." << endl << endl;
+      instance_driver.PrepareNextStep();
+      cout << "Finished instance integration." << endl << endl;
+    }
   }
 }
 
