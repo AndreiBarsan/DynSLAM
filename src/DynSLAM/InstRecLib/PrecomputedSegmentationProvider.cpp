@@ -125,7 +125,10 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
     // TODO(andrei): Consider maintaining some overlap--we could use the 1.2 mask for sending info
     // to the reconstruction and e.g., 1.0 for sending it to the static map. However, the ambiguous
     // band could maybe be flagged with a lower update weight.
-    float mask_rescale_factor = 1.1f;
+//    float mask_rescale_factor = 1.1f;
+    /// XXX: using >1.0 breaks the instance pose estimation for dynamic objects, unless you go
+    // batshit insane with the RANSAC iterations for pose estimation (~15k).
+    float mask_rescale_factor = 1.0f;
     mask->Rescale(mask_rescale_factor);
     detections.emplace_back(class_probability, class_id, mask, this->dataset_used);
 
