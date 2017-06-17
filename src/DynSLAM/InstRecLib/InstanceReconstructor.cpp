@@ -49,6 +49,7 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
   // Keep track of the minimum depth in the frame, so we can use it as a heuristic when
   // reconstructing instances.
   float min_depth = numeric_limits<float>::max();
+  const float kInvalidDepth = -1.0f;
 
   // Instead of expensively doing a per-pixel for every SF vector (ouch!), we just use the bounding
   // boxes, since we'll be using those vectors for RANSAC anyway. In the future, we could maybe
@@ -92,14 +93,58 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
         destDepth[frame_idx] = depth;
         sourceDepth[frame_idx] = 0.0f;
 
-        if (depth < min_depth) {
+        if (depth != kInvalidDepth && depth < min_depth) {
           min_depth = depth;
         }
       }
     }
   }
 
+  cout << "Instance frame min depth: " << min_depth << endl;
+
   // TODO(andrei): Store min depth somewhere.
+}
+
+Option<Eigen::Matrix4d>* EstimateInstanceMotion(
+    const vector<RawFlow> &instance_raw_flow,
+    const SparseSFProvider &ssf_provider
+) {
+  uint32_t kMinFlowVectorsForPoseEst = 16;   // TODO experiment and set proper value;
+  // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
+  // we're being a little paranoid).
+  size_t flow_count = instance_raw_flow.size();
+
+  // TODO(andrei): Consider doing these computations in the tracker, or lazily, only when the
+  // system decides to start reconstructing something, maybe?
+
+  // TODO(andrei): Since we're not doing egomotion computation, the nr of inputs is much lower
+  // than in the full viso case => fewer RANSAC iterations than the default should be OK,
+  // especially if we then use a direct method for refinement.
+  if (instance_raw_flow.size() >= kMinFlowVectorsForPoseEst) {
+    vector<double> instance_motion_delta = ssf_provider.ExtractMotion(instance_raw_flow);
+    if (instance_motion_delta.size() != 6) {
+      // track information not available yet; idea: we could move this computation into the
+      // track object, and use data from many more frames (if available).
+          cerr << "Could not compute instance delta motion from " << flow_count << " matches." << endl;
+      return new Option<Eigen::Matrix4d>();
+    } else {
+          cout << "Successfully estimated the relative instance pose from " << flow_count
+               << " matches." << endl;
+      Matrix delta_mx = VisualOdometry::transformationVectorToMatrix(instance_motion_delta);
+
+      // TODO(andrei): Prof Geiger: compare this to the current egomotion (or to ID if egomotion
+      // removed). If close to egomotion (compare correctly! absolute translation l2 + rodrigues
+      // rotation repr.), then the object is static; we set the relative motion to id and BAM! done.
+
+      // TODO(andrei): Make this a utility. Note: The '~' transposes the matrix...
+      auto *md_mat = new Eigen::Matrix4d((~delta_mx).val[0]);
+      return new Option<Eigen::Matrix4d>(md_mat);
+    }
+  }
+  else {
+    cout << "Only " << flow_count << " scene flow points. Not estimating relative pose." << endl;
+    return new Option<Eigen::Matrix4d>();
+  }
 }
 
 void InstanceReconstructor::ProcessFrame(
@@ -148,48 +193,16 @@ void InstanceReconstructor::ProcessFrame(
       view->rgb->UpdateDeviceFromHost();
       view->depth->UpdateDeviceFromHost();
 
-      uint32_t kMinFlowVectorsForPoseEst = 10;   // TODO experiment and set proper value;
-      // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
-      // we're being a little paranoid).
-      size_t flow_count = instance_raw_flow.size();
-      Option<Eigen::Matrix4d> *motion_delta;
-
-      // TODO(andrei): Consider doing these computations in the tracker, or lazily, only when the
-      // system decides to start reconstructing something, maybe?
-
-      // TODO(andrei): Since we're not doing egomotion computation, the nr of inputs is much lower
-      // than in the full viso case => fewer RANSAC iterations than the default should be OK,
-      // especially if we then use a direct method for refinement.
-      if (instance_raw_flow.size() >= kMinFlowVectorsForPoseEst) {
-        vector<double> instance_motion_delta = ssf_provider.ExtractMotion(instance_raw_flow);
-        if (instance_motion_delta.size() != 6) {
-          // track information not available yet; idea: we could move this computation into the
-          // track object, and use data from many more frames (if available).
-//          cerr << "Could not compute instance delta motion from " << flow_count << " matches." << endl;
-          motion_delta = new Option<Eigen::Matrix4d>();
-        } else {
-//          cout << "Successfully estimated the relative instance pose from " << flow_count
-//               << " matches." << endl;
-          Matrix delta_mx = VisualOdometry::transformationVectorToMatrix(instance_motion_delta);
-
-          // TODO(andrei): Prof Geiger: compare this to the current egomotion (or to ID if egomotion
-          // removed). If close to egomotion (compare correctly! absolute translation l2 + rodrigues
-          // rotation repr.), then the object is static; we set the relative motion to id and BAM! done.
-
-          // TODO(andrei): Make this a utility. The '~' transposes the matrix...
-          auto *md_mat = new Eigen::Matrix4d((~delta_mx).val[0]);
-          motion_delta = new Option<Eigen::Matrix4d>(md_mat);
-        }
-      }
-      else {
-        cout << "Only " << flow_count << " scene flow points. Not estimating relative pose." << endl;
-        motion_delta = new Option<Eigen::Matrix4d>();
-      }
+      Option<Eigen::Matrix4d> *motion_delta = EstimateInstanceMotion(instance_raw_flow, ssf_provider);
 
       new_instance_views.emplace_back(instance_detection,
                                       view,
                                       instance_raw_flow,
                                       shared_ptr<Option<Eigen::Matrix4d>>(motion_delta));
+    }
+    else {
+      // Not a car; TODO(andrei): If it's a pedestrian or biker, consider removing it from the map
+      // either way!
     }
   }
 
@@ -202,7 +215,7 @@ void InstanceReconstructor::ProcessFrame(
   main_view->depth->UpdateDeviceFromHost();
 
   // ``Graphically'' display the object tracks for debugging.
-  /*
+//  /*
   for (const auto &pair: this->instance_tracker_->GetActiveTracks()) {
     cout << "Track: " << pair.second.GetAsciiArt() << endl;
   }
@@ -344,19 +357,20 @@ void InstanceReconstructor::ProcessReconstructions() {
     Eigen::Matrix4f inv_first_pose = track.GetFrame(0).camera_pose.inverse();
 
     // TODO(andrei): Reduce code duplication.
-    Eigen::Matrix4d rel_dyn_pose;
-    cout << "Track " << track.GetId() << " at frame " << c_frame.frame_idx << ": ";
+//    Eigen::Matrix4d rel_dyn_pose;
+//    cout << "Track " << track.GetId() << " at frame " << c_frame.frame_idx << ": ";
     if(c_frame.instance_view.HasRelativePose()) {
-      rel_dyn_pose = c_frame.instance_view.GetRelativePose();
-      cout << "Relative pose (new frame integration): " << endl << rel_dyn_pose << endl;
+//      rel_dyn_pose = c_frame.instance_view.GetRelativePose();
+//      cout << "Relative pose (new frame integration): " << endl << rel_dyn_pose << endl;
     }
     else {
-      rel_dyn_pose.setIdentity();
-      cout << "No Relative pose available (new frame integration). Used Identity." << endl;
+//      rel_dyn_pose.setIdentity();
+//      cout << "No Relative pose available (new frame integration). Used Identity." << endl;
     }
+    Eigen::Matrix4d rel_dyn_pose = track.GetLastFrameRelPose();
     Eigen::Matrix4f rel_dyn_pose_f = rel_dyn_pose.cast<float>();
 
-    instance_driver.SetPose(inv_first_pose * rel_dyn_pose_f * c_frame.camera_pose);
+    instance_driver.SetPose(inv_first_pose * rel_dyn_pose_f.inverse() * c_frame.camera_pose);
 
     try {
       // TODO(andrei): See above and also fix here.
