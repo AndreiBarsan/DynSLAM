@@ -7,6 +7,7 @@
 #include "InstanceSegmentationResult.h"
 #include "InstanceView.h"
 #include "../InfiniTamDriver.h"
+#include "../Utils.h"
 
 namespace instreclib {
 namespace reconstruction {
@@ -89,7 +90,7 @@ class Track {
   }
 
   /// \brief Returns the relative pose of the most recent frame w.r.t. the first one.
-  Eigen::Matrix4d GetLastFrameRelPose() const;
+  dynslam::utils::Option<Eigen::Matrix4d> GetLastFrameRelPose() const;
 
  private:
   /// \brief A unique identifier for this particular track.
