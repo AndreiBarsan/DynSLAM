@@ -84,6 +84,7 @@ Option<Eigen::Matrix4d> Track::GetLastFrameRelPose() const {
   pose->setIdentity();
   bool found_good_pose = false;
 
+  // Start from #1 since we care about relative pose to 1st frame
   for (size_t i = 1; i < frames_.size(); ++i) {
     if(frames_[i].instance_view.HasRelativePose()) {
       found_good_pose = true;

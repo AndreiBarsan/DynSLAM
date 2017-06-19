@@ -128,7 +128,7 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
 //    float mask_rescale_factor = 1.1f;
     /// XXX: using >1.0 breaks the instance pose estimation for dynamic objects, unless you go
     // batshit insane with the RANSAC iterations for pose estimation (~15k).
-    float mask_rescale_factor = 1.0f;
+    float mask_rescale_factor = 0.95f;
     mask->Rescale(mask_rescale_factor);
     detections.emplace_back(class_probability, class_id, mask, this->dataset_used);
 
