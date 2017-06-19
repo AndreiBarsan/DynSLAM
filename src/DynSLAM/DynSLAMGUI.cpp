@@ -20,8 +20,21 @@
 #include "DSHandler3D.h"
 
 
+const std::string kKittiOdometry = "kitti-odometry";
+const std::string kKitti         = "kitti";
+const std::string kCityscapes    = "cityscapes";
+
 // Commandline arguments using gflags
-DEFINE_string(dataset_root, "", "The root folder of the dataset to use.");
+DEFINE_string(dataset_type,
+              kKittiOdometry,
+              "The type of the input dataset at which 'dataset_root'is pointing. "
+              "Currently supported is only 'kitti-odometry'.");
+DEFINE_string(dataset_root, "", "The root folder of the dataset sequence to use.");
+
+// Useful offsets for dynamic object reconstruction:
+//  int frame_offset = 85; // for odo seq 02
+//  int frame_offset = 4015;         // Clear dynamic object in odometry sequence 08.
+DEFINE_int32 (frame_offset, 0, "The frame index from which to start reading the dataset sequence.");
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
 // issue.
@@ -611,9 +624,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 //  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
-  int frame_offset = 85; // for odo seq 02
-//  int frame_offset = 4015;         // Clear dynamic object in odometry sequence 08.
-//  int frame_offset = 0;
+  int frame_offset = FLAGS_frame_offset;
 
   *input_out = new Input(
       dataset_root,
@@ -654,16 +665,23 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder, frame_offset);
 
   VisualOdometryStereo::parameters sf_params;
+  // TODO(andrei): The main VO (which we're not using viso2 for, at the moment (June '17) and the
+  // "VO" we use to align object instance frames have VASTLY different requirements, so we should
+  // use separate parameter sets for them.
   sf_params.base = baseline_m;
   sf_params.match.nms_n = 3;    // Optimal from KITTI leaderboard: 3 (also the default)
   sf_params.match.half_resolution = 0;
   sf_params.match.multi_stage = 1;    // Default = 1 (= 0 => much slower)
   sf_params.match.refinement = 1;   // Default = 1 (per-pixel); 2 = sub-pixel, slower
-  sf_params.ransac_iters = 15000;    // Default = 200; added more to see if it helps instance reconstruction
-//  sf_params.ransac_iters = 2500;    // Default = 200; added more to see if it helps instance reconstruction
+//  sf_params.ransac_iters = 50000;    // Default = 200; added more to see if it helps instance reconstruction
+  sf_params.ransac_iters = 1000;    // Default = 200; added more to see if it helps instance reconstruction
+  sf_params.inlier_threshold = 4.5;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
+                                      // object instances
+  sf_params.bucket.max_features = 10;    // Default = 2
   sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;
   sf_params.calib.cv = itm_calibration.intrinsics_rgb.projectionParamsSimple.py;
   sf_params.calib.f  = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx; // TODO should we average fx and fy?
+
 
   auto sparse_sf_provider = new instreclib::VisoSparseSFProvider(sf_params);
 
@@ -683,6 +701,12 @@ int main(int argc, char **argv) {
          << endl;
 
     return -1;
+  }
+
+  if (FLAGS_dataset_type != kKittiOdometry) {
+    throw runtime_error(dynslam::utils::Format(
+        "Unsupported dataset type: %s", FLAGS_dataset_type.c_str()
+    ));
   }
 
   DynSlam *dyn_slam;
