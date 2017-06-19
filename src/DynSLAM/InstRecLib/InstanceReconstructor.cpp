@@ -117,7 +117,9 @@ Option<Eigen::Matrix4d>* EstimateInstanceMotion(
     const vector<RawFlow> &instance_raw_flow,
     const SparseSFProvider &ssf_provider
 ) {
-  uint32_t kMinFlowVectorsForPoseEst = 25;   // TODO experiment and set proper value;
+  // This is a good conservative value, but we can definitely do better.
+//  uint32_t kMinFlowVectorsForPoseEst = 25;   // TODO experiment and set proper value;
+  uint32_t kMinFlowVectorsForPoseEst = 12;
   // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
   // we're being a little paranoid).
   size_t flow_count = instance_raw_flow.size();
@@ -223,7 +225,7 @@ void InstanceReconstructor::ProcessFrame(
   main_view->depth->UpdateDeviceFromHost();
 
   // ``Graphically'' display the object tracks for debugging.
-//  /*
+  /*
   for (const auto &pair: this->instance_tracker_->GetActiveTracks()) {
     cout << "Track: " << pair.second.GetAsciiArt() << endl;
   }
@@ -259,7 +261,8 @@ void InstanceReconstructor::ProcessReconstructions() {
   for (auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
 
-    if(track.GetLastFrame().frame_idx != frame_idx_ || (track.GetId() != 3 && track.GetId() != 1)) {
+    if(track.GetLastFrame().frame_idx != frame_idx_) {
+       //        (track.GetId() != 3 && track.GetId() != 0 && track.GetId() != 1)) {
       // If we don't have any new information in this track, there's nothing to fuse.
       continue;
     }
@@ -357,11 +360,12 @@ void InstanceReconstructor::ProcessReconstructions() {
 
     // TODO(andrei): Reduce code duplication.
     Option<Eigen::Matrix4d> rel_dyn_pose = track.GetLastFrameRelPose();
+    // Only fuse the information if the relative pose could be established.
     if (rel_dyn_pose.IsPresent()) {
-      // Only fuse the information if the relative pose could be established.
-      Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
 
-      instance_driver.SetPose(rel_dyn_pose_f.inverse() * c_frame.camera_pose);
+      Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
+      instance_driver.SetPose(rel_dyn_pose_f.inverse());
+//                                  * c_frame.camera_pose.inverse());
 
       try {
         // TODO(andrei): See above and also fix here.
