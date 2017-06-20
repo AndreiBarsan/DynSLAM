@@ -154,11 +154,8 @@ public:
         const unsigned char *preview = dyn_slam_->GetObjectRaycastFreeViewPreview(
             visualized_object_idx_,
             pane_cam_->GetModelViewMatrix(),
-            PreviewType::kColor);
-        pane_texture_->Upload(
-            preview,
-            GL_RGBA,
-            GL_UNSIGNED_BYTE);
+            static_cast<PreviewType>(current_preview_type_));
+        pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
       }
       pangolin::GlFont &font = pangolin::GlFont::I();
       pane_texture_->RenderToViewport(true);
@@ -373,6 +370,21 @@ protected:
     pangolin::Var<function<void(void)>> quit_button("ui.[Q]uit", quit);
     pangolin::RegisterKeyPressCallback('q', quit);
 
+    auto previous_preview_type = [this]() {
+      if (--current_preview_type_ < 0) {
+        current_preview_type_ = (PreviewType::kEnd - 1);
+      }
+    };
+    auto next_preview_type = [this]() {
+      if (++current_preview_type_ >= PreviewType::kEnd) {
+        current_preview_type_ = 0;
+      }
+    };
+    pangolin::Var<function<void(void)>> ppt("ui.Previous Preview Type [j]", previous_preview_type);
+    pangolin::RegisterKeyPressCallback('j', previous_preview_type);
+    pangolin::Var<function<void(void)>> npt("ui.Next Preview Type [k]", next_preview_type);
+    pangolin::RegisterKeyPressCallback('k', next_preview_type);
+
     // This is used for the free view camera. The focal lengths are not used in rendering, BUT they
     // impact the sensitivity of the free view camera. The smaller they are, the faster the camera
     // responds to input (ideally, you should use the translation and zoom scales to control this,
@@ -581,6 +593,8 @@ private:
 
   // Indicates which object is currently being visualized in the GUI.
   int visualized_object_idx_ = 0;
+
+  int current_preview_type_ = kColor;
 
   /// \brief Prepares the contents of an OpenCV Mat object for rendering with Pangolin (OpenGL).
   /// Does not actually render the texture.
