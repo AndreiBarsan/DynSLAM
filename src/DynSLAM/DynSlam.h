@@ -20,8 +20,7 @@ using namespace dynslam::drivers;
 /// It processes input stereo frames and generates separate maps for all encountered object
 /// instances, as well one for the static background.
 class DynSlam {
-
-public:
+ public:
   // TODO(andrei): If possible, get rid of the initialize method.
   void Initialize(InfiniTamDriver *itm_static_scene_engine,
                   SegmentationProvider *segmentation_provider,
@@ -31,8 +30,9 @@ public:
   void ProcessFrame(Input *input);
 
   const unsigned char* GetRaycastPreview() {
-    // TODO(andrei): Get rid of reliance on itam enums via a driver abstraction.
-    return GetItamData(ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST);
+    // TODO(andrei): Make this also work with opencv images.
+//    static_scene_->GetImage(out_image_, PreviewType::kLatestRaycast);
+    return GetItamData(PreviewType::kLatestRaycast);
   }
 
   /// \brief Returns an RGB preview of the latest color frame.
@@ -55,21 +55,26 @@ public:
     return static_scene_->GetDepthPreview();
   }
 
-  const unsigned char* GetObjectRaycastPreview(int object_idx, const pangolin::OpenGlMatrix &model_view) {
+  const unsigned char* GetObjectRaycastPreview(
+      int object_idx,
+      const pangolin::OpenGlMatrix &model_view
+  ) {
     instance_reconstructor_->GetInstanceRaycastPreview(out_image_, object_idx, model_view);
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
   const unsigned char* GetObjectRaycastFreeViewPreview(
       int object_idx,
-      const pangolin::OpenGlMatrix &model_view
+      const pangolin::OpenGlMatrix &model_view,
+      PreviewType preview
    ) {
     // TODO(andrei): Finish implementing for actual objects. This now just works for static bg, but
     // we use 'GetObjectRaycastPreview' to get raycasts for instances, which is confusing name-wise.
 
     static_scene_->GetImage(
         out_image_,
-        ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
+//        ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
+        preview,
         model_view);
 
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
@@ -164,9 +169,8 @@ private:
   int input_width_;
   int input_height_;
 
-  // TODO(andrei): Isolate this in a specific itam driver.
-  const unsigned char* GetItamData(ITMMainEngine::GetImageType image_type) {
-    static_scene_->GetImage(out_image_, image_type);
+  const unsigned char* GetItamData(PreviewType preview_type) {
+    static_scene_->GetImage(out_image_, preview_type);
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 

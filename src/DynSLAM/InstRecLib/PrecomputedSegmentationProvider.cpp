@@ -3,17 +3,12 @@
 #include "PrecomputedSegmentationProvider.h"
 #include "InstanceSegmentationResult.h"
 
-// TODO(andrei): Get rid of this dependency.
-#include "../../InfiniTAM/InfiniTAM/Utils/FileUtils.h"
 #include "../Utils.h"
 #include "../Input.h"
 
-#include <cstdlib>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
-#include <opencv/highgui.h>
-#include <GL/gl.h>
 
 namespace instreclib {
 namespace segmentation {
@@ -21,6 +16,13 @@ namespace segmentation {
 using namespace std;
 using namespace instreclib::utils;
 using namespace dynslam::utils;
+
+/// \brief Rescale factor used for RGB and depth masking of object instances.
+float kMaskRescaleFactor = 1.25f;
+
+/// \brief Rescale factor used for scene flow masking of instances.
+/// Smaller => fewer sparse scene flow vectors from, e.g., the background behind the object.
+float kConservativeMaskRescaleFactor = 0.95f;
 
 /// \brief Reads a numpy text dump of an object's 2D binary segmentation mask.
 ///
@@ -126,15 +128,8 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
     // TODO(andrei): Consider maintaining some overlap--we could use the 1.2 mask for sending info
     // to the reconstruction and e.g., 1.0 for sending it to the static map. However, the ambiguous
     // band could maybe be flagged with a lower update weight.
-    float kMaskRescaleFactor = 1.25f;
     mask->Rescale(kMaskRescaleFactor);
-
-    float kConservativeMaskRescaleFactor = 0.95f;
     conservative_mask->Rescale(kConservativeMaskRescaleFactor);
-
-//    cv::imshow("regular", *mask->GetMaskData() * 255.0f);
-//    cv::imshow("conservative", *conservative_mask->GetMaskData() * 255.0f);
-//    cv::waitKey(0);
 
     detections.emplace_back(class_probability, class_id, mask, conservative_mask, this->dataset_used);
     instance_idx++;
@@ -153,8 +148,7 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
     last_seg_preview_ = new cv::Mat3b(rgb.rows, rgb.cols);
   }
 
-  // TODO(andrei): Do we need the unchanged part?
-  *last_seg_preview_ = cv::imread(img_fpath, CV_LOAD_IMAGE_UNCHANGED);
+  *last_seg_preview_ = cv::imread(img_fpath);
 
   if (! last_seg_preview_->data) {
     throw std::runtime_error(Format(

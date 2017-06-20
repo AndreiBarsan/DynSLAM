@@ -43,6 +43,8 @@ void DynSlam::ProcessFrame(Input *input) {
     return;
   }
 
+  bool first_frame = (current_frame_no_ == 0);
+
   utils::Tic("Read input and compute depth");
   if(!input->ReadNextFrame()) {
     throw runtime_error("Could not read input from the data source.");
@@ -69,7 +71,7 @@ void DynSlam::ProcessFrame(Input *input) {
       make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
       make_pair(left_gray, right_gray)
   );
-  if (!sparse_sf_provider_->FlowAvailable() && current_frame_no_ > 0) {
+  if (!sparse_sf_provider_->FlowAvailable() && !first_frame) {
     cerr << "Warning: could not compute scene flow." << endl;
   }
   utils::Toc();
@@ -92,18 +94,16 @@ void DynSlam::ProcessFrame(Input *input) {
         sparse_sf_provider_->GetFlow(),
         *sparse_sf_provider_);
   }
-  else {
-    cerr << "TODO we still want to scrub all suspicious stuff from the first frame, just in case."
-         << endl;
-  }
   utils::Toc();
 
   // Perform the tracking after the segmentation, so that we may in the future leverage semantic
   // information to enhance tracking.
-  utils::Tic("Static map fusion");
-  static_scene_->Integrate();
-  static_scene_->PrepareNextStep();
-  utils::Toc();
+  if (! first_frame) {
+    utils::Tic("Static map fusion");
+    static_scene_->Integrate();
+    static_scene_->PrepareNextStep();
+    utils::Toc();
+  }
 
   utils::Tic("Final error check");
   // Final sanity check after the frame is processed: individual components should check for errors.

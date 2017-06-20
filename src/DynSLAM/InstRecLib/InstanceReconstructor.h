@@ -69,7 +69,7 @@ class InstanceReconstructor {
       if (track.HasReconstruction()) {
         track.GetReconstruction()->GetImage(
             out,
-            ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
+            dynslam::PreviewType::kColor,
             model_view);
 
         return;
