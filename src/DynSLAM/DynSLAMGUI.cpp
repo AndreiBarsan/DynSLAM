@@ -327,41 +327,52 @@ protected:
     pangolin::CreatePanel("ui")
       .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(kUiWidth));
 
-    pangolin::Var<function<void(void)>> a_button("ui.Save Static Map", [this]() {
+    auto next_frame = [this]() {
+      *(this->autoplay_) = false;
+      this->ProcessFrame();
+    };
+    pangolin::Var<function<void(void)>> next_frame_button("ui.[N]ext Frame", next_frame);
+    pangolin::RegisterKeyPressCallback('n', next_frame);
+
+    auto save_map = [this]() {
       cout << "Saving static map..." << endl;
       dyn_slam_->SaveStaticMap(dyn_slam_input_->GetName(),
                                dyn_slam_input_->GetDepthProvider()->GetName());
       cout << "Done saving map." << endl;
-    });
+    };
+
+    pangolin::Var<function<void(void)>> save_map_button("ui.[S]ave Static Map", save_map);
+    pangolin::RegisterKeyPressCallback('s', save_map);
+
     reconstructions = new pangolin::Var<string>("ui.Rec", "");
 
     wiggle_mode_ = new pangolin::Var<bool>("ui.Wiggle mode", false, true);
-    autoplay_ = new pangolin::Var<bool>("ui.Autoplay", false, true);
-    live_raycast_ = new pangolin::Var<bool>("ui.Raycast Mode", false, true);
-    display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", true, true);
-
-    pangolin::Var<function<void(void)>> previous_object("ui.Previous Object", [this]() {
-      SelectPreviousVisualizedObject();
-    });
-    pangolin::Var<function<void(void)>> next_object("ui.Next Object", [this]() {
-      SelectNextVisualizedObject();
-    });
-    pangolin::RegisterKeyPressCallback('n', [this]() {
-      *(this->autoplay_) = false;
-      this->ProcessFrame();
-    });
+    autoplay_ = new pangolin::Var<bool>("ui.[A]utoplay", false, true);
     pangolin::RegisterKeyPressCallback('a', [this]() {
       *(this->autoplay_) = ! *(this->autoplay_);
     });
-    pangolin::RegisterKeyPressCallback('q', [this]() { pangolin::QuitAll(); });
-    pangolin::Var<function<void(void)>> save_object("ui.Save Active Object", [this]() {
+    live_raycast_ = new pangolin::Var<bool>("ui.Raycast Mode", false, true);
+    display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", true, true);
+
+    pangolin::Var<function<void(void)>> previous_object("ui.Previous Object [z]", [this]() {
+      SelectPreviousVisualizedObject();
+    });
+    pangolin::RegisterKeyPressCallback('z', [this]() { SelectPreviousVisualizedObject(); });
+    pangolin::Var<function<void(void)>> next_object("ui.Ne[x]t Object", [this]() {
+      SelectNextVisualizedObject();
+    });
+    pangolin::RegisterKeyPressCallback('x', [this]() { SelectNextVisualizedObject(); });
+    auto save_object = [this]() {
       dyn_slam_->SaveDynamicObject(dyn_slam_input_->GetName(),
-                                   dyn_slam_input_->GetDepthProvider()->GetName(),
-                                   visualized_object_idx_);
-    });
-    pangolin::Var<function<void(void)>> quit_button("ui.Quit", []() {
-      pangolin::QuitAll();
-    });
+                                     dyn_slam_input_->GetDepthProvider()->GetName(),
+                                     visualized_object_idx_);
+    };
+    pangolin::Var<function<void(void)>> save_active_object("ui.Save Active [O]bject", save_object);
+    pangolin::RegisterKeyPressCallback('o', save_object);
+
+    auto quit = [this]() { pangolin::QuitAll(); };
+    pangolin::Var<function<void(void)>> quit_button("ui.[Q]uit", quit);
+    pangolin::RegisterKeyPressCallback('q', quit);
 
     // This is used for the free view camera. The focal lengths are not used in rendering, BUT they
     // impact the sensitivity of the free view camera. The smaller they are, the faster the camera

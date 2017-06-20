@@ -8,6 +8,7 @@
 #include "InstanceView.h"
 #include "../InfiniTamDriver.h"
 #include "../Utils.h"
+#include "../Defines.h"
 
 namespace instreclib {
 namespace reconstruction {
@@ -16,14 +17,14 @@ namespace reconstruction {
 struct TrackFrame {
   int frame_idx;
   InstanceView instance_view;
+
   /// \brief The camera pose at the time when this frame was observed.
   Eigen::Matrix4f camera_pose;
 
   TrackFrame(int frame_idx, const InstanceView& instance_view, const Eigen::Matrix4f camera_pose)
       : frame_idx(frame_idx), instance_view(instance_view), camera_pose(camera_pose) {}
 
-  // Necessary for having Eigen types as fields.
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+  SUPPORT_EIGEN_FIELDS;
 };
 
 /// \brief A detected object's track through multiple frames.
@@ -89,8 +90,8 @@ class Track {
     return GetSize() >= 1;
   }
 
-  /// \brief Returns the relative pose of the most recent frame w.r.t. the first one.
-  dynslam::utils::Option<Eigen::Matrix4d> GetLastFrameRelPose() const;
+  /// \brief Returns the relative pose of the specified frame w.r.t. the first one.
+  dynslam::utils::Option<Eigen::Matrix4d> GetFramePose(size_t frame_idx) const;
 
  private:
   /// \brief A unique identifier for this particular track.
