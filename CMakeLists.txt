@@ -83,20 +83,20 @@ add_subdirectory(src/DynSLAM/InstRecLib)
 
 # TODO(andrei): Make dynslam a library, and link the GUI with it.
 set(DYNSLAM_SOURCES
-        src/DynSLAM/Utils.cpp
+    src/DynSLAM/DepthProvider.h
+    src/DynSLAM/DSHandler3D.cpp
     src/DynSLAM/DynSlam.cpp
     src/DynSLAM/InfiniTamDriver.cpp
     src/DynSLAM/Input.cpp
-    src/DynSLAM/DepthProvider.h
     src/DynSLAM/PrecomputedDepthProvider.cpp
-    src/DynSLAM/DSHandler3D.cpp
+    src/DynSLAM/Utils.cpp
 
     # A tiny library for working with portable float map (PFM) files.
     src/pfmLib/ImageIOpfm.cpp)
 
 set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
-    src/DynSLAM/DynSLAMGUI.cpp src/DynSLAM/Defines.h)
+    src/DynSLAM/DynSLAMGUI.cpp)
 
 add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} )
 
@@ -111,5 +111,5 @@ target_link_libraries(DynSLAMGUI InstRecLib)
 target_link_libraries(DynSLAMGUI ${Pangolin_LIBRARIES})
 target_link_libraries(DynSLAMGUI ${OpenCV_LIBS})
 target_link_libraries(DynSLAMGUI gflags)
-#target_link_libraries(DynSLAMGUI ${Viso2_LIBS})
-target_link_libraries(DynSLAMGUI viso2)
+target_link_libraries(DynSLAMGUI ${Viso2_LIBS})
+
