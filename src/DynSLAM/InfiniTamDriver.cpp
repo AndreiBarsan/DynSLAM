@@ -7,6 +7,27 @@
 namespace dynslam {
 namespace drivers {
 
+using namespace dynslam::utils;
+
+/// \brief Converts between the DynSlam preview type enums and the InfiniTAM ones.
+ITMMainEngine::GetImageType GetItmVisualization(PreviewType preview_type) {
+  switch(preview_type) {
+    case PreviewType::kGray:
+      return ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_SHADED;
+    case PreviewType::kColor:
+      return ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME;
+    case PreviewType::kNormal:
+      return ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL;
+    case PreviewType::kWeight:
+      return ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_DEPTH_WEIGHT;
+    case PreviewType::kLatestRaycast:
+      return ITMMainEngine::GetImageType::InfiniTAM_IMAGE_SCENERAYCAST;
+
+    default:
+      throw runtime_error(Format("Unknown preview type: %d", preview_type));
+  }
+}
+
 ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix) {
   Matrix4f M;
   for(int i = 0; i < 16; ++i) {
@@ -107,7 +128,7 @@ Matrix4f EigenToItm(const Eigen::Matrix4f &eigen_matrix) {
 }
 
 void InfiniTamDriver::GetImage(ITMUChar4Image *out,
-                               ITMMainEngine::GetImageType get_image_type,
+                               dynslam::PreviewType get_image_type,
                                const pangolin::OpenGlMatrix &model_view) {
   if (nullptr != this->view) {
     ITMPose itm_freeview_pose = PoseFromPangolin(model_view);
@@ -115,7 +136,7 @@ void InfiniTamDriver::GetImage(ITMUChar4Image *out,
     ITMIntrinsics intrinsics = this->view->calib->intrinsics_d;
     ITMMainEngine::GetImage(
         out,
-        get_image_type,
+        GetItmVisualization(get_image_type),
         &itm_freeview_pose,
         &intrinsics);
   }

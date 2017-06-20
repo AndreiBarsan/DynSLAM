@@ -92,7 +92,7 @@ set(DYNSLAM_SOURCES
     src/DynSLAM/Utils.cpp
 
     # A tiny library for working with portable float map (PFM) files.
-    src/pfmLib/ImageIOpfm.cpp)
+    src/pfmLib/ImageIOpfm.cpp src/DynSLAM/PreviewType.h)
 
 set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}

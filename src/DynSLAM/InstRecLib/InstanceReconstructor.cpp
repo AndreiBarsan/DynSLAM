@@ -59,34 +59,12 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
   // use some sort of hashing/sparse matrix for the scene flow and support per-pixel stuff.
   for(const auto &match : scene_flow.matches) {
     // TODO(andrei): Store old motion of car in track and use to initialize RANSAC under a constant
-    // motion assumption.
+    // motion assumption (poor man's Kalman filtering).
     int fx = static_cast<int>(match.curr_left(0));
     int fy = static_cast<int>(match.curr_left(1));
 
     if (bbox.ContainsPoint(fx, fy)) {
-//      instance_flow_vectors.push_back(match);
       coord_to_flow.emplace(pair<pair<int, int>, RawFlow>(pair<int, int>(fx, fy), match));
-    }
-  }
-
-  int cons_box_width = conservative_bbox.GetWidth();
-  int cons_box_height = conservative_bbox.GetHeight();
-  for(int row = 0; row < cons_box_height; ++row) {
-    for(int col = 0; col < cons_box_width; ++col) {
-      int frame_row = row + conservative_bbox.r.y0;
-      int frame_col = col + conservative_bbox.r.x0;
-
-      if (frame_row >= frame_height || frame_col >= frame_width) {
-        continue;
-      }
-
-      u_char c_mask_val = detection.conservative_mask->GetMaskData()->at<u_char>(row, col);
-      if (c_mask_val == 1) {
-        auto coord_pair = pair<int, int>(frame_col, frame_row);
-        if (coord_to_flow.find(coord_pair) != coord_to_flow.cend()) {
-          instance_flow_vectors.push_back(coord_to_flow.find(coord_pair)->second);
-        }
-      }
     }
   }
 
@@ -120,6 +98,22 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
 
         if (depth != kInvalidDepth && depth < min_depth) {
           min_depth = depth;
+        }
+      }
+
+      // Mask the scene flow using the (smaller) conservative mask
+      int cons_frame_row = row + conservative_bbox.r.y0;
+      int const_frame_col = col + conservative_bbox.r.x0;
+
+      if (cons_frame_row >= frame_height || const_frame_col >= frame_width) {
+        continue;
+      }
+
+      u_char c_mask_val = detection.conservative_mask->GetMaskData()->at<u_char>(row, col);
+      if (c_mask_val == 1) {
+        auto coord_pair = pair<int, int>(const_frame_col, cons_frame_row);
+        if (coord_to_flow.find(coord_pair) != coord_to_flow.cend()) {
+          instance_flow_vectors.push_back(coord_to_flow.find(coord_pair)->second);
         }
       }
     }
