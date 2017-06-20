@@ -291,9 +291,6 @@ void InstanceReconstructor::ProcessReconstructions() {
       settings->sdfLocalBlockNum = 5000;
       // We don't want to create an (expensive) meshing engine for every instance.
       settings->createMeshingEngine = false;
-      // Make the ground truth tracker start from the current frame, and not from the default
-      // 0th frame.
-//      settings->groundTruthPoseOffset += track.GetStartTime();
 
       track.GetReconstruction() = make_shared<InfiniTamDriver>(
           settings,
@@ -301,83 +298,56 @@ void InstanceReconstructor::ProcessReconstructions() {
           driver->GetView()->rgb->noDims,
           driver->GetView()->rgb->noDims);
 
-      Eigen::Matrix4f inv_first_pose = track.GetFrame(0).camera_pose.inverse();
-      cout << "Begin initialization"
-          << " | Initial pose:" << endl << track.GetFrame(0).camera_pose << endl
-          << " | Its inverse:" << endl << inv_first_pose << endl;
-
       // If we already have some frames, integrate them into the new volume.
-      for(int i = 0; i < static_cast<int>(track.GetSize()) - 1; ++i) {
-        TrackFrame &frame = track.GetFrame(i);
-        InfiniTamDriver &reconstruction = *(track.GetReconstruction());
-        reconstruction.SetView(frame.instance_view.GetView());
-
-        // TODO(andrei): This accounts for gaps in tracks for static objects, but not for dynamic
-        // ones.
-        Eigen::Matrix4d rel_dyn_pose;
-        if(frame.instance_view.HasRelativePose()) {
-          rel_dyn_pose = frame.instance_view.GetRelativePose();
-        }
-        else {
-//          rel_dyn_pose.setIdentity();
-//          cerr << "No relative pose; aborting (hacky solution for testing)." << endl;
-        }
-        cerr << "This is not correct. You need to project all the frames back into the coordinate"
-            " frame of the first reconstructed frame of this instance!" << endl;
-        cerr << "Currently, your first frame looks OK, since there's nothign to misalign it with. "
-                "Then, the next one aligns well, because its relative pose is also its absolute "
-                "pose WRT the first frame. Only from the third frame on, does instance "
-                "reconstruction fuck up because of this issue.";
-        Eigen::Matrix4f rel_dyn_pose_f = rel_dyn_pose.cast<float>();
-
-        Eigen::Matrix4f rel_pose = inv_first_pose * rel_dyn_pose_f * frame.camera_pose;
-        reconstruction.SetPose(rel_pose);
-
-        try {
-          reconstruction.Integrate();
-        }
-        catch(std::runtime_error &error) {
-          // TODO(andrei): Custom dynslam allocation exception we can catch here to avoid fatal
-          // errors.
-          // This happens when we run out of memory on the GPU for this volume. We should prolly
-          // have a custom exception/error code for this.
-          cerr << "Caught runtime error while integrating new data into an instance volume: "
-               << error.what() << endl << "Will continue regular operation." << endl;
-        }
-
-        reconstruction.PrepareNextStep();
+      for(size_t i = 0; i < track.GetSize(); ++i) {
+        // TODO(andrei): This accounts for gaps in tracks for static objects, but not for dynamic ones.
+        FuseFrame(track, i);
       }
     } else {
       cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
+      // Fuse the latest frame into the volume.
+      FuseFrame(track, track.GetSize() - 1);
     }
 
-    // We now fuse the current frame into the reconstruction volume.
-    InfiniTamDriver &instance_driver = *track.GetReconstruction();
-    instance_driver.SetView(track.GetLastFrame().instance_view.GetView());
+  }
+}
 
-    const TrackFrame &curr_frame = track.GetLastFrame();
+void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
+  InfiniTamDriver &instance_driver = *track.GetReconstruction();
 
-    // TODO(andrei): Reduce code duplication.
-    Option<Eigen::Matrix4d> rel_dyn_pose = track.GetLastFrameRelPose();
-    // Only fuse the information if the relative pose could be established.
-    if (rel_dyn_pose.IsPresent()) {
+  TrackFrame &frame = track.GetFrame(frame_idx);
+  instance_driver.SetView(frame.instance_view.GetView());
+  Option<Eigen::Matrix4d> rel_dyn_pose = track.GetFramePose(frame_idx);
 
-      Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
+  // Only fuse the information if the relative pose could be established.
+  // TODO(andrei): This would require modifying libviso a little, but in the even that we miss a
+  // frame, i.e., we are unable to estimate the relative pose from frame k to frame k+1, we could
+  // still try to estimate it from k to k+2.
+  if (rel_dyn_pose.IsPresent()) {
+    Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
 
-      // TODO(andrei): Replace this with fine tracking initialized by this coarse relative pose.
-      instance_driver.SetPose(rel_dyn_pose_f.inverse());
-      try {
-        // TODO(andrei): See above and also fix here.
-        instance_driver.Integrate();
-      }
-      catch (std::runtime_error &error) {
-        cerr << "Caught runtime error while integrating new data into an instance volume: "
-             << error.what() << endl << "Will continue regular operation." << endl;
-      }
+    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
 
-      instance_driver.PrepareNextStep();
-      cout << "Finished instance integration." << endl << endl;
+    // TODO(andrei): Replace this with fine tracking initialized by this coarse relative pose.
+    instance_driver.SetPose(rel_dyn_pose_f.inverse());
+
+    try {
+      instance_driver.Integrate();
     }
+    catch (runtime_error &error) {
+      // TODO(andrei): Custom dynslam allocation exception we can catch here to avoid fatal errors.
+      // This happens when we run out of memory on the GPU for this volume. We should prolly have a
+      // custom exception/error code for this.
+      cerr << "Caught runtime error while integrating new data into an instance volume: "
+           << error.what() << endl << "Will continue regular operation." << endl;
+    }
+
+    instance_driver.PrepareNextStep();
+//      cout << "Finished instance integration." << endl << endl;
+  }
+  else {
+    cout << "Could not fuse instance data for track #" << track.GetId() << " due to missing pose "
+         << "information." << endl;
   }
 }
 
