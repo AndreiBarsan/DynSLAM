@@ -686,7 +686,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   sf_params.match.refinement = 1;   // Default = 1 (per-pixel); 2 = sub-pixel, slower
 //  sf_params.ransac_iters = 50000;    // Default = 200; added more to see if it helps instance reconstruction
   sf_params.ransac_iters = 1000;    // Default = 200; added more to see if it helps instance reconstruction
-  sf_params.inlier_threshold = 4.5;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
+  sf_params.inlier_threshold = 6.0;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
                                       // object instances
   sf_params.bucket.max_features = 10;    // Default = 2
   sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;

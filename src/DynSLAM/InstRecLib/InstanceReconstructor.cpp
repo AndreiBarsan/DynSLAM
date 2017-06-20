@@ -39,6 +39,7 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
   int frame_width = sourceDims[0];
   int frame_height = sourceDims[1];
   const BoundingBox &bbox = detection.GetBoundingBox();
+  const BoundingBox &conservative_bbox = detection.conservative_mask->GetBoundingBox();
 
   int box_width = bbox.GetWidth();
   int box_height = bbox.GetHeight();
@@ -65,6 +66,27 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
     if (bbox.ContainsPoint(fx, fy)) {
 //      instance_flow_vectors.push_back(match);
       coord_to_flow.emplace(pair<pair<int, int>, RawFlow>(pair<int, int>(fx, fy), match));
+    }
+  }
+
+  int cons_box_width = conservative_bbox.GetWidth();
+  int cons_box_height = conservative_bbox.GetHeight();
+  for(int row = 0; row < cons_box_height; ++row) {
+    for(int col = 0; col < cons_box_width; ++col) {
+      int frame_row = row + conservative_bbox.r.y0;
+      int frame_col = col + conservative_bbox.r.x0;
+
+      if (frame_row >= frame_height || frame_col >= frame_width) {
+        continue;
+      }
+
+      u_char c_mask_val = detection.conservative_mask->GetMaskData()->at<u_char>(row, col);
+      if (c_mask_val == 1) {
+        auto coord_pair = pair<int, int>(frame_col, frame_row);
+        if (coord_to_flow.find(coord_pair) != coord_to_flow.cend()) {
+          instance_flow_vectors.push_back(coord_to_flow.find(coord_pair)->second);
+        }
+      }
     }
   }
 
@@ -98,11 +120,6 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
 
         if (depth != kInvalidDepth && depth < min_depth) {
           min_depth = depth;
-        }
-
-        const auto pp = pair<int, int>(frame_col, frame_row);
-        if (coord_to_flow.find(pp) != coord_to_flow.cend()) {
-          instance_flow_vectors.push_back(coord_to_flow.find(pp)->second);
         }
       }
     }
@@ -288,7 +305,7 @@ void InstanceReconstructor::ProcessReconstructions() {
       // TODO(andrei): Set this limit based on some physical specification, such as 10m x 10m x
       // 10m.
 //      settings->sdfLocalBlockNum = 2500;
-      settings->sdfLocalBlockNum = 5000;
+      settings->sdfLocalBlockNum = 10000;
       // We don't want to create an (expensive) meshing engine for every instance.
       settings->createMeshingEngine = false;
 
