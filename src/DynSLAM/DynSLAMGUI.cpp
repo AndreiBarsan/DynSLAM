@@ -110,7 +110,8 @@ public:
       glColor3f(1.0f, 1.0f, 1.0f);
 
       if(live_raycast_->Get()) {
-        const unsigned char *slam_frame_data = dyn_slam_->GetRaycastPreview();
+        const unsigned char *slam_frame_data =
+            dyn_slam_->GetRaycastPreview();
         pane_texture_->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
       }
       else {
@@ -135,14 +136,13 @@ public:
           );
         }
 
-        struct timeval tp;
-        gettimeofday(&tp, NULL);
-        double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-        double time_scale = 500.0;
-        double r = 1;
-        double a = sin(time_ms / time_scale) * r;
-        double cc = cos(time_ms / time_scale) * r;
-
+//        struct timeval tp;
+//        gettimeofday(&tp, NULL);
+//        double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+//        double time_scale = 500.0;
+//        double r = 1;
+//        double a = sin(time_ms / time_scale) * r;
+//        double cc = cos(time_ms / time_scale) * r;
 //        cout << (sin(time_ms/time_scale) * 10) << endl;
 //        instance_cam_->SetModelViewMatrix(
 //        pangolin::ModelViewLookAt(
@@ -151,11 +151,10 @@ public:
 //            pangolin::AxisY)
 //        );
 
-
         const unsigned char *preview = dyn_slam_->GetObjectRaycastFreeViewPreview(
             visualized_object_idx_,
-            pane_cam_->GetModelViewMatrix());
-
+            pane_cam_->GetModelViewMatrix(),
+            PreviewType::kColor);
         pane_texture_->Upload(
             preview,
             GL_RGBA,
@@ -692,7 +691,6 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;
   sf_params.calib.cv = itm_calibration.intrinsics_rgb.projectionParamsSimple.py;
   sf_params.calib.f  = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx; // TODO should we average fx and fy?
-
 
   auto sparse_sf_provider = new instreclib::VisoSparseSFProvider(sf_params);
 

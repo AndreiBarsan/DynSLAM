@@ -11,7 +11,7 @@
 
 #include "../InfiniTAM/InfiniTAM/ITMLib/Engine/ITMMainEngine.h"
 #include "Input.h"
-#include "../libviso2/src/matrix.h"
+#include "PreviewType.h"
 
 namespace dynslam {
 namespace drivers {
@@ -152,7 +152,7 @@ public:
   // Not const because 'ITMMainEngine's implementation is not const either.
   void GetImage(
       ITMUChar4Image *out,
-      GetImageType get_image_type,
+      dynslam::PreviewType get_image_type,
       const pangolin::OpenGlMatrix &model_view = pangolin::IdentityMatrix()
   );
 

@@ -80,14 +80,14 @@ class Track {
     return reconstruction;
   }
 
-  /// \brief Uses a series of ``goodness heuristics'' to establish whether the information
-  /// contained in this track's frames is good enough for a 3D reconstruction.
+  /// \brief Uses a series of goodness heuristics to establish whether the information contained in
+  /// this track's frames is good enough for a 3D reconstruction.
   // TODO(andrei): Consider delegating this task to a separate (highly configurable) class.
   bool EligibleForReconstruction() const {
     // TODO(andrei): Moonshot---use a classifier to do this based on, e.g., track length, some
     // pose info, frame sizes, etc. Main challenge: how to get training data?
     // For now, use this simple heuristic: at least k frames in track.
-    return GetSize() >= 5;
+    return GetSize() >= 7;
   }
 
   /// \brief Returns the relative pose of the specified frame w.r.t. the first one.
