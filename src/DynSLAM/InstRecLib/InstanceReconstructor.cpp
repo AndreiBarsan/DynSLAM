@@ -355,8 +355,7 @@ void InstanceReconstructor::ProcessReconstructions() {
     InfiniTamDriver &instance_driver = *track.GetReconstruction();
     instance_driver.SetView(track.GetLastFrame().instance_view.GetView());
 
-    const TrackFrame &c_frame = track.GetLastFrame();
-    Eigen::Matrix4f inv_first_pose = track.GetFrame(0).camera_pose.inverse();
+    const TrackFrame &curr_frame = track.GetLastFrame();
 
     // TODO(andrei): Reduce code duplication.
     Option<Eigen::Matrix4d> rel_dyn_pose = track.GetLastFrameRelPose();
@@ -364,9 +363,9 @@ void InstanceReconstructor::ProcessReconstructions() {
     if (rel_dyn_pose.IsPresent()) {
 
       Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
-      instance_driver.SetPose(rel_dyn_pose_f.inverse());
-//                                  * c_frame.camera_pose.inverse());
 
+      // TODO(andrei): Replace this with fine tracking initialized by this coarse relative pose.
+      instance_driver.SetPose(rel_dyn_pose_f.inverse());
       try {
         // TODO(andrei): See above and also fix here.
         instance_driver.Integrate();
