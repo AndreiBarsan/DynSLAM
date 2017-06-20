@@ -96,7 +96,7 @@ set(DYNSLAM_SOURCES
 
 set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
-    src/DynSLAM/DynSLAMGUI.cpp)
+    src/DynSLAM/DynSLAMGUI.cpp src/DynSLAM/Defines.h)
 
 add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} )
 

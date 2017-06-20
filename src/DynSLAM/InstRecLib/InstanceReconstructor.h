@@ -101,6 +101,9 @@ class InstanceReconstructor {
   InfiniTamDriver *driver;
 
   void ProcessReconstructions();
+
+  /// \brief Fuses the specified frame into the track's 3D reconstruction.
+  void FuseFrame(Track &track, size_t frame_idx) const;
 };
 
 }  // namespace reconstruction

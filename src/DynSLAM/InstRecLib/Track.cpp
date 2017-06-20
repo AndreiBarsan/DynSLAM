@@ -78,14 +78,16 @@ string Track::GetAsciiArt() const {
   return out.str();
 }
 
-Option<Eigen::Matrix4d> Track::GetLastFrameRelPose() const {
+dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
+  assert(frame_idx < GetFrames().size() && "Cannot get the relative pose of a non-existent frame.");
+
   // Skip the original very distant frames with no relative pose info.
+  bool found_good_pose = false;
   Eigen::Matrix4d *pose = new Eigen::Matrix4d;
   pose->setIdentity();
-  bool found_good_pose = false;
 
-  // Start from #1 since we care about relative pose to 1st frame
-  for (size_t i = 1; i < frames_.size(); ++i) {
+  // Start from 1 since we care about relative pose to 1st frame.
+  for (size_t i = 1; i <= frame_idx; ++i) {
     if(frames_[i].instance_view.HasRelativePose()) {
       found_good_pose = true;
 //      cout << "Track #" << id_ << ": Good pose at frame " << i << " (" << frames_[i].frame_idx << ")." << endl;
@@ -101,8 +103,8 @@ Option<Eigen::Matrix4d> Track::GetLastFrameRelPose() const {
     }
   }
 
-  cout << "Returning relative pose for frame [" << (frames_.size() - 1) << "]." << endl
-       << *pose << endl;
+//  cout << "Returning relative pose for frame [" << (frames_.size() - 1) << "]." << endl
+//       << *pose << endl;
   return Option<Eigen::Matrix4d>(pose);
 }
 
