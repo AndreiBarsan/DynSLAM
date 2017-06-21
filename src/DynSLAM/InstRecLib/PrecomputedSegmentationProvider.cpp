@@ -22,7 +22,7 @@ float kMaskRescaleFactor = 1.25f;
 
 /// \brief Rescale factor used for scene flow masking of instances.
 /// Smaller => fewer sparse scene flow vectors from, e.g., the background behind the object.
-float kConservativeMaskRescaleFactor = 0.95f;
+float kConservativeMaskRescaleFactor = 0.97f;
 
 /// \brief Reads a numpy text dump of an object's 2D binary segmentation mask.
 ///
