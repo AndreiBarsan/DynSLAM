@@ -16,7 +16,7 @@ namespace segmentation {
 
 class InstanceSegmentationResult;
 
-// TODO(andrei): Consider storing an entire class-conditional distribution in each detection object.
+// TODO(andrei): Consider storing an entire class prob. distribution in each detection object.
 
 /// \brief Describes a single object instance detected semantically in an input frame.
 /// This is a component of InstanceSegmentationResult.

@@ -15,6 +15,51 @@ using namespace instreclib::utils;
 
 using namespace ITMLib::Objects;
 
+/// \brief Masks the scene flow using the (smaller) conservative mask.
+void ExtractSceneFlow(
+    const SparseSceneFlow &scene_flow,
+    vector<RawFlow> &out_instance_flow_vectors,
+    const InstanceDetection &detection,
+    int frame_width,
+    int frame_height
+) {
+  const BoundingBox &flow_bbox = detection.conservative_mask->GetBoundingBox();
+  map<pair<int, int>, RawFlow> coord_to_flow;
+
+  // Instead of expensively doing a per-pixel for every SF vector (ouch!), we just use the bounding
+  // boxes, since we'll be using those vectors for RANSAC anyway. In the future, we could maybe
+  // use some sort of hashing/sparse matrix for the scene flow and support per-pixel stuff.
+  for(const auto &match : scene_flow.matches) {
+    // TODO(andrei): Store old motion of car in track and use to initialize RANSAC under a constant
+    // motion assumption (poor man's Kalman filtering).
+    int fx = static_cast<int>(match.curr_left(0));
+    int fy = static_cast<int>(match.curr_left(1));
+
+    if (flow_bbox.ContainsPoint(fx, fy)) {
+      coord_to_flow.emplace(pair<pair<int, int>, RawFlow>(pair<int, int>(fx, fy), match));
+    }
+  }
+
+  for (int cons_row = 0; cons_row < flow_bbox.GetHeight(); ++cons_row) {
+    for (int cons_col = 0; cons_col < flow_bbox.GetWidth(); ++cons_col) {
+      int cons_frame_row = cons_row + flow_bbox.r.y0;
+      int const_frame_col = cons_col + flow_bbox.r.x0;
+
+      if (cons_frame_row >= frame_height || const_frame_col >= frame_width) {
+        continue;
+      }
+
+      u_char c_mask_val = detection.conservative_mask->GetMaskData()->at<u_char>(cons_row, cons_col);
+      if (c_mask_val == 1) {
+        auto coord_pair = pair<int, int>(const_frame_col, cons_frame_row);
+        if (coord_to_flow.find(coord_pair) != coord_to_flow.cend()) {
+          out_instance_flow_vectors.push_back(coord_to_flow.find(coord_pair)->second);
+        }
+      }
+    }
+  }
+}
+
 // TODO(andrei): Implement this in CUDA. It should be easy.
 template <typename DEPTH_T>
 void ProcessSilhouette_CPU(Vector4u *sourceRGB,
@@ -39,7 +84,6 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
   int frame_width = sourceDims[0];
   int frame_height = sourceDims[1];
   const BoundingBox &bbox = detection.GetBoundingBox();
-  const BoundingBox &conservative_bbox = detection.conservative_mask->GetBoundingBox();
 
   int box_width = bbox.GetWidth();
   int box_height = bbox.GetHeight();
@@ -51,22 +95,6 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
   // reconstructing instances.
   float min_depth = numeric_limits<float>::max();
   const float kInvalidDepth = -1.0f;
-
-  map<pair<int, int>, RawFlow> coord_to_flow;
-
-  // Instead of expensively doing a per-pixel for every SF vector (ouch!), we just use the bounding
-  // boxes, since we'll be using those vectors for RANSAC anyway. In the future, we could maybe
-  // use some sort of hashing/sparse matrix for the scene flow and support per-pixel stuff.
-  for(const auto &match : scene_flow.matches) {
-    // TODO(andrei): Store old motion of car in track and use to initialize RANSAC under a constant
-    // motion assumption (poor man's Kalman filtering).
-    int fx = static_cast<int>(match.curr_left(0));
-    int fy = static_cast<int>(match.curr_left(1));
-
-    if (bbox.ContainsPoint(fx, fy)) {
-      coord_to_flow.emplace(pair<pair<int, int>, RawFlow>(pair<int, int>(fx, fy), match));
-    }
-  }
 
   for (int row = 0; row < box_height; ++row) {
     for (int col = 0; col < box_width; ++col) {
@@ -100,29 +128,20 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
           min_depth = depth;
         }
       }
-
-      // Mask the scene flow using the (smaller) conservative mask
-      int cons_frame_row = row + conservative_bbox.r.y0;
-      int const_frame_col = col + conservative_bbox.r.x0;
-
-      if (cons_frame_row >= frame_height || const_frame_col >= frame_width) {
-        continue;
-      }
-
-      u_char c_mask_val = detection.conservative_mask->GetMaskData()->at<u_char>(row, col);
-      if (c_mask_val == 1) {
-        auto coord_pair = pair<int, int>(const_frame_col, cons_frame_row);
-        if (coord_to_flow.find(coord_pair) != coord_to_flow.cend()) {
-          instance_flow_vectors.push_back(coord_to_flow.find(coord_pair)->second);
-        }
-      }
     }
   }
 
-  cout << "Instance frame min depth: " << min_depth << endl;
+  ExtractSceneFlow(
+      scene_flow,
+      instance_flow_vectors,
+      detection,
+      frame_width,
+      frame_height);
 
   // TODO(andrei): Store min depth somewhere.
+  cout << "Instance frame min depth: " << min_depth << endl;
 }
+
 
 Option<Eigen::Matrix4d>* EstimateInstanceMotion(
     const vector<RawFlow> &instance_raw_flow,
