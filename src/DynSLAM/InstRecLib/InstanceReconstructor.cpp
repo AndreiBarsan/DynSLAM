@@ -21,7 +21,8 @@ void ExtractSceneFlow(
     vector<RawFlow> &out_instance_flow_vectors,
     const InstanceDetection &detection,
     int frame_width,
-    int frame_height
+    int frame_height,
+    bool check_sf_start = true
 ) {
   const BoundingBox &flow_bbox = detection.conservative_mask->GetBoundingBox();
   map<pair<int, int>, RawFlow> coord_to_flow;
@@ -34,9 +35,14 @@ void ExtractSceneFlow(
     // motion assumption (poor man's Kalman filtering).
     int fx = static_cast<int>(match.curr_left(0));
     int fy = static_cast<int>(match.curr_left(1));
+    int fx_prev = static_cast<int>(match.prev_left(0));
+    int fy_prev = static_cast<int>(match.prev_left(1));
 
     if (flow_bbox.ContainsPoint(fx, fy)) {
-      coord_to_flow.emplace(pair<pair<int, int>, RawFlow>(pair<int, int>(fx, fy), match));
+      // Use the larger mask so we only filter out truly ridiculous SF values
+      if (!check_sf_start || detection.mask->GetBoundingBox().ContainsPoint(fx_prev, fy_prev)) {
+        coord_to_flow.emplace(pair<pair<int, int>, RawFlow>(pair<int, int>(fx, fy), match));
+      }
     }
   }
 

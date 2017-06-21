@@ -62,14 +62,15 @@ class InstanceReconstructor {
   void GetInstanceRaycastPreview(
       ITMUChar4Image *out,
       int object_idx,
-      const pangolin::OpenGlMatrix &model_view = pangolin::IdentityMatrix()
+      const pangolin::OpenGlMatrix &model_view = pangolin::IdentityMatrix(),
+      dynslam::PreviewType preview_type = dynslam::PreviewType::kNormal
   ) {
     if (instance_tracker_->HasTrack(object_idx)) {
       Track& track = instance_tracker_->GetTrack(object_idx);
       if (track.HasReconstruction()) {
         track.GetReconstruction()->GetImage(
             out,
-            dynslam::PreviewType::kColor,
+            preview_type,
             model_view);
 
         return;
