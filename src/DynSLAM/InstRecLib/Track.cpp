@@ -85,6 +85,7 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) co
   bool found_good_pose = false;
   Eigen::Matrix4d *pose = new Eigen::Matrix4d;
   pose->setIdentity();
+  Eigen::Matrix4d last_good_relative_pose = Eigen::Matrix4d::Identity();
 
   // Start from 1 since we care about relative pose to 1st frame.
   for (size_t i = 1; i <= frame_idx; ++i) {
@@ -94,17 +95,21 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) co
 
       Eigen::Matrix4d rel_pose = frames_[i].instance_view.GetRelativePose();
       *pose = rel_pose * (*pose);
+      last_good_relative_pose = rel_pose;
     }
     else {
       if (found_good_pose) {
-        cerr << "Found good pose followed by an estimation error at i=" << i <<". Giving up!" << endl;
-        return Option<Eigen::Matrix4d>::Empty();
+        cerr << "Found good pose followed by an estimation error at i=" << i <<". "
+            "Assuming constant velocity (poor man's Kalman filter)." << endl;
+        *pose = last_good_relative_pose * (*pose);
       }
     }
   }
 
-//  cout << "Returning relative pose for frame [" << (frames_.size() - 1) << "]." << endl
-//       << *pose << endl;
+  if (!found_good_pose) {
+    return Option<Eigen::Matrix4d>::Empty();
+  }
+
   return Option<Eigen::Matrix4d>(pose);
 }
 
