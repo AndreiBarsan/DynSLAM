@@ -106,7 +106,7 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) co
     }
   }
 
-  if (!found_good_pose) {
+  if (!found_good_pose && frame_idx > 0) {
     return Option<Eigen::Matrix4d>::Empty();
   }
 
