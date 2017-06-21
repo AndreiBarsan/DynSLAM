@@ -59,9 +59,10 @@ class DynSlam {
   /// \brief Returns a preview of the reconstructed object indicated by `object_idx`.
   const unsigned char* GetObjectRaycastPreview(
       int object_idx,
-      const pangolin::OpenGlMatrix &model_view
+      const pangolin::OpenGlMatrix &model_view,
+      PreviewType preview
   ) {
-    instance_reconstructor_->GetInstanceRaycastPreview(out_image_, object_idx, model_view);
+    instance_reconstructor_->GetInstanceRaycastPreview(out_image_, object_idx, model_view, preview);
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 

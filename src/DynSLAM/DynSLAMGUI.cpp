@@ -213,7 +213,8 @@ public:
       pane_texture_->Upload(
           dyn_slam_->GetObjectRaycastPreview(
               visualized_object_idx_,
-              instance_cam_->GetModelViewMatrix()
+              instance_cam_->GetModelViewMatrix(),
+              static_cast<PreviewType>(current_preview_type_)
           ),
           GL_RGBA,
           GL_UNSIGNED_BYTE);
@@ -703,8 +704,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   sf_params.match.multi_stage = 1;    // Default = 1 (= 0 => much slower)
   sf_params.match.refinement = 1;   // Default = 1 (per-pixel); 2 = sub-pixel, slower
 //  sf_params.ransac_iters = 50000;    // Default = 200; added more to see if it helps instance reconstruction
-  sf_params.ransac_iters = 1000;    // Default = 200; added more to see if it helps instance reconstruction
-  sf_params.inlier_threshold = 4.5;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
+  sf_params.ransac_iters = 2500;    // Default = 200; added more to see if it helps instance reconstruction
+  sf_params.inlier_threshold = 5.0;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
                                       // object instances
   sf_params.bucket.max_features = 10;    // Default = 2
   sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;
