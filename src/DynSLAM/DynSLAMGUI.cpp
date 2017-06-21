@@ -110,8 +110,7 @@ public:
       glColor3f(1.0f, 1.0f, 1.0f);
 
       if(live_raycast_->Get()) {
-        const unsigned char *slam_frame_data =
-            dyn_slam_->GetRaycastPreview();
+        const unsigned char *slam_frame_data = dyn_slam_->GetRaycastPreview();
         pane_texture_->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
       }
       else {
@@ -151,7 +150,7 @@ public:
 //            pangolin::AxisY)
 //        );
 
-        const unsigned char *preview = dyn_slam_->GetObjectRaycastFreeViewPreview(
+        const unsigned char *preview = dyn_slam_->GetStaticMapRaycastPreview(
             visualized_object_idx_,
             pane_cam_->GetModelViewMatrix(),
             static_cast<PreviewType>(current_preview_type_));
@@ -240,13 +239,17 @@ public:
   /// \brief Converts the pixel coordinates into [-1, +1]-style OpenGL coordinates.
   /// \note The GL coordinates range from (-1.0, -1.0) in the bottom-left, to (+1.0, +1.0) in the
   ///       top-right.
-  cv::Vec2f PixelsToGl(Eigen::Vector2f px, const pangolin::View &view) {
+  cv::Vec2f PixelsToGl(Eigen::Vector2f px, Eigen::Vector2f px_range, const pangolin::View &view) {
     float view_w = view.GetBounds().w;
     float view_h = view.GetBounds().h;
-    float gl_x = (px(0) - view_w) / view_w;
+
+    float px_x = px(0) * (view_w / px_range(0));
+    float px_y = px(1) * (view_h / px_range(1));
+
+    float gl_x = ((px_x - view_w) / view_w + 0.5f) * 2.0f;
     // We need the opposite sign here since pixel coordinates are assumed to have the origin in the
     // top-left, while the GL origin is in the bottom-left.
-    float gl_y = (view_h - px(1)) / view_h;
+    float gl_y = ((view_h - px_y) / view_h - 0.5f) * 2.0f;
 
     return cv::Vec2f(gl_x, gl_y);
   }
@@ -267,6 +270,7 @@ public:
       InstanceDetection latest_detection = track.GetLastFrame().instance_view.GetInstanceDetection();
       const auto &bbox = latest_detection.mask->GetBoundingBox();
       cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(bbox.r.x0, bbox.r.y0 - font.Height()),
+                                    Eigen::Vector2f(width_, height_),
                                     segment_view_);
 
       stringstream info_label;
@@ -281,13 +285,14 @@ public:
   /// \brief Renders a simple preview of the scene flow information onto the currently active pane.
   void PreviewSparseSF(const vector<RawFlow> &flow, const pangolin::View &view) {
     pangolin::GlFont &font = pangolin::GlFont::I();
+    Eigen::Vector2f frame_size(width_, height_);
     font.Text("libviso2 scene flow preview").Draw(-0.98f, 0.89f);
 
     // We don't need z-checks since we're rendering UI stuff.
     glDisable(GL_DEPTH_TEST);
     for(const RawFlow &match : flow) {
-      cv::Vec2f gl_pos = PixelsToGl(match.curr_left, view);
-      cv::Vec2f gl_pos_old = PixelsToGl(match.prev_left, view);
+      cv::Vec2f gl_pos = PixelsToGl(match.curr_left, frame_size, view);
+      cv::Vec2f gl_pos_old = PixelsToGl(match.prev_left, frame_size, view);
 
       cv::Vec2f delta = gl_pos - gl_pos_old;
       float magnitude = 15.0f * static_cast<float>(cv::norm(delta));
@@ -699,7 +704,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   sf_params.match.refinement = 1;   // Default = 1 (per-pixel); 2 = sub-pixel, slower
 //  sf_params.ransac_iters = 50000;    // Default = 200; added more to see if it helps instance reconstruction
   sf_params.ransac_iters = 1000;    // Default = 200; added more to see if it helps instance reconstruction
-  sf_params.inlier_threshold = 6.0;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
+  sf_params.inlier_threshold = 4.5;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
                                       // object instances
   sf_params.bucket.max_features = 10;    // Default = 2
   sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;

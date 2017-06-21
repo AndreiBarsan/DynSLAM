@@ -16,6 +16,8 @@ using namespace instreclib::reconstruction;
 using namespace instreclib::segmentation;
 using namespace dynslam::drivers;
 
+// TODO(andrei): Get rid of ITM-specific image objects for visualization.
+
 /// \brief The central class of the DynSLAM system.
 /// It processes input stereo frames and generates separate maps for all encountered object
 /// instances, as well one for the static background.
@@ -30,9 +32,8 @@ class DynSlam {
   void ProcessFrame(Input *input);
 
   const unsigned char* GetRaycastPreview() {
-    // TODO(andrei): Make this also work with opencv images.
-//    static_scene_->GetImage(out_image_, PreviewType::kLatestRaycast);
-    return GetItamData(PreviewType::kLatestRaycast);
+    static_scene_->GetImage(out_image_, PreviewType::kLatestRaycast);
+    return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
   /// \brief Returns an RGB preview of the latest color frame.
@@ -55,6 +56,7 @@ class DynSlam {
     return static_scene_->GetDepthPreview();
   }
 
+  /// \brief Returns a preview of the reconstructed object indicated by `object_idx`.
   const unsigned char* GetObjectRaycastPreview(
       int object_idx,
       const pangolin::OpenGlMatrix &model_view
@@ -63,20 +65,13 @@ class DynSlam {
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
-  const unsigned char* GetObjectRaycastFreeViewPreview(
+  /// \brief Returns a preview of the reconstructed static map.
+  const unsigned char* GetStaticMapRaycastPreview(
       int object_idx,
       const pangolin::OpenGlMatrix &model_view,
       PreviewType preview
-   ) {
-    // TODO(andrei): Finish implementing for actual objects. This now just works for static bg, but
-    // we use 'GetObjectRaycastPreview' to get raycasts for instances, which is confusing name-wise.
-
-    static_scene_->GetImage(
-        out_image_,
-//        ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME,
-        preview,
-        model_view);
-
+  ) {
+    static_scene_->GetImage(out_image_, preview, model_view);
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
@@ -161,18 +156,12 @@ private:
   SparseSFProvider *sparse_sf_provider_;
 
   ITMUChar4Image *out_image_;
-  ITMFloatImage *out_image_float_;
   cv::Mat3b *input_rgb_image_;
   cv::Mat1s *input_raw_depth_image_;
 
   int current_frame_no_;
   int input_width_;
   int input_height_;
-
-  const unsigned char* GetItamData(PreviewType preview_type) {
-    static_scene_->GetImage(out_image_, preview_type);
-    return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
-  }
 
   /// \brief Returns a path to the folder where the dataset's meshes should be dump, creating it
   ///        using a naive system call if it does not exist.
