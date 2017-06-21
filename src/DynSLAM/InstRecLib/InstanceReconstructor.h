@@ -93,9 +93,6 @@ class InstanceReconstructor {
   /// detections through time, and dump old-enough reconstructions to the disk.
   int frame_idx_;
 
-  // TODO(andrei): Is this still necessary?
-//  std::map<int, InfiniTamDriver *> id_to_reconstruction_;
-
   // A bit hacky, but used as a "template" when allocating new reconstructors for objects. This is a
   // pointer to the driver used for reconstructing the static scene.
   // TODO(andrei): Looks like a good place to use factories.

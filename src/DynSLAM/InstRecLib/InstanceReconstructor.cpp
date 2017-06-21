@@ -1,4 +1,7 @@
 
+#include <algorithm>
+#include <vector>
+
 #include "InstanceReconstructor.h"
 #include "InstanceView.h"
 #include "../DynSlam.h"
@@ -148,6 +151,45 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
   cout << "Instance frame min depth: " << min_depth << endl;
 }
 
+// TODO(andrei): Rename variable according to style guide.
+template<typename TDepth>
+void RemoveSilhouette_CPU(ORUtils::Vector4<unsigned char> *sourceRGB,
+                          TDepth *sourceDepth,
+                          ORUtils::Vector2<int> sourceDims,
+                          const segmentation::InstanceDetection &detection) {
+
+  int frame_width = sourceDims[0];
+  int frame_height = sourceDims[1];
+  const BoundingBox &bbox = detection.GetBoundingBox();
+
+  int box_width = bbox.GetWidth();
+  int box_height = bbox.GetHeight();
+
+  for (int row = 0; row < box_height; ++row) {
+    for (int col = 0; col < box_width; ++col) {
+      int frame_row = row + bbox.r.y0;
+      int frame_col = col + bbox.r.x0;
+      // TODO(andrei): Are the CPU-specific InfiniTAM functions doing this in a nicer way, or are
+      // they also just looping?
+
+      if (frame_row < 0 || frame_row >= frame_height ||
+          frame_col < 0 || frame_col >= frame_width) {
+        continue;
+      }
+
+      int frame_idx = frame_row * frame_width + frame_col;
+      u_char mask_val = detection.mask->GetMaskData()->at<u_char>(row, col);
+      if (mask_val == 1) {
+        sourceRGB[frame_idx].r = 0;
+        sourceRGB[frame_idx].g = 0;
+        sourceRGB[frame_idx].b = 0;
+        sourceRGB[frame_idx].a = 0;
+      }
+    }
+  }
+
+}
+
 
 Option<Eigen::Matrix4d>* EstimateInstanceMotion(
     const vector<RawFlow> &instance_raw_flow,
@@ -208,11 +250,37 @@ void InstanceReconstructor::ProcessFrame(
       main_view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
   float *depth_data_h = main_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
+  cerr << "TODO: but why not at least attempt to perform motion analysis on these dudes, in case "
+      "there's something like a stationary bike, or train, even if we never plan on attempting to "
+      "reconstruct them... For persons, it might often fail, but in that case we may just default "
+      "to deleting them out of the frame anyway..." << endl;
+  // Note: for a real self-driving cars, you definitely want a completely generic obstacle detector.
+  vector<string> classes_to_reconstruct_voc2012 = { "car" };
+  vector<string> possibly_dynamic_classes_voc2012 = {
+      "airplane",   // you never know...
+      "bicycle",
+      "bird",
+      "boat",       // again, you never know...
+      "bus",
+      "car",
+      "cat",
+      "cow",
+      "dog",
+      "horse",
+      "motorbike",
+      "person",
+      "sheep",
+      "train"
+  };
+
   vector<InstanceView> new_instance_views;
   for (const InstanceDetection &instance_detection : segmentation_result.instance_detections) {
     // At this stage of the project, we only care about cars. In the future, this scheme could be
     // extended to also support other classes, as well as any unknown, but moving, objects.
-    if (instance_detection.class_id == kPascalVoc2012.label_to_id.at("car")) {
+    if (find(classes_to_reconstruct_voc2012.begin(),
+             classes_to_reconstruct_voc2012.end(),
+             instance_detection.GetClassName()) != classes_to_reconstruct_voc2012.end()
+    ) {
       Vector2i frame_size = main_view->rgb->noDims;
       // bool use_gpu = main_view->rgb->isAllocated_CUDA; // May need to modify 'MemoryBlock' to
       // check this, since the field is private.
@@ -246,10 +314,15 @@ void InstanceReconstructor::ProcessFrame(
                                       instance_raw_flow,
                                       shared_ptr<Option<Eigen::Matrix4d>>(motion_delta));
     }
-    else {
-      // Not a car; TODO(andrei): If it's a pedestrian or biker, consider removing it from the map
-      // either way!
+    else if(find(possibly_dynamic_classes_voc2012.cbegin(),
+                 possibly_dynamic_classes_voc2012.cend(),
+                 instance_detection.GetClassName()) != possibly_dynamic_classes_voc2012.cend()
+    ) {
+      // In this case, we simply remove the object from view, but we don't attempt to track or
+      // reconstruct it.
+      RemoveSilhouette_CPU(rgb_data_h, depth_data_h, main_view->rgb->noDims, instance_detection);
     }
+    // else, it's not an object in which we are interested
   }
 
   // Associate this frame's detection(s) with those from previous frames.
