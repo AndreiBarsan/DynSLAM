@@ -150,11 +150,13 @@ public:
 //            pangolin::AxisY)
 //        );
 
-        const unsigned char *preview = dyn_slam_->GetStaticMapRaycastPreview(
-            visualized_object_idx_,
-            pane_cam_->GetModelViewMatrix(),
-            static_cast<PreviewType>(current_preview_type_));
-        pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
+        if (dyn_slam_->GetCurrentFrameNo() > 1) {
+          const unsigned char *preview = dyn_slam_->GetStaticMapRaycastPreview(
+              visualized_object_idx_,
+              pane_cam_->GetModelViewMatrix(),
+              static_cast<PreviewType>(current_preview_type_));
+          pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
+        }
       }
       pangolin::GlFont &font = pangolin::GlFont::I();
       pane_texture_->RenderToViewport(true);
@@ -170,7 +172,7 @@ public:
       }
       pane_texture_->RenderToViewport(true);
 
-      if (dyn_slam_->GetCurrentFrameNo() > 1) {
+      if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
         PreviewSparseSF(dyn_slam_->GetLatestFlow().matches, rgb_view_);
       }
 
@@ -199,7 +201,7 @@ public:
       pane_texture_->RenderToViewport(true);
 
       auto &tracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
-      if (dyn_slam_->GetCurrentFrameNo() > 0) {
+      if (dyn_slam_->GetCurrentFrameNo() > 0 && preview_sf_->Get()) {
         // TODO-LOW(andrei): This is bonkers. Add some helpers!
         if (tracker.HasTrack(visualized_object_idx_)) {
           const auto &track = tracker.GetTrack(visualized_object_idx_);
@@ -355,6 +357,7 @@ protected:
     });
     live_raycast_ = new pangolin::Var<bool>("ui.Raycast Mode", false, true);
     display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", true, true);
+    preview_sf_ = new pangolin::Var<bool>("ui.Show Scene Flow", true, true);
 
     pangolin::Var<function<void(void)>> previous_object("ui.Previous Object [z]", [this]() {
       SelectPreviousVisualizedObject();
@@ -592,6 +595,8 @@ private:
   /// \brief Whether to display the RGB and depth previews directly from the input, or from the
   /// static scene, i.e., with the dynamic objects removed.
   pangolin::Var<bool> *display_raw_previews_;
+  /// \brief Whether to preview the sparse scene flow on the input and current instance RGP panes.
+  pangolin::Var<bool> *preview_sf_;
 
   // TODO(andrei): On-the-fly depth provider toggling.
   // TODO(andrei): Reset button.

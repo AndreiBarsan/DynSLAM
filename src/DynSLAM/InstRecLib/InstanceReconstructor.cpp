@@ -151,7 +151,7 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
   cout << "Instance frame min depth: " << min_depth << endl;
 }
 
-// TODO(andrei): Rename variable according to style guide.
+// TODO(andrei): Rename variables according to style guide.
 template<typename TDepth>
 void RemoveSilhouette_CPU(ORUtils::Vector4<unsigned char> *sourceRGB,
                           TDepth *sourceDepth,
@@ -184,6 +184,7 @@ void RemoveSilhouette_CPU(ORUtils::Vector4<unsigned char> *sourceRGB,
         sourceRGB[frame_idx].g = 0;
         sourceRGB[frame_idx].b = 0;
         sourceRGB[frame_idx].a = 0;
+        sourceDepth[frame_idx] = 0.0f;
       }
     }
   }
@@ -254,9 +255,10 @@ void InstanceReconstructor::ProcessFrame(
       "there's something like a stationary bike, or train, even if we never plan on attempting to "
       "reconstruct them... For persons, it might often fail, but in that case we may just default "
       "to deleting them out of the frame anyway..." << endl;
+
   // Note: for a real self-driving cars, you definitely want a completely generic obstacle detector.
-  vector<string> classes_to_reconstruct_voc2012 = { "car" };
-  vector<string> possibly_dynamic_classes_voc2012 = {
+  const vector<string> classes_to_reconstruct_voc2012 = { "car" };
+  const vector<string> possibly_dynamic_classes_voc2012 = {
       "airplane",   // you never know...
       "bicycle",
       "bird",
@@ -308,6 +310,12 @@ void InstanceReconstructor::ProcessFrame(
       view->depth->UpdateDeviceFromHost();
 
       Option<Eigen::Matrix4d> *motion_delta = EstimateInstanceMotion(instance_raw_flow, ssf_provider);
+
+      // TODO(andrei): Compare with egomotion here. If < some delta, then fuse the data into the
+      // static map, unless, perhaps, the object is already moving.
+      // Note that neatly keeping track of instance information inside the map is non-trivial, and
+      // would go beyond the scope of this work (but is doable by keeping track of a sparse prob.
+      // dist in each voxel).
 
       new_instance_views.emplace_back(instance_detection,
                                       view,
