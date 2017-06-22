@@ -7,6 +7,29 @@ Currently under development as my Master's Thesis, as part of the [Computer
 Vision and Geometry Group](https://cvg.ethz.ch) of [ETH
 Zurich](https://ethz.ch).
 
+## Preview
+
+The following screenshot shows an early preview of DynSLAM in action. It
+takes in stereo input, computes the depth map, using either ELAS or
+dispnet, segments the input RGB using Multi-task Network Cascades to
+detect object instances, and then separately reconstructs the static
+background and individual object instances.
+
+The top pane shows the dense reconstruction of the background. The
+following panes show, in top-down, left-right order: the left RGB frame,
+the computed depth map, the output of the instance-aware semantic
+segmentation algorithm, the input RGB to the instance reconstructor,
+memory usage statistics, and a novel view of the reconstructed object
+instance.
+
+The colors in the 3D reconstructions correspond to the voxel weights:
+red-tinted areas are low-weight ones, whereas blue ones are high-weight
+ones. Areas which remain low-weight even several frames after first
+being observed are very likely to be noisy, while blue ones are ones
+where the system is confident in its reconstruction.
+
+![DynSLAM GUI screenshot](data/screenshots/dynslam-preview.png)
+
 ## Related Repositories
 
  * [My InfiniTAM fork](https://github.com/AndreiBarsan/InfiniTAM), which
