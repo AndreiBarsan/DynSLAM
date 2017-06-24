@@ -104,6 +104,13 @@ void DynSlam::ProcessFrame(Input *input) {
     utils::Toc();
   }
 
+  // Decay old, possibly noisy, voxels, to improve map quality and reduce its memory footprint.
+  if ((current_frame_no_ + 1) % 5 == 0) {
+    utils::Tic("Map decay");
+    static_scene_->Decay();
+    utils::Toc();
+  }
+
   utils::Tic("Final error check");
   // Final sanity check after the frame is processed: individual components should check for errors.
   // If something slips through and gets here, it's bad and we want to stop execution.
