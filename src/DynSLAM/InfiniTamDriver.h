@@ -177,6 +177,15 @@ public:
     return *last_egomotion_;
   }
 
+  void Decay() {
+    // Experimental map decay; currently only implemented for the GPU, and for the voxel hashing map
+    // representation.
+
+    // TODO(andrei): Run maybe more agressively for object instances.
+    // TODO(andrei): Pass in proper config parameters.
+    denseMapper->Decay();
+  }
+
   // Necessary for having Eigen types as fields.
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 

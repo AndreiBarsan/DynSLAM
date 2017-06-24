@@ -85,8 +85,10 @@ class DepthProvider {
   void DepthFromDisparityMap(const cv::Mat_<T> &disparity,
                              const StereoCalibration &calibration,
                              cv::Mat1s &out_depth,
-                             float min_depth_m = 0.50f, // using 3 or even 5 can fix the dispnet artifacts
-                             float max_depth_m = 15.0f
+                             float min_depth_m = 6.00f, // using ~6.5m can fix the dispnet artifacts
+                                                        // but ends up discarding quite a bit of
+                                                        // useful information...
+                             float max_depth_m = 20.0f
   ) {
     assert(disparity.size() == out_depth.size());
 
