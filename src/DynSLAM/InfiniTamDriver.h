@@ -183,7 +183,7 @@ public:
 
     // TODO(andrei): Run maybe more agressively for object instances.
     // TODO(andrei): Pass in proper config parameters.
-    denseMapper->Decay();
+    denseMapper->Decay(scene, 3, 5);
   }
 
   // Necessary for having Eigen types as fields.
