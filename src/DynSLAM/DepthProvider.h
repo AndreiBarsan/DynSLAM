@@ -72,6 +72,7 @@ class DepthProvider {
     return (calibration.baseline_meters * calibration.focal_length_px) / disparity_px;
   }
 
+  // TODO(andrei): Higher max depth once we're modeling noise properly.
   // TODO-LOW(andrei): This can be sped up trivially using CUDA.
   /// \brief Computes a depth map from a disparity map using the `DepthFromDisparity` function at
   /// every pixel.
@@ -85,10 +86,8 @@ class DepthProvider {
   void DepthFromDisparityMap(const cv::Mat_<T> &disparity,
                              const StereoCalibration &calibration,
                              cv::Mat1s &out_depth,
-                             float min_depth_m = 6.00f, // using ~6.5m can fix the dispnet artifacts
-                                                        // but ends up discarding quite a bit of
-                                                        // useful information...
-                             float max_depth_m = 20.0f
+                             float min_depth_m =  0.50f,
+                             float max_depth_m = 18.0f
   ) {
     assert(disparity.size() == out_depth.size());
 
