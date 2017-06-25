@@ -183,7 +183,11 @@ public:
 
     // TODO(andrei): Run maybe more agressively for object instances.
     // TODO(andrei): Pass in proper config parameters.
-    denseMapper->Decay(scene, 3, 5);
+    // w=3, a=5 seems a little aggressive for dispnet. As long as we're using it and not elas, maybe
+    // even w=1, a=7-8 can also work.
+    int maxWeight = 3;
+    int minAge = 5;
+    denseMapper->Decay(scene, maxWeight, 5);
   }
 
   // Necessary for having Eigen types as fields.
