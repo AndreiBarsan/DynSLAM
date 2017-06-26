@@ -148,7 +148,7 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
       frame_height);
 
   // TODO(andrei): Store min depth somewhere.
-  cout << "Instance frame min depth: " << min_depth << endl;
+//  cout << "Instance frame min depth: " << min_depth << endl;
 }
 
 // TODO(andrei): Rename variables according to style guide.
@@ -169,8 +169,6 @@ void RemoveSilhouette_CPU(ORUtils::Vector4<unsigned char> *sourceRGB,
     for (int col = 0; col < box_width; ++col) {
       int frame_row = row + bbox.r.y0;
       int frame_col = col + bbox.r.x0;
-      // TODO(andrei): Are the CPU-specific InfiniTAM functions doing this in a nicer way, or are
-      // they also just looping?
 
       if (frame_row < 0 || frame_row >= frame_height ||
           frame_col < 0 || frame_col >= frame_width) {
