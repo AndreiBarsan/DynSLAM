@@ -32,7 +32,7 @@ ELSE(MSVC_IDE)
   set(CFLAGS_WARN "-Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing")
     # TODO(andrei): Do we still need the '-g' and '-O' flags with -DCMAKE_BUILD_TYPE(=debug) flag?
 #  set(CMAKE_CXX_FLAGS "-fPIC -O3 -march=native ${CFLAGS_WARN} ${CMAKE_CXX_FLAGS}")
-  set(CMAKE_CXX_FLAGS "-fPIC -O1 -march=native -g ${CFLAGS_WARN} ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-fPIC -O3 -march=native -g ${CFLAGS_WARN} ${CMAKE_CXX_FLAGS}")
 ENDIF(MSVC_IDE)
 
 if(APPLE)
