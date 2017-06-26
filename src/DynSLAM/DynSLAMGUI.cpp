@@ -451,7 +451,11 @@ protected:
     detail_views_ = &(pangolin::Display("detail"));
 
     // Add labels to our data logs (and automatically to our plots).
-    data_log_.SetLabels({"Active tracks", "Free GPU Memory (100s of MiB)"});
+    data_log_.SetLabels({"Active tracks",
+                         "Free GPU Memory (100s of MiB)",
+                         "Static map memory usage (100s of MiB)",
+                         "Static map memory usage without decay (100s of Mib)",
+                        });
 
     // OpenGL 'view' of data such as the number of actively tracked instances over time.
     float tick_x = 1.0f;
@@ -535,7 +539,9 @@ protected:
     double free_gpu_gb = static_cast<float>(free_gpu_memory_bytes) * kBytesToGb;
     data_log_.Log(
         active_object_count_,
-        static_cast<float>(free_gpu_gb) * 10.0f    // Mini-hack to make the scales better
+        static_cast<float>(free_gpu_gb) * 10.0f,   // Mini-hack to make the scales better
+        dyn_slam_->GetStaticMapMemory() * 10.0f * kBytesToGb,
+        (dyn_slam_->GetStaticMapMemory() + dyn_slam_->GetStaticMapSavedDecayMemory()) * 10.0f * kBytesToGb
     );
 
     Tic("DynSLAM frame");

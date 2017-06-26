@@ -199,6 +199,21 @@ public:
     denseMapper->Decay(scene, maxWeight, minAge);
   }
 
+  size_t GetVoxelSizeBytes() const {
+    return sizeof(ITMVoxel);
+  }
+
+  size_t GetUsedMemoryBytes() const {
+    int num_used_blocks = (scene->index.getNumAllocatedVoxelBlocks() - scene->localVBA.lastFreeBlockId);
+    return GetVoxelSizeBytes() * SDF_BLOCK_SIZE3 * num_used_blocks;
+  }
+
+  size_t GetSavedDecayMemory() const {
+    size_t block_size_bytes = GetVoxelSizeBytes() * SDF_BLOCK_SIZE3;
+    size_t decayed_block_count = denseMapper->GetDecayedBlockCount();
+    return decayed_block_count * block_size_bytes;
+  }
+
   // Necessary for having Eigen types as fields.
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
