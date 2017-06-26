@@ -147,6 +147,16 @@ class DynSlam {
     return static_scene_->GetPose();
   }
 
+  // TODO(andrei): Similar stats also taking instances (and maybe views) into account. Take into
+  // account the destroyed tracks (old ones) somehow.
+  size_t GetStaticMapMemory() const {
+    return static_scene_->GetUsedMemoryBytes();
+  }
+
+  size_t GetStaticMapSavedDecayMemory() const {
+    return static_scene_->GetSavedDecayMemory();
+  }
+
 private:
   // This is the main reconstruction component. Should split for dynamic+static.
   // In the future, we may need to write our own.
