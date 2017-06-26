@@ -185,6 +185,15 @@ public:
     // TODO(andrei): Pass in proper config parameters.
     // w=3, a=5 seems a little aggressive for dispnet. As long as we're using it and not elas, maybe
     // even w=1, a=7-8 can also work.
+    // ELAS
+//    int maxWeight = 3;
+//    int minAge = 10;
+
+    // DispNet
+//    int maxWeight = 2;
+//    int minAge = 10;
+
+    // Semi-aggressive debug
     int maxWeight = 1;
     int minAge = 3;
     denseMapper->Decay(scene, maxWeight, minAge);

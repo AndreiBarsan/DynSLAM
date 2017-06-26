@@ -76,12 +76,16 @@ inline bool FileExists(const std::string &fpath) {
 /// \brief Returns the number of milliseconds since the start of the epoch.
 int64_t GetTimeMs();
 
+/// \brief Returns the number of microseconds since the start of the epoch.
+int64_t GetTimeMicro();
+
 /// \brief Converts an OpenCV image type to a human-readable string.
 std::string Type2Str(int type);
 
 // TODO(andrei): Consider moving the timing code to its own file.
 
-/// \brief A simple multi-lap timer. All timestamps are expressed in milliseconds.
+/// \brief A simple multi-lap timer. All timestamps are expressed in microseconds unless otherwise
+///        stated.
 class Timer {
  public:
   Timer(const std::string &name) : name_(name), start_(-1), end_(-1), is_running_(false) { }
@@ -96,13 +100,13 @@ class Timer {
   void Start() {
     Reset();
     is_running_ = true;
-    start_ = GetTimeMs();
+    start_ = GetTimeMicro();
   }
 
   void Lap() {
     assert(IsRunning());
 
-    laps_.push_back(GetTimeMs());
+    laps_.push_back(GetTimeMicro());
   }
 
   void Stop() {
@@ -110,7 +114,7 @@ class Timer {
 
     Lap();
     is_running_ = false;
-    end_ = GetTimeMs();
+    end_ = GetTimeMicro();
   }
 
   bool IsRunning() const {
@@ -121,7 +125,7 @@ class Timer {
     assert(is_running_ && "Cannot get elapsed time of non-running timer. If the timer was already "
         "stopped, then please use 'GetDuration()'.");
 
-    int64_t now = GetTimeMs();
+    int64_t now = GetTimeMicro();
     return now - start_;
   }
 
@@ -213,14 +217,20 @@ class Timers {
   std::stack<std::string> names_;
 };
 
-/// \brief Easily start a timer.
+/// \brief Helper for starting a timer.
 void Tic(const std::string &name);
 
-/// \brief Easily stop a timer and get the total measured duration.
+/// \brief Stops the specified timer and gets the total measured duration in milliseconds.
 int64_t Toc(const std::string &name, bool quiet = false);
 
-/// \brief Stops the most recent timer and gets the total measured duration.
+/// \brief Stops the specified timer and gets the total measured duration in microseconds.
+int64_t TocMicro(const std::string &name, bool quiet = false);
+
+/// \brief Stops the most recent timer and gets the total measured duration in milliseconds.
 int64_t Toc(bool quiet = false);
+
+/// \brief Stops the most recent timer and gets the total measured duration in microseconds.
+int64_t TocMicro(bool quiet = false);
 
 
 } // namespace utils

@@ -101,12 +101,12 @@ void DynSlam::ProcessFrame(Input *input) {
     utils::Tic("Static map fusion");
     static_scene_->Integrate();
     static_scene_->PrepareNextStep();
-    utils::Toc();
+    utils::TocMicro();
 
     // Decay old, possibly noisy, voxels, to improve map quality and reduce its memory footprint.
     utils::Tic("Map decay");
     static_scene_->Decay();
-    utils::Toc();
+    utils::TocMicro();
   }
 
 //  utils::Tic("Final error check");
