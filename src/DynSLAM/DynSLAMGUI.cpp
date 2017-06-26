@@ -655,8 +655,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   float focal_length_px = 707.0912f;
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
 
-  Input::Config input_config = Input::KittiOdometryConfig();
-//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+//  Input::Config input_config = Input::KittiOdometryConfig();
+  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
   int frame_offset = FLAGS_frame_offset;
