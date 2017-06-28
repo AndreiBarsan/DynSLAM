@@ -268,7 +268,7 @@ void InstanceReconstructor::ProcessFrame(
       "horse",
       "motorbike",
       "person",
-      "sheep",
+      "sheep",      // If we're driving in Romania.
       "train"
   };
 
