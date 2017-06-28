@@ -177,26 +177,19 @@ public:
     return *last_egomotion_;
   }
 
+  /// \brief Regularizes the map by pruning low-weight voxels which are old enough.
+  /// Very useful for, e.g., reducing artifacts caused by noisy depth maps.
+  /// \note This implementation is only supported on the GPU, and for voxel hashing.
   void Decay() {
-    // Experimental map decay; currently only implemented for the GPU, and for the voxel hashing map
-    // representation.
+    denseMapper->Decay(scene, max_decay_weight_, min_decay_age_, false);
+  }
 
-    // TODO(andrei): Run maybe more agressively for object instances.
-    // TODO(andrei): Pass in proper config parameters.
-    // w=3, a=5 seems a little aggressive for dispnet. As long as we're using it and not elas, maybe
-    // even w=1, a=7-8 can also work.
-    // ELAS
-//    int maxWeight = 5;
-//    int minAge = 10;
-
-    // DispNet
-    int maxWeight = 2;
-    int minAge = 10;
-
-    // Semi-aggressive debug
-//    int maxWeight = 1;
-//    int minAge = 3;
-    denseMapper->Decay(scene, maxWeight, minAge);
+  /// \brief Aggressive decay which ignores the minimum age requirement and acts on ALL voxels.
+  /// Typically used to clean up finished reconstructions. Can be much slower than `Decay`, even by
+  /// a few orders of magnitude if used on the full static map.
+  void Reap() {
+//    denseMapper->Decay(scene, max_decay_weight_, 0, true);
+    denseMapper->Decay(scene, max_decay_weight_, 0, false);
   }
 
   size_t GetVoxelSizeBytes() const {
@@ -225,6 +218,25 @@ public:
   cv::Mat1s *raw_depth_cv_;
 
   Eigen::Matrix4f *last_egomotion_;
+
+  // Parameters for voxel decay
+  // w=3, a=5 seems a little aggressive for dispnet. As long as we're using it and not elas, maybe
+  // even w=1, a=7-8 can also work.
+  // ELAS
+//    int maxWeight = 3;
+//    int minAge = 10;
+
+  // DispNet
+//  int maxWeight = 2;
+//  int minAge = 10;
+
+  // Semi-aggressive debug
+//    int maxWeight = 1;
+//    int minAge = 3;
+  /// \brief Voxels older than this are eligible for decay.
+  int min_decay_age_ = 10;
+  /// \brief Voxels with a weight smaller than this are decayed, provided that they are old enough.
+  int max_decay_weight_ = 2;
 };
 
 } // namespace drivers
