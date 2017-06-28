@@ -396,7 +396,7 @@ void InstanceReconstructor::ProcessReconstructions() {
       // No reconstruction allocated yet; let's initialize one.
       cout << endl << endl;
       cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl << endl;
-      ITMLibSettings *settings = new ITMLibSettings(*driver->GetSettings());
+      ITMLibSettings *settings = new ITMLibSettings(*driver_->GetSettings());
 
       // Set a much smaller voxel block number for the reconstruction, since individual objects
       // occupy a limited amount of space in the scene.
@@ -409,9 +409,9 @@ void InstanceReconstructor::ProcessReconstructions() {
 
       track.GetReconstruction() = make_shared<InfiniTamDriver>(
           settings,
-          driver->GetView()->calib,
-          driver->GetView()->rgb->noDims,
-          driver->GetView()->rgb->noDims);
+          driver_->GetView()->calib,
+          driver_->GetView()->rgb->noDims,
+          driver_->GetView()->rgb->noDims);
 
       // If we already have some frames, integrate them into the new volume.
       for(size_t i = 0; i < track.GetSize(); ++i) {
@@ -458,11 +458,25 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     }
 
     instance_driver.PrepareNextStep();
-//      cout << "Finished instance integration." << endl << endl;
+
+    // TODO(andrei): Consider making this a parameter of the driver. Maybe put it in its config.
+    if (use_decay_) {
+      instance_driver.Decay();
+    }
+
+    track.SetNeedsCleanup(true);
   }
   else {
     cout << "Could not fuse instance data for track #" << track.GetId() << " due to missing pose "
          << "information." << endl;
+
+    // TODO(andrei): Do this in a smarter way, in case of plain gaps in tracking.
+    // On blank frames, which we assume are at the very end of the track, we do a full, aggressive
+    // cleanup of the reconstruction.
+    if (track.NeedsCleanup()) {
+      instance_driver.Reap();
+      track.SetNeedsCleanup(false);
+    }
   }
 }
 

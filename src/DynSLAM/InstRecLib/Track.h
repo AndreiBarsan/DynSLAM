@@ -93,6 +93,14 @@ class Track {
   /// \brief Returns the relative pose of the specified frame w.r.t. the first one.
   dynslam::utils::Option<Eigen::Matrix4d> GetFramePose(size_t frame_idx) const;
 
+  bool NeedsCleanup() const {
+    return needs_cleanup_;
+  }
+
+  void SetNeedsCleanup(bool needs_cleanup) {
+    this->needs_cleanup_ = needs_cleanup;
+  }
+
  private:
   /// \brief A unique identifier for this particular track.
   int id_;
@@ -101,6 +109,9 @@ class Track {
   /// \brief A pointer to a 3D reconstruction of the object in this track.
   /// Is set to `nullptr` if no reconstruction is available.
   std::shared_ptr<dynslam::drivers::InfiniTamDriver> reconstruction;
+
+  /// \brief Whether the reconstruction is pending a full voxel decay iteration.
+  bool needs_cleanup_;
 };
 
 }  // namespace reconstruction

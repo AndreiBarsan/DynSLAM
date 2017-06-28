@@ -21,17 +21,18 @@ namespace reconstruction {
 
 using namespace dynslam::drivers;
 
-// TODO(andrei): Refactor this class once its functionality is defined better.
+// TODO(andrei): Extract an interface from this class once its functionality is defined better.
 /// \brief Pipeline component responsible for reconstructing the individual object instances.
 class InstanceReconstructor {
  public:
-  InstanceReconstructor(InfiniTamDriver *driver)
+  InstanceReconstructor(InfiniTamDriver *driver, bool use_decay = true)
       : instance_tracker_(new InstanceTracker()),
         frame_idx_(0),
-        driver(driver) {}
+        driver_(driver),
+        use_decay_(use_decay) {}
 
   /// \brief Uses the segmentation result to remove dynamic objects from the main view and save
-  /// them to separate buffers, which are then used for individual object reconstruction.
+  ///        them to separate buffers, which are then used for individual object reconstruction.
   ///
   /// This is the ``meat'' of the reconstruction engine.
   ///
@@ -87,7 +88,8 @@ class InstanceReconstructor {
  private:
   std::shared_ptr<InstanceTracker> instance_tracker_;
 
-  // TODO(andrei): Consider keeping track of this in centralized manner in DynSLAM.
+  // TODO(andrei): Consider keeping track of this in centralized manner in DynSLAM, and having
+  // components like this one hold a pointer to their daddy. 'Member XNA components?
   /// \brief The current input frame number.
   /// Useful for, e.g., keeping track of when we last saw a car, so we can better associate
   /// detections through time, and dump old-enough reconstructions to the disk.
@@ -96,7 +98,10 @@ class InstanceReconstructor {
   // A bit hacky, but used as a "template" when allocating new reconstructors for objects. This is a
   // pointer to the driver used for reconstructing the static scene.
   // TODO(andrei): Looks like a good place to use factories.
-  InfiniTamDriver *driver;
+  InfiniTamDriver *driver_;
+
+  /// \brief Whether to use voxel decay for regularizing the reconstructed objects.
+  bool use_decay_;
 
   void ProcessReconstructions();
 
