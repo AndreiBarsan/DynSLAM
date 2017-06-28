@@ -376,9 +376,18 @@ void InstanceReconstructor::ProcessReconstructions() {
   for (auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
 
+    // If we don't have any new information in this track, there's nothing to fuse.
     if(track.GetLastFrame().frame_idx != frame_idx_) {
-       //        (track.GetId() != 3 && track.GetId() != 0 && track.GetId() != 1)) {
-      // If we don't have any new information in this track, there's nothing to fuse.
+
+      // TODO(andrei): Do this in a smarter way.
+      // However, if we just encountered a gap in the track (or its end), let's do a full,
+      // aggressive cleanup of the reconstruction, if applicable.
+      int gap_size = frame_idx_ - track.GetLastFrame().frame_idx;
+      if (track.NeedsCleanup() && track.HasReconstruction() && gap_size >= 2) {
+        track.GetReconstruction()->Reap();
+        track.SetNeedsCleanup(false);
+      }
+
       continue;
     }
 
@@ -469,14 +478,6 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
   else {
     cout << "Could not fuse instance data for track #" << track.GetId() << " due to missing pose "
          << "information." << endl;
-
-    // TODO(andrei): Do this in a smarter way, in case of plain gaps in tracking.
-    // On blank frames, which we assume are at the very end of the track, we do a full, aggressive
-    // cleanup of the reconstruction.
-    if (track.NeedsCleanup()) {
-      instance_driver.Reap();
-      track.SetNeedsCleanup(false);
-    }
   }
 }
 

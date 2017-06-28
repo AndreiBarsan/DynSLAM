@@ -188,8 +188,7 @@ public:
   /// Typically used to clean up finished reconstructions. Can be much slower than `Decay`, even by
   /// a few orders of magnitude if used on the full static map.
   void Reap() {
-//    denseMapper->Decay(scene, max_decay_weight_, 0, true);
-    denseMapper->Decay(scene, max_decay_weight_, 0, false);
+    denseMapper->Decay(scene, max_decay_weight_, 0, true);
   }
 
   size_t GetVoxelSizeBytes() const {
@@ -231,12 +230,12 @@ public:
 //  int minAge = 10;
 
   // Semi-aggressive debug
-//    int maxWeight = 1;
-//    int minAge = 3;
+    int max_decay_weight_= 1;
+    int min_decay_age_ = 3;
   /// \brief Voxels older than this are eligible for decay.
-  int min_decay_age_ = 10;
+//  int min_decay_age_ = 10;
   /// \brief Voxels with a weight smaller than this are decayed, provided that they are old enough.
-  int max_decay_weight_ = 2;
+//  int max_decay_weight_ = 2;
 };
 
 } // namespace drivers
