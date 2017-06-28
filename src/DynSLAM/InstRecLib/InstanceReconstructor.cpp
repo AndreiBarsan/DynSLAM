@@ -71,11 +71,11 @@ void ExtractSceneFlow(
 
 // TODO(andrei): Implement this in CUDA. It should be easy.
 template <typename DEPTH_T>
-void ProcessSilhouette_CPU(Vector4u *sourceRGB,
-                           DEPTH_T *sourceDepth,
-                           Vector4u *destRGB,
-                           DEPTH_T *destDepth,
-                           Vector2i sourceDims,
+void ProcessSilhouette_CPU(Vector4u *source_rgb,
+                           DEPTH_T *source_depth,
+                           Vector4u *dest_rgb,
+                           DEPTH_T *dest_depth,
+                           Eigen::Vector2i sourceDims,
                            vector<RawFlow> &instance_flow_vectors,  // expressed in the current left camera's frame
                            const InstanceDetection &detection,
                            const SparseSceneFlow &scene_flow) {
@@ -97,8 +97,8 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
   int box_width = bbox.GetWidth();
   int box_height = bbox.GetHeight();
 
-  memset(destRGB, 0, frame_width * frame_height * sizeof(*sourceRGB));
-  memset(destDepth, 0, frame_width * frame_height * sizeof(DEPTH_T));
+  memset(dest_rgb, 0, frame_width * frame_height * sizeof(*source_rgb));
+  memset(dest_depth, 0, frame_width * frame_height * sizeof(DEPTH_T));
 
   // Keep track of the minimum depth in the frame, so we can use it as a heuristic when
   // reconstructing instances.
@@ -120,18 +120,18 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
       int frame_idx = frame_row * frame_width + frame_col;
       u_char mask_val = detection.mask->GetMaskData()->at<u_char>(row, col);
       if (mask_val == 1) {
-        destRGB[frame_idx].r = sourceRGB[frame_idx].r;
-        destRGB[frame_idx].g = sourceRGB[frame_idx].g;
-        destRGB[frame_idx].b = sourceRGB[frame_idx].b;
-        destRGB[frame_idx].a = sourceRGB[frame_idx].a;
-        sourceRGB[frame_idx].r = 0;
-        sourceRGB[frame_idx].g = 0;
-        sourceRGB[frame_idx].b = 0;
-        sourceRGB[frame_idx].a = 0;
+        dest_rgb[frame_idx].r = source_rgb[frame_idx].r;
+        dest_rgb[frame_idx].g = source_rgb[frame_idx].g;
+        dest_rgb[frame_idx].b = source_rgb[frame_idx].b;
+        dest_rgb[frame_idx].a = source_rgb[frame_idx].a;
+        source_rgb[frame_idx].r = 0;
+        source_rgb[frame_idx].g = 0;
+        source_rgb[frame_idx].b = 0;
+        source_rgb[frame_idx].a = 0;
 
-        float depth = sourceDepth[frame_idx];
-        destDepth[frame_idx] = depth;
-        sourceDepth[frame_idx] = 0.0f;
+        float depth = source_depth[frame_idx];
+        dest_depth[frame_idx] = depth;
+        source_depth[frame_idx] = 0.0f;
 
         if (depth != kInvalidDepth && depth < min_depth) {
           min_depth = depth;
@@ -151,15 +151,14 @@ void ProcessSilhouette_CPU(Vector4u *sourceRGB,
 //  cout << "Instance frame min depth: " << min_depth << endl;
 }
 
-// TODO(andrei): Rename variables according to style guide.
 template<typename TDepth>
-void RemoveSilhouette_CPU(ORUtils::Vector4<unsigned char> *sourceRGB,
-                          TDepth *sourceDepth,
-                          ORUtils::Vector2<int> sourceDims,
+void RemoveSilhouette_CPU(ORUtils::Vector4<unsigned char> *source_rgb,
+                          TDepth *source_depth,
+                          Eigen::Vector2i source_dimensions,
                           const segmentation::InstanceDetection &detection) {
 
-  int frame_width = sourceDims[0];
-  int frame_height = sourceDims[1];
+  int frame_width = source_dimensions[0];
+  int frame_height = source_dimensions[1];
   const BoundingBox &bbox = detection.GetBoundingBox();
 
   int box_width = bbox.GetWidth();
@@ -178,11 +177,11 @@ void RemoveSilhouette_CPU(ORUtils::Vector4<unsigned char> *sourceRGB,
       int frame_idx = frame_row * frame_width + frame_col;
       u_char mask_val = detection.mask->GetMaskData()->at<u_char>(row, col);
       if (mask_val == 1) {
-        sourceRGB[frame_idx].r = 0;
-        sourceRGB[frame_idx].g = 0;
-        sourceRGB[frame_idx].b = 0;
-        sourceRGB[frame_idx].a = 0;
-        sourceDepth[frame_idx] = 0.0f;
+        source_rgb[frame_idx].r = 0;
+        source_rgb[frame_idx].g = 0;
+        source_rgb[frame_idx].b = 0;
+        source_rgb[frame_idx].a = 0;
+        source_depth[frame_idx] = 0.0f;
       }
     }
   }
@@ -273,6 +272,8 @@ void InstanceReconstructor::ProcessFrame(
       "train"
   };
 
+  Vector2i frame_size_itm = main_view->rgb->noDims;
+  Eigen::Vector2i frame_size(frame_size_itm.x, frame_size_itm.y);
   vector<InstanceView> new_instance_views;
   for (const InstanceDetection &instance_detection : segmentation_result.instance_detections) {
     // At this stage of the project, we only care about cars. In the future, this scheme could be
@@ -281,7 +282,6 @@ void InstanceReconstructor::ProcessFrame(
              classes_to_reconstruct_voc2012.end(),
              instance_detection.GetClassName()) != classes_to_reconstruct_voc2012.end()
     ) {
-      Vector2i frame_size = main_view->rgb->noDims;
       // bool use_gpu = main_view->rgb->isAllocated_CUDA; // May need to modify 'MemoryBlock' to
       // check this, since the field is private.
       bool use_gpu = true;
@@ -290,7 +290,7 @@ void InstanceReconstructor::ProcessFrame(
       ITMRGBDCalib *calibration = new ITMRGBDCalib;
       *calibration = *main_view->calib;
 
-      auto view = make_shared<ITMView>(calibration, frame_size, frame_size, use_gpu);
+      auto view = make_shared<ITMView>(calibration, frame_size_itm, frame_size_itm, use_gpu);
       auto rgb_segment_h = view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
       auto depth_segment_h = view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
@@ -299,7 +299,7 @@ void InstanceReconstructor::ProcessFrame(
                             depth_data_h,
                             rgb_segment_h,
                             depth_segment_h,
-                            main_view->rgb->noDims,
+                            frame_size,
                             instance_raw_flow,
                             instance_detection,
                             scene_flow);
@@ -326,7 +326,7 @@ void InstanceReconstructor::ProcessFrame(
     ) {
       // In this case, we simply remove the object from view, but we don't attempt to track or
       // reconstruct it.
-      RemoveSilhouette_CPU(rgb_data_h, depth_data_h, main_view->rgb->noDims, instance_detection);
+      RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size, instance_detection);
     }
     // else, it's not an object in which we are interested
   }
