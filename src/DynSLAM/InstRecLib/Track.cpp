@@ -99,8 +99,8 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) co
     }
     else {
       if (found_good_pose) {
-        cerr << "Found good pose followed by an estimation error at i=" << i <<". "
-            "Assuming constant velocity (poor man's Kalman filter)." << endl;
+//        cerr << "Found good pose followed by an estimation error at i=" << i <<". "
+//            "Assuming constant velocity (poor man's Kalman filter)." << endl;
         *pose = last_good_relative_pose * (*pose);
       }
     }
