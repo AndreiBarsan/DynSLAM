@@ -388,7 +388,9 @@ void InstanceReconstructor::ProcessReconstructions() {
                    track.GetId(),
                    track.GetLastFrame().frame_idx,
                    gap_size));
-        track.GetReconstruction()->Reap();
+        // TODO(andrei): Only re-enable this (and fix it up) once regular voxel decay (aka GC in the
+        // Niessner et al paper) works well.
+//        track.GetReconstruction()->Reap();
         TocMicro();
 
         track.SetNeedsCleanup(false);
