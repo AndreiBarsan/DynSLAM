@@ -384,7 +384,13 @@ void InstanceReconstructor::ProcessReconstructions() {
       // aggressive cleanup of the reconstruction, if applicable.
       int gap_size = frame_idx_ - track.GetLastFrame().frame_idx;
       if (track.NeedsCleanup() && track.HasReconstruction() && gap_size >= 2) {
+        Tic(Format("Full cleanup for instance %d last seen at frame %d, so %d frame(s) ago.",
+                   track.GetId(),
+                   track.GetLastFrame().frame_idx,
+                   gap_size));
         track.GetReconstruction()->Reap();
+        TocMicro();
+
         track.SetNeedsCleanup(false);
       }
 
@@ -450,7 +456,7 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
   if (rel_dyn_pose.IsPresent()) {
     Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
 
-    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
+//    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
 
     // TODO(andrei): Replace this with fine tracking initialized by this coarse relative pose.
     instance_driver.SetPose(rel_dyn_pose_f.inverse());

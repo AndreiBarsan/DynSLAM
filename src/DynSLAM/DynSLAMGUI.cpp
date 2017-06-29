@@ -5,7 +5,7 @@
 #include <iostream>
 #include <sys/time.h>
 
-#include <backward.hpp>
+//#include <backward.hpp>
 #include <gflags/gflags.h>
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
@@ -49,7 +49,7 @@ DEFINE_int32 (frame_offset, 0, "The frame index from which to start reading the 
 
 // Handle SIGSEGV and its friends by printing sensible stack traces with code snippets.
 // TODO(andrei): this is a hack, please remove or depend on backward directly.
-backward::SignalHandling sh;
+//backward::SignalHandling sh;
 
 /// \brief Define these because OpenCV doesn't. Used in the `cv::flip` OpenCV function.
 enum {

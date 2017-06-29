@@ -222,16 +222,16 @@ public:
   // w=3, a=5 seems a little aggressive for dispnet. As long as we're using it and not elas, maybe
   // even w=1, a=7-8 can also work.
   // ELAS
-  int max_decay_weight_ = 3;
-  int min_decay_age_ = 10;
+//  int max_decay_weight_ = 3;
+//  int min_decay_age_ = 10;
 
   // DispNet
 //  int max_decay_weight_ = 2;
 //  int min_decay_age_ = 10;
 
   // Semi-aggressive debug
-//    int max_decay_weight_= 1;
-//    int min_decay_age_ = 3;
+    int max_decay_weight_= 1;
+    int min_decay_age_ = 3;
   /// \brief Voxels older than this are eligible for decay.
 //  int min_decay_age_ = 10;
   /// \brief Voxels with a weight smaller than this are decayed, provided that they are old enough.
