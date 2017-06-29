@@ -81,7 +81,6 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 add_subdirectory(src/InfiniTAM/InfiniTAM)
 add_subdirectory(src/DynSLAM/InstRecLib)
 
-# TODO(andrei): Make dynslam a library, and link the GUI with it.
 set(DYNSLAM_SOURCES
     src/DynSLAM/DepthProvider.h
     src/DynSLAM/DSHandler3D.cpp
@@ -98,18 +97,25 @@ set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
     src/DynSLAM/DynSLAMGUI.cpp)
 
-add_executable(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} )
+add_library(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} )
+# TODO(andrei): Rename this to ITMEngine or something for clarity.
+target_link_libraries(DynSLAM Engine)
+# TODO(andrei): Ditto. These are the InfiniTAM utilities!
+target_link_libraries(DynSLAM Utils)
+target_link_libraries(DynSLAM ITMLib)
+target_link_libraries(DynSLAM ORUtils)
+target_link_libraries(DynSLAM InstRecLib)
+target_link_libraries(DynSLAM ${OpenCV_LIBS})
+target_link_libraries(DynSLAM gflags)
+target_link_libraries(DynSLAM ${Viso2_LIBS})
 
 add_executable(DynSLAMGUI ${DYNSLAM_GUI_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
-# TODO(andrei): Rename this to ITMEngine or something for clarity.
+target_link_libraries(DynSLAMGUI ${Pangolin_LIBRARIES})
 target_link_libraries(DynSLAMGUI Engine)
-# TODO(andrei): Ditto. These are the InfiniTAM utilities!
 target_link_libraries(DynSLAMGUI Utils)
 target_link_libraries(DynSLAMGUI ITMLib)
 target_link_libraries(DynSLAMGUI ORUtils)
 target_link_libraries(DynSLAMGUI InstRecLib)
-target_link_libraries(DynSLAMGUI ${Pangolin_LIBRARIES})
 target_link_libraries(DynSLAMGUI ${OpenCV_LIBS})
 target_link_libraries(DynSLAMGUI gflags)
 target_link_libraries(DynSLAMGUI ${Viso2_LIBS})
-
