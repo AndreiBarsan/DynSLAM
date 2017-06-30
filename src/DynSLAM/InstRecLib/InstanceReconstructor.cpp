@@ -420,7 +420,7 @@ void InstanceReconstructor::ProcessReconstructions() {
       // TODO(andrei): Set this limit based on some physical specification, such as 10m x 10m x
       // 10m.
 //      settings->sdfLocalBlockNum = 2500;
-      settings->sdfLocalBlockNum = 10000;
+      settings->sdfLocalBlockNum = 6000;
       // We don't want to create an (expensive) meshing engine for every instance.
       settings->createMeshingEngine = false;
 
