@@ -661,8 +661,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   float focal_length_px = 707.0912f;
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
 
-  Input::Config input_config = Input::KittiOdometryConfig();
-//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+//  Input::Config input_config = Input::KittiOdometryConfig();
+  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
   int frame_offset = FLAGS_frame_offset;
@@ -676,8 +676,6 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       // faced with reflective surfaces, but dispnet is more robust to that. Similarly, for certain
       // areas of the static map such as foliage and fences, dispnet's smoothness is more of a
       // liability than an asset.
-      // TODO(andrei): Make sure you normalize dispnet's depth range when using it, since it seems
-      // to be inconsistent across frames (though it shouldn't be...).
       // TODO(andrei): Carefully read the dispnet paper.
       new PrecomputedDepthProvider(dataset_root + "/" + input_config.depth_folder,
                                    input_config.depth_fname_format,
@@ -689,7 +687,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 
   // [RIP] I lost a couple of hours debugging a bug caused by the fact that InfiniTAM still works
   // even when there is a discrepancy between the size of the depth/rgb inputs, as specified in the
-  // calibration file, and the actual size of the input images.
+  // calibration file, and the actual size of the input images (but it screws up the previews).
 
   ITMLibSettings *settings = new ITMLibSettings();
   settings->groundTruthPoseFpath = dataset_root + "/" + input_config.odometry_fname;
