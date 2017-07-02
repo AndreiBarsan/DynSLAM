@@ -127,7 +127,9 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
 
     // TODO(andrei): Consider maintaining some overlap--we could use the 1.2 mask for sending info
     // to the reconstruction and e.g., 1.0 for sending it to the static map. However, the ambiguous
-    // band could maybe be flagged with a lower update weight.
+    // band could maybe be flagged with a lower update weight. Now that we have decay this should
+    // TOTALLY be a thing. put 1.2x into car, but pretend the car is still 1.0x or even 0.9x when
+    // you're cutting it out of the main map.
     mask->Rescale(kMaskRescaleFactor);
     conservative_mask->Rescale(kConservativeMaskRescaleFactor);
 
