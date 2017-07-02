@@ -137,12 +137,15 @@ public:
   }
 
   void PrepareNextStep() {
-    // This may not be necessary if we're using ground truth VO.
-    this->trackingController->Prepare(this->trackingState, this->view, this->renderState_live);
+    ITMRenderState_VH *renderState_vh = (ITMRenderState_VH*)this->renderState_live;
+    if (renderState_vh->noVisibleEntries > 0) {
+      // This may not be necessary if we're using ground truth VO.
+      this->trackingController->Prepare(this->trackingState, this->view, this->renderState_live);
 
-    // Keep the OpenCV previews up to date.
-    ItmToCv(*this->view->rgb, rgb_cv_);
-    ItmToCv(*this->view->depth, raw_depth_cv_);
+      // Keep the OpenCV previews up to date.
+      ItmToCv(*this->view->rgb, rgb_cv_);
+      ItmToCv(*this->view->depth, raw_depth_cv_);
+    }
   }
 
   const ITMLibSettings* GetSettings() const {
@@ -188,7 +191,7 @@ public:
   /// Typically used to clean up finished reconstructions. Can be much slower than `Decay`, even by
   /// a few orders of magnitude if used on the full static map.
   void Reap() {
-    denseMapper->Decay(scene, max_decay_weight_, 0, true);
+    denseMapper->Decay(scene, aggressive_max_decay_weight_, 0, true);
   }
 
   size_t GetVoxelSizeBytes() const {
@@ -227,7 +230,8 @@ public:
 
   // Semi-aggressive debug
     int max_decay_weight_= 2;
-    int min_decay_age_ = 30;
+    int aggressive_max_decay_weight_= 2;
+    int min_decay_age_ = 50;
   /// \brief Voxels older than this are eligible for decay.
 //  int min_decay_age_ = 10;
   /// \brief Voxels with a weight smaller than this are decayed, provided that they are old enough.

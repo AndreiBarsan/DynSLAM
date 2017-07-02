@@ -388,9 +388,7 @@ void InstanceReconstructor::ProcessReconstructions() {
                    track.GetId(),
                    track.GetLastFrame().frame_idx,
                    gap_size));
-        // TODO(andrei): Only re-enable this (and fix it up) once regular voxel decay (aka GC in the
-        // Niessner et al paper) works well.
-//        track.GetReconstruction()->Reap();
+        track.GetReconstruction()->Reap();
         TocMicro();
 
         track.SetNeedsCleanup(false);
@@ -419,8 +417,7 @@ void InstanceReconstructor::ProcessReconstructions() {
       // occupy a limited amount of space in the scene.
       // TODO(andrei): Set this limit based on some physical specification, such as 10m x 10m x
       // 10m.
-//      settings->sdfLocalBlockNum = 2500;
-      settings->sdfLocalBlockNum = 6000;
+      settings->sdfLocalBlockNum = 10000;
       // We don't want to create an (expensive) meshing engine for every instance.
       settings->createMeshingEngine = false;
 

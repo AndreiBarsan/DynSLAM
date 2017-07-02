@@ -106,6 +106,7 @@ void DynSlam::ProcessFrame(Input *input) {
     static_scene_->PrepareNextStep();
     utils::TocMicro();
 
+    // Idea: trigger decay not based on frame gap, but using translation-based threshold.
     // Decay old, possibly noisy, voxels to improve map quality and reduce its memory footprint.
     utils::Tic("Map decay");
     static_scene_->Decay();
