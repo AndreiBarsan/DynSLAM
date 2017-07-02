@@ -23,12 +23,13 @@ void ExtractSceneFlow(
     const SparseSceneFlow &scene_flow,
     vector<RawFlow> &out_instance_flow_vectors,
     const InstanceDetection &detection,
-    int frame_width,
-    int frame_height,
+    const Eigen::Vector2i &frame_size,
     bool check_sf_start = true
 ) {
   const BoundingBox &flow_bbox = detection.conservative_mask->GetBoundingBox();
   map<pair<int, int>, RawFlow> coord_to_flow;
+  int frame_width = frame_size(0);
+  int frame_height = frame_size(1);
 
   // Instead of expensively doing a per-pixel for every SF vector (ouch!), we just use the bounding
   // boxes, since we'll be using those vectors for RANSAC anyway. In the future, we could maybe
@@ -140,13 +141,6 @@ void ProcessSilhouette_CPU(Vector4u *source_rgb,
     }
   }
 
-  ExtractSceneFlow(
-      scene_flow,
-      instance_flow_vectors,
-      detection,
-      frame_width,
-      frame_height);
-
   // TODO(andrei): Store min depth somewhere.
 //  cout << "Instance frame min depth: " << min_depth << endl;
 }
@@ -233,6 +227,24 @@ Option<Eigen::Matrix4d>* EstimateInstanceMotion(
   }
 }
 
+/// \brief Computes a relative pose rotation error using the metric from the KITTI odometry evaluation.
+inline float rotationError(const Eigen::Matrix4f &pose_error) {
+  float a = pose_error(0, 0);
+  float b = pose_error(1, 1);
+  float c = pose_error(2, 2);
+  double d = 0.5 * (a + b + c - 1.0);
+  return static_cast<float>(acos(max(min(d, 1.0), -1.0)));
+}
+
+/// \brief Computes a relative pose translation error using the metric from the KITTI odometry evaluation.
+inline float translationError(const Eigen::Matrix4f &pose_error) {
+  float dx = pose_error(0, 3);
+  float dy = pose_error(1, 3);
+  float dz = pose_error(2, 3);
+  return sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+
 void InstanceReconstructor::ProcessFrame(
     const dynslam::DynSlam* dyn_slam,
     ITMLib::Objects::ITMView *main_view,
@@ -258,18 +270,19 @@ void InstanceReconstructor::ProcessFrame(
   const vector<string> possibly_dynamic_classes_voc2012 = {
       "airplane",   // you never know...
       "bicycle",
-      "bird",
+      "bird",       // stupid pigeons
       "boat",       // again, you never know...
       "bus",
       "car",
       "cat",
       "cow",
-      "dog",
+      "dog",        // No, Timmy, Lassie went to live on your Aunt's farm. Totally didn't get ran
+                    // over by self-driving car.
       "horse",
       "motorbike",
       "person",
       "sheep",      // If we're driving in Romania.
-      "train"
+      "train"       // MNC is shit at segmenting trains anyway
   };
 
   Vector2i frame_size_itm = main_view->rgb->noDims;
@@ -294,31 +307,56 @@ void InstanceReconstructor::ProcessFrame(
       auto rgb_segment_h = view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
       auto depth_segment_h = view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
-      vector<RawFlow> instance_raw_flow;
-      ProcessSilhouette_CPU(rgb_data_h,
-                            depth_data_h,
-                            rgb_segment_h,
-                            depth_segment_h,
-                            frame_size,
-                            instance_raw_flow,
-                            instance_detection,
-                            scene_flow);
+      vector<RawFlow> instance_flow_vectors;
+      ExtractSceneFlow(
+          scene_flow,
+          instance_flow_vectors,
+          instance_detection,
+          frame_size);
 
-      view->rgb->UpdateDeviceFromHost();
-      view->depth->UpdateDeviceFromHost();
+      Option<Eigen::Matrix4d> *motion_delta = EstimateInstanceMotion(instance_flow_vectors, ssf_provider);
+      // TODO(andrei): We may need to apply the dense refinement right here, in case the RANSAC
+      // result from libviso is inconclusive.
 
-      Option<Eigen::Matrix4d> *motion_delta = EstimateInstanceMotion(instance_raw_flow, ssf_provider);
+      Eigen::Matrix4f egomotion = dyn_slam->GetLastEgomotion();
+      if (motion_delta->IsPresent()) {
+        // But what if the motion can't be estimated? Wouldn't it make more sense to first try to
+        // find the best track, and then possibly apply the "poor man's Kalman filter" from there?
 
-      // TODO(andrei): Compare with egomotion here. If < some delta, then fuse the data into the
-      // static map, unless, perhaps, the object is already moving.
-      // Note that neatly keeping track of instance information inside the map is non-trivial, and
-      // would go beyond the scope of this work (but is doable by keeping track of a sparse prob.
-      // dist in each voxel).
+//        cout << "Egomotion: " << endl << egomotion << endl;
+//        cout << "Motion delta for this object: " << endl << motion_delta->Get() << endl;
 
-      new_instance_views.emplace_back(instance_detection,
-                                      view,
-                                      instance_raw_flow,
-                                      shared_ptr<Option<Eigen::Matrix4d>>(motion_delta));
+        // Since the egomotion is already expressed as the inverse motion in the camera frame,
+        // there's no need to invert it here again.
+        Eigen::Matrix4f error = egomotion * motion_delta->Get().cast<float>();
+
+        float transError = translationError(error);
+        float kTransErrorTreshold = 0.25f;
+        printf("Frame has %.4f trans error wrt my egomotion.\n", transError);
+
+        if (transError > kTransErrorTreshold) {
+          printf("Fusing into own instance!\n");
+          ProcessSilhouette_CPU(rgb_data_h,
+                                depth_data_h,
+                                rgb_segment_h,
+                                depth_segment_h,
+                                frame_size,
+                                instance_flow_vectors,  // TODO(andrei): Remove
+                                instance_detection,
+                                scene_flow);
+          view->rgb->UpdateDeviceFromHost();
+          view->depth->UpdateDeviceFromHost();
+
+          new_instance_views.emplace_back(instance_detection,
+                                          view,
+                                          instance_flow_vectors,
+                                          shared_ptr<Option<Eigen::Matrix4d>>(motion_delta));
+        }
+        else {
+          printf("Fusing into static map!\n");
+        }
+      }
+
     }
     else if(find(possibly_dynamic_classes_voc2012.cbegin(),
                  possibly_dynamic_classes_voc2012.cend(),

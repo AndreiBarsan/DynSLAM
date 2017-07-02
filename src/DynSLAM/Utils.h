@@ -26,11 +26,19 @@ class Option {
   }
 
   T& operator*() {
+    return Get();
+  }
+
+  const T& operator*() const {
+    return Get();
+  }
+
+  T& Get() {
     assert(IsPresent() && "Cannot dereference an empty optional!");
     return *value_;
   }
 
-  const T& operator*() const {
+  const T& Get() const {
     assert(IsPresent() && "Cannot dereference an empty optional!");
     return *value_;
   }
