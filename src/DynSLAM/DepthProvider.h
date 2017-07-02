@@ -87,7 +87,7 @@ class DepthProvider {
                              const StereoCalibration &calibration,
                              cv::Mat1s &out_depth,
                              float min_depth_m =  0.50f,
-                             float max_depth_m = 16.0f
+                             float max_depth_m = 15.0f
   ) {
     assert(disparity.size() == out_depth.size());
 
@@ -102,9 +102,6 @@ class DepthProvider {
         // our map will be very noisy; too small, and we only map the road and a couple of meters of
         // the sidewalks.
         int32_t min_depth_mm = static_cast<int32_t>(min_depth_m * kMetersToMillimeters);
-
-        // TODO(andrei): Log min/max/mean depth and other stats, and verify whether the disparities
-        // produced by dispnet are consistent across frames.
 
         if (depth_mm > max_depth_m * kMetersToMillimeters || depth_mm < min_depth_mm) {
           depth_mm = std::numeric_limits<int16_t>::max();
