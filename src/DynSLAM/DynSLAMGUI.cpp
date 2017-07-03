@@ -339,10 +339,12 @@ protected:
     pangolin::RegisterKeyPressCallback('n', next_frame);
 
     auto save_map = [this]() {
+      Tic("Static map mesh generation");
       cout << "Saving static map..." << endl;
       dyn_slam_->SaveStaticMap(dyn_slam_input_->GetName(),
                                dyn_slam_input_->GetDepthProvider()->GetName());
       cout << "Done saving map." << endl;
+      Toc();
     };
 
     pangolin::Var<function<void(void)>> save_map_button("ui.[S]ave Static Map", save_map);
