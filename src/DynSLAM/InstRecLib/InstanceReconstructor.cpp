@@ -244,7 +244,6 @@ inline float translationError(const Eigen::Matrix4f &pose_error) {
   return sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-
 void InstanceReconstructor::ProcessFrame(
     const dynslam::DynSlam* dyn_slam,
     ITMLib::Objects::ITMView *main_view,
@@ -260,10 +259,10 @@ void InstanceReconstructor::ProcessFrame(
       main_view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
   float *depth_data_h = main_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
-  cerr << "TODO: but why not at least attempt to perform motion analysis on these dudes, in case "
-      "there's something like a stationary bike, or train, even if we never plan on attempting to "
-      "reconstruct them... For persons, it might often fail, but in that case we may just default "
-      "to deleting them out of the frame anyway..." << endl;
+//  cerr << "TODO: but why not at least attempt to perform motion analysis on these dudes, in case "
+//      "there's something like a stationary bike, or train, even if we never plan on attempting to "
+//      "reconstruct them... For persons, it might often fail, but in that case we may just default "
+//      "to deleting them out of the frame anyway..." << endl;
 
   // Note: for a real self-driving cars, you definitely want a completely generic obstacle detector.
   const vector<string> classes_to_reconstruct_voc2012 = { "car" };
@@ -332,9 +331,10 @@ void InstanceReconstructor::ProcessFrame(
 
         float transError = translationError(error);
         float kTransErrorTreshold = 0.25f;
+        bool alwaysSeparate = true;   // Whether to always separately reconstruct car models, even if they're static.
         printf("Frame has %.4f trans error wrt my egomotion.\n", transError);
 
-        if (transError > kTransErrorTreshold) {
+        if (transError > kTransErrorTreshold || alwaysSeparate) {
           printf("Fusing into own instance!\n");
           ProcessSilhouette_CPU(rgb_data_h,
                                 depth_data_h,
@@ -436,8 +436,6 @@ void InstanceReconstructor::ProcessReconstructions() {
     }
 
     if (! track.HasReconstruction()) {
-      // TODO(andrei): Consider comparing object motion relative to camera---if close to none, then
-      // no point in reconstructing, and we can just merge the object into the map.
       bool eligible = track.EligibleForReconstruction();
 
       if (! eligible) {

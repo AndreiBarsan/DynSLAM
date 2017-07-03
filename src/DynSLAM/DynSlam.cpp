@@ -89,12 +89,12 @@ void DynSlam::ProcessFrame(Input *input) {
     // We need flow information in order to correctly determine which objects are moving, so we
     // can't do this when no scene flow is available (i.e., in the first frame, unless an error
     // occurs).
-    instance_reconstructor_->ProcessFrame(
-        this,
-        static_scene_->GetView(),
-        *segmentationResult,
-        sparse_sf_provider_->GetFlow(),
-        *sparse_sf_provider_);
+//    instance_reconstructor_->ProcessFrame(
+//        this,
+//        static_scene_->GetView(),
+//        *segmentationResult,
+//        sparse_sf_provider_->GetFlow(),
+//        *sparse_sf_provider_);
   }
   utils::Toc();
 
