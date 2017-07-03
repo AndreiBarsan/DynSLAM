@@ -138,7 +138,7 @@ public:
 
   void PrepareNextStep() {
     ITMRenderState_VH *renderState_vh = (ITMRenderState_VH*)this->renderState_live;
-    if (renderState_vh->noVisibleEntries > 0) {
+    if (renderState_vh->noVisibleBlocks > 0) {
       // This may not be necessary if we're using ground truth VO.
       this->trackingController->Prepare(this->trackingState, this->view, this->renderState_live);
 

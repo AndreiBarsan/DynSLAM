@@ -359,7 +359,7 @@ protected:
     });
     live_raycast_ = new pangolin::Var<bool>("ui.Raycast Mode", false, true);
     display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", true, true);
-    preview_sf_ = new pangolin::Var<bool>("ui.Show Scene Flow", true, true);
+    preview_sf_ = new pangolin::Var<bool>("ui.Show Scene Flow", false, true);
 
     pangolin::Var<function<void(void)>> previous_object("ui.Previous Object [z]", [this]() {
       SelectPreviousVisualizedObject();

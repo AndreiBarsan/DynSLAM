@@ -69,13 +69,13 @@ void DynSlam::ProcessFrame(Input *input) {
   // SF values, such as those associated with the road or buildings would become close to zero).
   // Look at libviso2 source code for inspiration on the relation between egomotion and SF. How do
   // they extract egomotion from the SF?
-  sparse_sf_provider_->ComputeSparseSF(
-      make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
-      make_pair(left_gray, right_gray)
-  );
-  if (!sparse_sf_provider_->FlowAvailable() && !first_frame) {
-    cerr << "Warning: could not compute scene flow." << endl;
-  }
+//  sparse_sf_provider_->ComputeSparseSF(
+//      make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
+//      make_pair(left_gray, right_gray)
+//  );
+//  if (!sparse_sf_provider_->FlowAvailable() && !first_frame) {
+//    cerr << "Warning: could not compute scene flow." << endl;
+//  }
   utils::Toc();
 
   utils::Tic("Input preprocessing");
