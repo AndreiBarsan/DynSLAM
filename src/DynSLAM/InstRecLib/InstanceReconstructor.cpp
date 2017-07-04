@@ -318,7 +318,9 @@ void InstanceReconstructor::ProcessFrame(
       // result from libviso is inconclusive.
 
       Eigen::Matrix4f egomotion = dyn_slam->GetLastEgomotion();
-      if (motion_delta->IsPresent()) {
+      bool alwaysSeparate = true;   // Whether to always separately reconstruct car models, even if they're static.
+
+      if (motion_delta->IsPresent() || alwaysSeparate) {
         // But what if the motion can't be estimated? Wouldn't it make more sense to first try to
         // find the best track, and then possibly apply the "poor man's Kalman filter" from there?
 
@@ -327,12 +329,13 @@ void InstanceReconstructor::ProcessFrame(
 
         // Since the egomotion is already expressed as the inverse motion in the camera frame,
         // there's no need to invert it here again.
-        Eigen::Matrix4f error = egomotion * motion_delta->Get().cast<float>();
-
-        float transError = translationError(error);
+        float transError = 0.0f;
         float kTransErrorTreshold = 0.25f;
-        bool alwaysSeparate = true;   // Whether to always separately reconstruct car models, even if they're static.
-        printf("Frame has %.4f trans error wrt my egomotion.\n", transError);
+        if (! alwaysSeparate) {
+          Eigen::Matrix4f error = egomotion * motion_delta->Get().cast<float>();
+          transError = translationError(error);
+          printf("Frame has %.4f trans error wrt my egomotion.\n", transError);
+        }
 
         if (transError > kTransErrorTreshold || alwaysSeparate) {
           printf("Fusing into own instance!\n");

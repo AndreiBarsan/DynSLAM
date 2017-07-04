@@ -107,9 +107,10 @@ class DynSlam {
 
   void SaveStaticMap(const std::string &dataset_name, const std::string &depth_name) {
     string target_folder = EnsureDumpFolderExists(dataset_name);
-    string map_fpath = utils::Format("%s/static-%s-mesh.obj",
+    string map_fpath = utils::Format("%s/static-%s-mesh-%06d-frames.obj",
                                      target_folder.c_str(),
-                                     depth_name.c_str());
+                                     depth_name.c_str(),
+                                     current_frame_no_);
     cout << "Saving full static map to: " << map_fpath << endl;
     static_scene_->SaveSceneToMesh(map_fpath.c_str());
   }
@@ -155,6 +156,10 @@ class DynSlam {
 
   size_t GetStaticMapSavedDecayMemory() const {
     return static_scene_->GetSavedDecayMemory();
+  }
+
+  void WaitForJobs() {
+    static_scene_->WaitForMeshDump();
   }
 
 private:
