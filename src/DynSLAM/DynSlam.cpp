@@ -4,8 +4,6 @@
 #include <thread>
 
 #include "DynSlam.h"
-#include "Input.h"
-#include "PrecomputedDepthProvider.h"
 
 namespace dynslam {
 
@@ -69,13 +67,13 @@ void DynSlam::ProcessFrame(Input *input) {
   // SF values, such as those associated with the road or buildings would become close to zero).
   // Look at libviso2 source code for inspiration on the relation between egomotion and SF. How do
   // they extract egomotion from the SF?
-//  sparse_sf_provider_->ComputeSparseSF(
-//      make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
-//      make_pair(left_gray, right_gray)
-//  );
-//  if (!sparse_sf_provider_->FlowAvailable() && !first_frame) {
-//    cerr << "Warning: could not compute scene flow." << endl;
-//  }
+  sparse_sf_provider_->ComputeSparseSF(
+      make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
+      make_pair(left_gray, right_gray)
+  );
+  if (!sparse_sf_provider_->FlowAvailable() && !first_frame) {
+    cerr << "Warning: could not compute scene flow." << endl;
+  }
   utils::Toc();
 
   utils::Tic("Input preprocessing");
@@ -89,12 +87,12 @@ void DynSlam::ProcessFrame(Input *input) {
     // We need flow information in order to correctly determine which objects are moving, so we
     // can't do this when no scene flow is available (i.e., in the first frame, unless an error
     // occurs).
-//    instance_reconstructor_->ProcessFrame(
-//        this,
-//        static_scene_->GetView(),
-//        *segmentationResult,
-//        sparse_sf_provider_->GetFlow(),
-//        *sparse_sf_provider_);
+    instance_reconstructor_->ProcessFrame(
+        this,
+        static_scene_->GetView(),
+        *segmentationResult,
+        sparse_sf_provider_->GetFlow(),
+        *sparse_sf_provider_);
   }
   utils::Toc();
 
