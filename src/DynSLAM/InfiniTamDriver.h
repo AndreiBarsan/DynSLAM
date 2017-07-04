@@ -184,14 +184,14 @@ public:
   /// Very useful for, e.g., reducing artifacts caused by noisy depth maps.
   /// \note This implementation is only supported on the GPU, and for voxel hashing.
   void Decay() {
-    denseMapper->Decay(scene, max_decay_weight_, min_decay_age_, false);
+    denseMapper->Decay(scene, renderState_live, max_decay_weight_, min_decay_age_, false);
   }
 
   /// \brief Aggressive decay which ignores the minimum age requirement and acts on ALL voxels.
   /// Typically used to clean up finished reconstructions. Can be much slower than `Decay`, even by
   /// a few orders of magnitude if used on the full static map.
   void Reap() {
-    denseMapper->Decay(scene, aggressive_max_decay_weight_, 0, true);
+    denseMapper->Decay(scene, renderState_live, aggressive_max_decay_weight_, 0, true);
   }
 
   size_t GetVoxelSizeBytes() const {
@@ -207,6 +207,12 @@ public:
     size_t block_size_bytes = GetVoxelSizeBytes() * SDF_BLOCK_SIZE3;
     size_t decayed_block_count = denseMapper->GetDecayedBlockCount();
     return decayed_block_count * block_size_bytes;
+  }
+
+  void WaitForMeshDump() {
+    if (write_result.valid()) {
+      write_result.wait();
+    }
   }
 
   // Necessary for having Eigen types as fields.
@@ -231,7 +237,7 @@ public:
   // Semi-aggressive debug
     int max_decay_weight_= 2;
     int aggressive_max_decay_weight_= 2;
-    int min_decay_age_ = 30;
+    int min_decay_age_ = 50;
   /// \brief Voxels older than this are eligible for decay.
 //  int min_decay_age_ = 10;
   /// \brief Voxels with a weight smaller than this are decayed, provided that they are old enough.

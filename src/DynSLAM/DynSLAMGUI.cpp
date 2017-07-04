@@ -343,7 +343,7 @@ protected:
       cout << "Saving static map..." << endl;
       dyn_slam_->SaveStaticMap(dyn_slam_input_->GetName(),
                                dyn_slam_input_->GetDepthProvider()->GetName());
-      cout << "Done saving map." << endl;
+      cout << "Mesh generated OK. Writing asynchronously to the disk..." << endl;
       Toc();
     };
 
@@ -377,7 +377,10 @@ protected:
     pangolin::Var<function<void(void)>> save_active_object("ui.Save Active [O]bject", save_object);
     pangolin::RegisterKeyPressCallback('o', save_object);
 
-    auto quit = [this]() { pangolin::QuitAll(); };
+    auto quit = [this]() {
+      dyn_slam_->WaitForJobs();
+      pangolin::QuitAll();
+    };
     pangolin::Var<function<void(void)>> quit_button("ui.[Q]uit", quit);
     pangolin::RegisterKeyPressCallback('q', quit);
 
@@ -663,8 +666,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   float focal_length_px = 707.0912f;
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
 
-//  Input::Config input_config = Input::KittiOdometryConfig();
-  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+  Input::Config input_config = Input::KittiOdometryConfig();
+//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
   int frame_offset = FLAGS_frame_offset;
