@@ -14,6 +14,12 @@ macro(CANONIFY_BOOL var)
   endif()
 endmacro()
 
+# If enabled, enables sensible stack traces on Linux, complete with corresponding source
+# code, where available. CUDA errors also produce complete stack traces when this is on.
+# If disabled, the error messages degrade gracefully to file/line information.
+OPTION(WITH_BACKWARDS_CPP "Build with backwards-cpp stack trace dumping library? (Linux-only)" TRUE)
+message(STATUS "backwards-cpp-enhanced stack traces? " ${WITH_BACKWARDS_CPP})
+
 # We use Eigen for generic matrix support and linear algebra routines.
 find_package(Eigen3 REQUIRED)
 find_package(GLUT REQUIRED)
@@ -46,6 +52,12 @@ ENDIF()
 
 # Set some additional common compilation flags, like C++11 feature support.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
+# TODO(andrei): Maybe just remove it from the ITM tree and put it in src/?
+if(WITH_BACKWARDS_CPP)
+  add_definitions(-DWITH_BACKWARDS_CPP)
+  add_subdirectory(src/InfiniTAM/InfiniTAM/ORUtils/third_party/backward-cpp)
+endif()
 
 # We use Pangolin for the main GUI. Pangolin is a lightweight GUI library focused on visual
 # applications with minimal support for multiple panels, widgets, and live plotting.
@@ -119,3 +131,13 @@ target_link_libraries(DynSLAMGUI InstRecLib)
 target_link_libraries(DynSLAMGUI ${OpenCV_LIBS})
 target_link_libraries(DynSLAMGUI gflags)
 target_link_libraries(DynSLAMGUI ${Viso2_LIBS})
+
+if(WITH_BACKWARDS_CPP)
+  # Link agains libbfd to ensure backward-cpp can extract additional information from the binary,
+  # such as source code mappings. The '-lbfd' dependency is optional, and if it is disabled, the
+  # stack traces will still work, but won't show unmangled symbol names or source code snippets.
+  # You may need to set BACKWARD_USE_BFD to 0 in its `hpp` and `cpp` files to avoid linker errors.
+  target_link_libraries(DynSLAMGUI -lbfd)
+  target_link_libraries(DynSLAMGUI backward)
+endif()
+

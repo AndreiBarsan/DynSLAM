@@ -5,7 +5,7 @@
 #include <iostream>
 #include <sys/time.h>
 
-//#include <backward.hpp>
+#include <backward.hpp>
 #include <gflags/gflags.h>
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
@@ -48,8 +48,7 @@ DEFINE_int32 (frame_offset, 0, "The frame index from which to start reading the 
 // refinement.
 
 // Handle SIGSEGV and its friends by printing sensible stack traces with code snippets.
-// TODO(andrei): this is a hack, please remove or depend on backward directly.
-//backward::SignalHandling sh;
+backward::SignalHandling sh;
 
 /// \brief Define these because OpenCV doesn't. Used in the `cv::flip` OpenCV function.
 enum {
@@ -666,8 +665,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   float focal_length_px = 707.0912f;
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
 
-  Input::Config input_config = Input::KittiOdometryConfig();
-//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+//  Input::Config input_config = Input::KittiOdometryConfig();
+  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
   int frame_offset = FLAGS_frame_offset;

@@ -18,7 +18,7 @@ class SegmentationProvider {
 
   /// \brief Performs semantic segmentation of the given frame.
   /// Usually uses only RGB data, but some segmentation pipelines may leverage depth as well.
-  virtual std::shared_ptr<InstanceSegmentationResult> SegmentFrame(const cv::Mat4b &rgb) = 0;
+  virtual std::shared_ptr<InstanceSegmentationResult> SegmentFrame(const cv::Mat3b &rgb) = 0;
 
   virtual cv::Mat3b *GetSegResult() = 0;
 
