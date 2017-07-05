@@ -228,14 +228,11 @@ public:
   Eigen::Matrix4f *last_egomotion_;
 
   // Parameters for voxel decay
-  // w=3, a=5 seems a little aggressive for dispnet. As long as we're using it and not elas, maybe
-  // even w=1, a=7-8 can also work.
   // ELAS
 //  int max_decay_weight_ = 3;
 //  int min_decay_age_ = 10;
 
-  // Semi-aggressive debug
-    int max_decay_weight_= 2;
+    int max_decay_weight_= 1;
     int aggressive_max_decay_weight_= 2;
     int min_decay_age_ = 50;
   /// \brief Voxels older than this are eligible for decay.

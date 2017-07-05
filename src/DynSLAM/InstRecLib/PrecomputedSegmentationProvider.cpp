@@ -140,7 +140,7 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
   return detections;
 }
 
-shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentFrame(const cv::Mat4b &rgb) {
+shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentFrame(const cv::Mat3b &rgb) {
   stringstream img_fpath_ss;
   img_fpath_ss << this->seg_folder_ << "/"
                << "cls_" << setfill('0') << setw(6) << this->frame_idx_ << ".png";
