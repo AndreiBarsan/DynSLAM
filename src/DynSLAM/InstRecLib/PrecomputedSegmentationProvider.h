@@ -24,7 +24,7 @@ class PrecomputedSegmentationProvider : public SegmentationProvider {
 
   ~PrecomputedSegmentationProvider() override { delete last_seg_preview_; }
 
-  std::shared_ptr<InstanceSegmentationResult> SegmentFrame(const cv::Mat4b &view) override;
+  std::shared_ptr<InstanceSegmentationResult> SegmentFrame(const cv::Mat3b &view) override;
 
   const cv::Mat3b *GetSegResult() const override;
 

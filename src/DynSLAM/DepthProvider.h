@@ -87,7 +87,7 @@ class DepthProvider {
                              const StereoCalibration &calibration,
                              cv::Mat1s &out_depth,
                              float min_depth_m =  0.50f,
-                             float max_depth_m = 15.0f
+                             float max_depth_m = 20.0f
   ) {
     assert(disparity.size() == out_depth.size());
 
