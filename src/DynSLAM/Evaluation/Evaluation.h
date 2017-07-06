@@ -29,6 +29,14 @@ class Evaluation {
     delete velodyne;
   }
 
+  Velodyne* GetVelodyne() {
+    return velodyne;
+  }
+
+  const Velodyne* GetVelodyne() const {
+    return velodyne;
+  }
+
  private:
   Velodyne *velodyne;
 

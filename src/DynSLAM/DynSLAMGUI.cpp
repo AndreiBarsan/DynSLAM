@@ -163,20 +163,41 @@ public:
 
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
-      if (display_raw_previews_->Get()) {
-        UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
-      }
-      else {
-        UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_);
-      }
-      pane_texture_->RenderToViewport(true);
+      // TODO(andrei): Toggle this or something.
+      // Currently visualizing LIDAR data.
 
-      if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
-        PreviewSparseSF(dyn_slam_->GetLatestFlow().matches, rgb_view_);
-      }
+      auto lidar = dyn_slam_->GetEvaluation()->GetVelodyne()->ReadFrame(dyn_slam_input_->GetCurrentFrame());
+//      Eigen::MatrixXf P = dyn_slam_->GetPose();   // TODO(andrei): ALWAYS use GT pose here, don't rely on using GT VO forever.
+      Eigen::MatrixXf P0(3, 4);
+      P0 << 7.070912000000e+02, 0.000000000000e+00, 6.018873000000e+02, 0.000000000000e+00,
+            0.000000000000e+00, 7.070912000000e+02, 1.831104000000e+02, 0.000000000000e+00,
+            0.000000000000e+00, 0.000000000000e+00, 1.000000000000e+00, 0.000000000000e+00;
+      Eigen::Matrix4f Tr;
+      Tr << -1.857739385241e-03, -9.999659513510e-01, -8.039975204516e-03, -4.784029760483e-03,
+            -6.481465826011e-03, 8.051860151134e-03, -9.999466081774e-01, -7.337429464231e-02,
+             9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,
+          0, 0, 0, 1;
+
+      Tic("LIDAR render (naive)");
+      PreviewLidar(lidar, P0, Tr, rgb_view_);
+      Toc();
+
+//      if (display_raw_previews_->Get()) {
+//        UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
+//      }
+//      else {
+//        UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_);
+//      }
+//      pane_texture_->RenderToViewport(true);
+//
+//      if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
+//        PreviewSparseSF(dyn_slam_->GetLatestFlow().matches, rgb_view_);
+//      }
 
       depth_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
+      // TODO(andrei): Make these rendered buffers use the same color map (currently differs and
+      // looks bad when the staticdepthpreview is used).
       if (display_raw_previews_->Get()) {
         UploadCvTexture(*(dyn_slam_->GetDepthPreview()), *pane_texture_, false, GL_SHORT);
       }
@@ -306,6 +327,60 @@ public:
     }
 
     glEnable(GL_DEPTH_TEST);
+  }
+
+  /// \brief Renders the velodyne points for visual inspection.
+  /// \param lidar_points
+  /// \param P Left camera matrix.
+  /// \param Tr Transforms velodyne points into the left camera's frame.
+  /// \note For fused visualization we need to use the depth render as a zbuffer when rendering
+  /// LIDAR points, either in OpenGL, or manually by projecting LIDAR points and manually checking
+  /// their resulting depth. But we don't need this visualization yet; So far, it's enough to render
+  /// the LIDAR results for sanity, and then for every point in the cam frame look up the model
+  /// depth and compare the two.
+  void PreviewLidar(
+      const Eigen::MatrixXf &lidar_points,
+      const Eigen::MatrixXf &P,
+      const Eigen::MatrixXf &Tr,
+      const pangolin::View &view
+  ) {
+    // TODO(andrei): This can be VERY slow (~40ms LOL). Be smart about it and vectorize the shit out
+    // of it.
+    //
+    // convert every velo point into 2D as: x_i = P * Tr * X_i
+    for (int i = 0; i < lidar_points.rows(); ++i) {
+      // check bounds, then check Z positive, greater than some near plane or smth.
+      Eigen::Vector4f point;
+      float reflectance = lidar_points(i, 3);
+      point(0) = lidar_points(i, 0);
+      point(1) = lidar_points(i, 1);
+      point(2) = lidar_points(i, 2);
+      point(3) = 1.0f;                // Replace reflectance with the homogeneous 1.
+
+      Eigen::VectorXf p3d = Tr * point;
+      p3d /= p3d(3);
+      float Z = p3d(2);
+
+      if (Z < 0.01f) {
+        continue;
+      }
+
+      Eigen::VectorXf p2d = P * p3d;
+      p2d /= p2d(2);
+
+      Eigen::Vector2f frame_size(width_, height_);
+      cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(p2d(0), p2d(1)), frame_size, view);
+      float intensity = min(10.0f / Z, 1.0f);
+      glColor4f(intensity, intensity, reflectance, 1.0f);
+      // LMAO
+      pangolin::glDrawCross(gl_pos[0], gl_pos[1], 0.001f);
+    }
+
+    glColor4f(1, 1, 1, 1);
+    pangolin::glDraw_x0(1.0f, 1);
+    pangolin::glDraw_y0(1.0f, 1);
+    pangolin::glDraw_z0(1.0f, 1);
+
   }
 
 protected:
