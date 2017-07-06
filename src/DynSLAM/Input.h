@@ -126,6 +126,12 @@ class Input {
     return depth_provider_;
   }
 
+  /// \brief Returns the current frame index from the dataset.
+  /// \note May not be the same as the current DynSLAM frame number if an offset was used.
+  int GetCurrentFrame() const {
+    return frame_idx_;
+  }
+
  private:
   std::string dataset_folder_;
   Config config_;

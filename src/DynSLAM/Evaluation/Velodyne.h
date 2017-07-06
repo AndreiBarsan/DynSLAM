@@ -55,23 +55,6 @@ class Velodyne {
     return points;
   }
 
-  /// \brief Renders the velodyne points for visual inspection.
-  /// \param velodyne_points
-  /// \param P (Left) camera pose matrix.
-  /// \param Tr Transforms velodyne points into the 0th camera's frame.
-  /// \note For fused visualization we need to use the depth render as a zbuffer when rendering
-  /// LIDAR points, either in OpenGL, or manually by projecting LIDAR points and manually checking
-  /// their resulting depth. But we don't need this visualization yet; So far, it's enough to render
-  /// the LIDAR results for sanity, and then for every point in the cam frame look up the model
-  /// depth and compare the two.
-  void RenderFrame(const Eigen::MatrixXf &velodyne_points,
-                   const Eigen::MatrixXf &P,
-                   const Eigen::MatrixXf &Tr
-  ) {
-    // convert every velo point into 2D as: x_i = P * Tr * X_i
-
-  }
-
  private:
   const std::string folder_;
   const std::string fname_format_;
