@@ -94,16 +94,17 @@ add_subdirectory(src/InfiniTAM/InfiniTAM)
 add_subdirectory(src/DynSLAM/InstRecLib)
 
 set(DYNSLAM_SOURCES
-    src/DynSLAM/DepthProvider.h
+    # A tiny library for working with portable float map (PFM) files.
+    src/pfmLib/ImageIOpfm.cpp
+
     src/DynSLAM/DSHandler3D.cpp
     src/DynSLAM/DynSlam.cpp
+    src/DynSLAM/Evaluation/Evaluation.cpp
+    src/DynSLAM/Evaluation/Velodyne.cpp
     src/DynSLAM/InfiniTamDriver.cpp
     src/DynSLAM/Input.cpp
     src/DynSLAM/PrecomputedDepthProvider.cpp
-    src/DynSLAM/Utils.cpp
-
-    # A tiny library for working with portable float map (PFM) files.
-    src/pfmLib/ImageIOpfm.cpp src/DynSLAM/PreviewType.h)
+    src/DynSLAM/Utils.cpp)
 
 set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}

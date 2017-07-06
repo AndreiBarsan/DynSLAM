@@ -725,9 +725,10 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   sf_params.calib.f  = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx; // TODO should we average fx and fy?
 
   auto sparse_sf_provider = new instreclib::VisoSparseSFProvider(sf_params);
+  auto evaluation = new dynslam::eval::Evaluation(dataset_root, input_config);
 
   *dyn_slam_out = new gui::DynSlam();
-  (*dyn_slam_out)->Initialize(driver, segmentation_provider, sparse_sf_provider);
+  (*dyn_slam_out)->Initialize(driver, segmentation_provider, sparse_sf_provider, evaluation);
 }
 
 } // namespace dynslam
