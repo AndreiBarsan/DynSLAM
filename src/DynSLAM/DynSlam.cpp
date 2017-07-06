@@ -8,13 +8,17 @@
 namespace dynslam {
 
 using namespace instreclib::reconstruction;
+using namespace dynslam::eval;
 
 void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine,
                          SegmentationProvider *segmentation_provider,
-                         SparseSFProvider *sparse_sf_provider) {
+                         SparseSFProvider *sparse_sf_provider,
+                         Evaluation *evaluation) {
 
   this->static_scene_ = itm_static_scene_engine;
   this->sparse_sf_provider_ = sparse_sf_provider;
+  this->segmentation_provider_ = segmentation_provider;
+  this->evaluation_ = evaluation;
   this->current_frame_no_ = 0;
 
   bool allocate_gpu = true;
@@ -28,9 +32,7 @@ void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine,
   input_height_ = input_shape.y;
 
   // TODO(andrei): Own CUDA safety wrapper. With blackjack. And hookers.
-  ITMSafeCall(cudaThreadSynchronize());
 
-  this->segmentation_provider_ = segmentation_provider;
   this->instance_reconstructor_ = new InstanceReconstructor(itm_static_scene_engine);
 
   cout << "DynSLAM initialization complete." << endl;
@@ -110,6 +112,11 @@ void DynSlam::ProcessFrame(Input *input) {
     static_scene_->Decay();
     utils::TocMicro();
   }
+
+  // TODO(andrei): Easy way to toggle this on/off.
+  utils::Tic("Evaluation");
+  evaluation_->EvaluateFrame(input, this);
+  utils::Toc();
 
 //  utils::Tic("Final error check");
   // Final sanity check after the frame is processed: individual components should check for errors.

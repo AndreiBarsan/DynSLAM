@@ -8,6 +8,13 @@
 #include "InstRecLib/PrecomputedSegmentationProvider.h"
 #include "InstRecLib/SparseSFProvider.h"
 #include "Input.h"
+#include "Evaluation/Evaluation.h"
+
+namespace dynslam {
+namespace eval {
+class Evaluation;
+}
+}
 
 namespace dynslam {
 
@@ -26,9 +33,11 @@ class DynSlam {
   // TODO(andrei): If possible, get rid of the initialize method.
   void Initialize(InfiniTamDriver *itm_static_scene_engine,
                   SegmentationProvider *segmentation_provider,
-                  SparseSFProvider *sparse_sf_provider);
+                  SparseSFProvider *sparse_sf_provider,
+                  dynslam::eval::Evaluation *evaluation);
 
   /// \brief Reads in and processes the next frame from the data source.
+  /// This is where most of the interesting stuff happens.
   void ProcessFrame(Input *input);
 
   const unsigned char* GetRaycastPreview() {
@@ -91,6 +100,10 @@ class DynSlam {
 
   InstanceReconstructor* GetInstanceReconstructor() {
     return instance_reconstructor_;
+  }
+
+  dynslam::eval::Evaluation* GetEvaluation() {
+    return evaluation_;
   }
 
   int GetInputWidth() {
@@ -163,13 +176,11 @@ class DynSlam {
   }
 
 private:
-  // This is the main reconstruction component. Should split for dynamic+static.
-  // In the future, we may need to write our own.
-  // For now, this shall only handle reconstructing the static part of a scene.
   InfiniTamDriver *static_scene_;
   SegmentationProvider *segmentation_provider_;
   InstanceReconstructor *instance_reconstructor_;
   SparseSFProvider *sparse_sf_provider_;
+  dynslam::eval::Evaluation *evaluation_;
 
   ITMUChar4Image *out_image_;
   cv::Mat3b *input_rgb_image_;
