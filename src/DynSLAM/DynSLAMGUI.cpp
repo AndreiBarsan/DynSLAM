@@ -361,7 +361,7 @@ public:
       p3d /= p3d(3);
       float Z = p3d(2);
 
-      if (Z < 0.01f) {
+      if (Z < 0.5f) {
         continue;
       }
 
@@ -370,7 +370,7 @@ public:
 
       Eigen::Vector2f frame_size(width_, height_);
       cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(p2d(0), p2d(1)), frame_size, view);
-      float intensity = min(10.0f / Z, 1.0f);
+      float intensity = min(5.0f / Z, 1.0f);
       glColor4f(intensity, intensity, reflectance, 1.0f);
       // LMAO
       pangolin::glDrawCross(gl_pos[0], gl_pos[1], 0.001f);
