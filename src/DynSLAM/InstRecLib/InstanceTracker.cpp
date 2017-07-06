@@ -33,7 +33,8 @@ void InstanceTracker::ProcessInstanceViews(int frame_idx,
   }
 
   // 3. Iterate through existing tracks, find ``expired'' ones, and discard them.
-  this->PruneTracks(frame_idx);
+  cerr << "XXX: Not pruning old tracks." << endl;
+//  this->PruneTracks(frame_idx);
 }
 
 void InstanceTracker::PruneTracks(int current_frame_idx) {
@@ -51,6 +52,8 @@ void InstanceTracker::PruneTracks(int current_frame_idx) {
         it->second.GetReconstruction()->SetView(nullptr);
       }
 
+      cout << "Erasing track: #" << it->first << ", " << it->second.GetClassName() << " of "
+           << it->second.GetSize() << " frames." << endl;
       it = id_to_active_track_.erase(it);
     } else {
       ++it;

@@ -21,6 +21,9 @@ struct TrackFrame {
   /// \brief The camera pose at the time when this frame was observed.
   Eigen::Matrix4f camera_pose;
 
+  /// \brief The relative pose to the previous frame in the track, if it could be computed.
+  dynslam::utils::Option<Eigen::Matrix4d> relative_pose;
+
   TrackFrame(int frame_idx, const InstanceView& instance_view, const Eigen::Matrix4f camera_pose)
       : frame_idx(frame_idx), instance_view(instance_view), camera_pose(camera_pose) {}
 
@@ -30,6 +33,9 @@ struct TrackFrame {
 /// \brief A detected object's track through multiple frames.
 /// Modeled as a series of detections, contained in the 'frames' field. Note that there can be
 /// gaps in this list, due to frames where this particular object was not detected.
+/// \todo In the long run, this class should be able to leverage a 3D reconstruction and something
+///       like a Kalman Filter for motion tracking to predict an object's (e.g., car) pose in a
+///       subsequent frame, in order to aid with tracking.
 class Track {
  public:
   Track(int id) : id_(id), reconstruction(nullptr) {}
@@ -63,6 +69,11 @@ class Track {
   TrackFrame& GetFrame(int i) { return frames_[i]; }
 
   int GetId() const { return id_; }
+
+  std::string GetClassName() const {
+    assert(frames_.size() > 0 || "Need at least one frame to determine a track's class.");
+    return GetLastFrame().instance_view.GetInstanceDetection().GetClassName();
+  }
 
   /// \brief Draws a visual representation of this feature track.
   /// \example For an object first seen in frame 11, then in frames 12, 13, and 16, this

@@ -167,7 +167,7 @@ public:
       // Currently visualizing LIDAR data.
 
       auto lidar = dyn_slam_->GetEvaluation()->GetVelodyne()->ReadFrame(dyn_slam_input_->GetCurrentFrame());
-//      Eigen::MatrixXf P = dyn_slam_->GetPose();   // TODO(andrei): ALWAYS use GT pose here, don't rely on using GT VO forever.
+      // TODO(andrei): Don't hardcode calibration params like this.
       Eigen::MatrixXf P0(3, 4);
       P0 << 7.070912000000e+02, 0.000000000000e+00, 6.018873000000e+02, 0.000000000000e+00,
             0.000000000000e+00, 7.070912000000e+02, 1.831104000000e+02, 0.000000000000e+00,
@@ -180,7 +180,7 @@ public:
 
       Tic("LIDAR render (naive)");
       PreviewLidar(lidar, P0, Tr, rgb_view_);
-      Toc();
+      Toc(true);
 
 //      if (display_raw_previews_->Get()) {
 //        UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
