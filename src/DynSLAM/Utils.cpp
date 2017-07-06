@@ -2,10 +2,13 @@
 
 #include "Utils.h"
 
+#include <iostream>
 #include <cstdarg>
 #include <cstring>
 #include <memory>
 #include <sys/time.h>
+
+#include <opencv/cv.h>
 
 namespace dynslam {
 namespace utils {

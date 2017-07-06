@@ -77,7 +77,6 @@ void ProcessSilhouette_CPU(Vector4u *source_rgb,
                            Vector4u *dest_rgb,
                            DEPTH_T *dest_depth,
                            Eigen::Vector2i sourceDims,
-                           vector<RawFlow> &instance_flow_vectors,  // expressed in the current left camera's frame
                            const InstanceDetection &detection,
                            const SparseSceneFlow &scene_flow) {
   // Blanks out the detection's silhouette in the 'source' frames, and writes its pixels into the
@@ -212,10 +211,6 @@ Option<Eigen::Matrix4d>* EstimateInstanceMotion(
                << " matches." << endl;
       Matrix delta_mx = VisualOdometry::transformationVectorToMatrix(instance_motion_delta);
 
-      // TODO(andrei): Prof Geiger: compare this to the current egomotion (or to ID if egomotion
-      // removed). If close to egomotion (compare correctly! absolute translation l2 + rodrigues
-      // rotation repr.), then the object is static; we set the relative motion to id and BAM! done.
-
       // TODO(andrei): Make this a utility. Note: The '~' transposes the matrix...
       auto *md_mat = new Eigen::Matrix4d((~delta_mx).val[0]);
       return new Option<Eigen::Matrix4d>(md_mat);
@@ -225,6 +220,29 @@ Option<Eigen::Matrix4d>* EstimateInstanceMotion(
     cout << "Only " << flow_count << " scene flow points. Not estimating relative pose." << endl;
     return new Option<Eigen::Matrix4d>();
   }
+}
+
+// TODO: move this to the track object, and make it easy to convert to proper tracker/motion
+// predictor if possible.
+Option<Eigen::Matrix4d>* EstimateTrackMotion(const Track &track, const SparseSFProvider &ssf_provider) {
+  Option<Eigen::Matrix4d> *relative_pose = EstimateInstanceMotion(
+      track.GetLastFrame().instance_view.GetFlow(),
+      ssf_provider);
+
+  if (relative_pose->IsPresent()) {
+    return relative_pose;
+  }
+
+  if (track.GetSize() > 1) {
+    const TrackFrame &previous_frame = track.GetFrame(static_cast<int>(track.GetSize() - 2));
+    if (previous_frame.relative_pose.IsPresent()) {
+      // TODO better memory management
+      return new dynslam::utils::Option<Eigen::Matrix4d>(new Eigen::Matrix4d(previous_frame.relative_pose.Get()));
+    }
+  }
+
+  // Motion is completely unknown
+  return new Option<Eigen::Matrix4d>();
 }
 
 /// \brief Computes a relative pose rotation error using the metric from the KITTI odometry evaluation.
@@ -244,13 +262,18 @@ inline float translationError(const Eigen::Matrix4f &pose_error) {
   return sqrt(dx * dx + dy * dy + dz * dz);
 }
 
+// TODO(andrei): Refactor this BEHEMOTH before it gets >500 LOC in size and devours us all.
+// TODO(andrei): Keep tracking static things, but don't attempt to reconstruct them, since it wastes memory.
 void InstanceReconstructor::ProcessFrame(
-    const dynslam::DynSlam* dyn_slam,
+    const dynslam::DynSlam *dyn_slam,
     ITMLib::Objects::ITMView *main_view,
     const segmentation::InstanceSegmentationResult &segmentation_result,
     const SparseSceneFlow &scene_flow,
     const SparseSFProvider &ssf_provider
 ) {
+  Eigen::Matrix4f egomotion = dyn_slam->GetLastEgomotion();
+  bool alwaysSeparate = false;   // Whether to always separately reconstruct car models, even if they're static.
+
   // TODO(andrei): Perform this slicing 100% on the GPU.
   main_view->rgb->UpdateHostFromDevice();
   main_view->depth->UpdateHostFromDevice();
@@ -275,8 +298,8 @@ void InstanceReconstructor::ProcessFrame(
       "car",
       "cat",
       "cow",
-      "dog",        // No, Timmy, Lassie went to live on your Aunt's farm. Totally didn't get ran
-                    // over by self-driving car.
+      "dog",        // No, Timmy, Lassie went to live on Auntie's farm. Totally didn't get ran
+                    // over by self-driving car or anything.
       "horse",
       "motorbike",
       "person",
@@ -288,11 +311,10 @@ void InstanceReconstructor::ProcessFrame(
   Eigen::Vector2i frame_size(frame_size_itm.x, frame_size_itm.y);
   vector<InstanceView> new_instance_views;
   for (const InstanceDetection &instance_detection : segmentation_result.instance_detections) {
-    // At this stage of the project, we only care about cars. In the future, this scheme could be
-    // extended to also support other classes, as well as any unknown, but moving, objects.
-    if (find(classes_to_reconstruct_voc2012.begin(),
-             classes_to_reconstruct_voc2012.end(),
-             instance_detection.GetClassName()) != classes_to_reconstruct_voc2012.end()
+
+    if (find(possibly_dynamic_classes_voc2012.cbegin(),
+             possibly_dynamic_classes_voc2012.cend(),
+             instance_detection.GetClassName()) != possibly_dynamic_classes_voc2012.end()
     ) {
       // bool use_gpu = main_view->rgb->isAllocated_CUDA; // May need to modify 'MemoryBlock' to
       // check this, since the field is private.
@@ -303,9 +325,6 @@ void InstanceReconstructor::ProcessFrame(
       *calibration = *main_view->calib;
 
       auto view = make_shared<ITMView>(calibration, frame_size_itm, frame_size_itm, use_gpu);
-      auto rgb_segment_h = view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
-      auto depth_segment_h = view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
-
       vector<RawFlow> instance_flow_vectors;
       ExtractSceneFlow(
           scene_flow,
@@ -313,67 +332,130 @@ void InstanceReconstructor::ProcessFrame(
           instance_detection,
           frame_size);
 
-      Option<Eigen::Matrix4d> *motion_delta = EstimateInstanceMotion(instance_flow_vectors, ssf_provider);
-      // TODO(andrei): We may need to apply the dense refinement right here, in case the RANSAC
-      // result from libviso is inconclusive.
-
-      Eigen::Matrix4f egomotion = dyn_slam->GetLastEgomotion();
-      bool alwaysSeparate = true;   // Whether to always separately reconstruct car models, even if they're static.
-
-      if (motion_delta->IsPresent() || alwaysSeparate) {
-        // But what if the motion can't be estimated? Wouldn't it make more sense to first try to
-        // find the best track, and then possibly apply the "poor man's Kalman filter" from there?
-
-//        cout << "Egomotion: " << endl << egomotion << endl;
-//        cout << "Motion delta for this object: " << endl << motion_delta->Get() << endl;
-
-        // Since the egomotion is already expressed as the inverse motion in the camera frame,
-        // there's no need to invert it here again.
-        float transError = 0.0f;
-        float kTransErrorTreshold = 0.25f;
-        if (! alwaysSeparate) {
-          Eigen::Matrix4f error = egomotion * motion_delta->Get().cast<float>();
-          transError = translationError(error);
-          printf("Frame has %.4f trans error wrt my egomotion.\n", transError);
-        }
-
-        if (transError > kTransErrorTreshold || alwaysSeparate) {
-          printf("Fusing into own instance!\n");
-          ProcessSilhouette_CPU(rgb_data_h,
-                                depth_data_h,
-                                rgb_segment_h,
-                                depth_segment_h,
-                                frame_size,
-                                instance_flow_vectors,  // TODO(andrei): Remove
-                                instance_detection,
-                                scene_flow);
-          view->rgb->UpdateDeviceFromHost();
-          view->depth->UpdateDeviceFromHost();
-
-          new_instance_views.emplace_back(instance_detection,
-                                          view,
-                                          instance_flow_vectors,
-                                          shared_ptr<Option<Eigen::Matrix4d>>(motion_delta));
-        }
-        else {
-          printf("Fusing into static map!\n");
-        }
-      }
-
+      new_instance_views.emplace_back(instance_detection,
+                                      view,
+                                      instance_flow_vectors);
     }
-    else if(find(possibly_dynamic_classes_voc2012.cbegin(),
-                 possibly_dynamic_classes_voc2012.cend(),
-                 instance_detection.GetClassName()) != possibly_dynamic_classes_voc2012.cend()
-    ) {
-      // In this case, we simply remove the object from view, but we don't attempt to track or
-      // reconstruct it.
-      RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size, instance_detection);
-    }
-    // else, it's not an object in which we are interested
   }
+
+  // TODO(andrei): Move or remove this wall of text.
+  // Limitation: how to deal with thresholding if the object's reconstruction has already started?
+  // Possible answer: if a track was at some point labeled as moving, which should be quite accurate
+  // in this new setup, then assume it never stops. For the other case (stopped and starts moving),
+  // we can simply start reconstruction from the point in time when the car starts moving, since the
+  // old halo can now get updated in theory. Note that these events may be very rare (or may not
+  // exist) in the KITTI dataset.
+  //
+  // 1. Loop through detections, and associate them with scene flow.
+  // 2. Perform track associations.
+  // 3. Evaluate each active object's current motion, based either on the latest estimate, or on a
+  //    constant-velocity assumption. We could also extend this part in the future with a proper
+  //    KF/particle filter tracker. Moreover, doing this would allow us, if applicable, to
+  //    initialize the relative pose estimator RANSAC using the known velocity.
+  // 4. First thresholding. If the object is clearly static, stop and fuse it.
+  // 5. (New) Use a direct method for finer-grained tracking, possibly initializing it with the
+  //    coarse estimate of the relative pose. This could be something similar to what Peidong
+  //    suggested, or something like ICP (though bear in mind you need to initialize a reconstruction
+  //    for ICP to work, OR you could hack out the code if you can).
+  // 6. (New) Second thresholding. If the object is still clearly moving, fuse it into its own
+  //    volume.
+
+  // A limitation of libviso for small object could be the fact that it's ignoring color information.
+  // TODO(andrei): Ghetto object relative pose estimation improvement idea: force a grid of features
+  // to be generated for a dynamic object.
 
   // Associate this frame's detection(s) with those from previous frames.
   this->instance_tracker_->ProcessInstanceViews(frame_idx_, new_instance_views, dyn_slam->GetPose());
+
+  // TODO make iteration less dumb
+  for (auto &pair : instance_tracker_->GetActiveTracks()) {
+    int id = pair.first;
+    Track &track = instance_tracker_->GetTrack(id);
+
+    Option<Eigen::Matrix4d> *motion_delta = EstimateTrackMotion(track, ssf_provider);
+    track.GetLastFrame().relative_pose = *motion_delta;
+
+    bool motion_known = false;
+    bool track_is_static = true;
+    bool should_reconstruct = (find(
+        classes_to_reconstruct_voc2012.begin(),
+        classes_to_reconstruct_voc2012.end(),
+        track.GetClassName()) != classes_to_reconstruct_voc2012.end());
+    bool possibly_dynamic = (find(
+        possibly_dynamic_classes_voc2012.cbegin(),
+        possibly_dynamic_classes_voc2012.cend(),
+        track.GetClassName()) != possibly_dynamic_classes_voc2012.cend());
+
+    if (motion_delta->IsPresent()) {
+      motion_known = true;
+      // Since the egomotion is already expressed as the inverse motion in the camera frame,
+      // there's no need to invert it here again.
+      Eigen::Matrix4f error = egomotion * motion_delta->Get().cast<float>();
+      float kTransErrorTreshold = 0.25f;
+      float transError = translationError(error);
+      printf("Frame %d has %.4f trans error wrt my egomotion: ", id, transError);
+
+      cout << "ME: " << endl << egomotion << endl;
+      cout << "Object: " << motion_delta->Get() << endl;
+
+
+      if (transError > kTransErrorTreshold) {
+        printf("Dynamic object!\n");
+        track_is_static = false;
+      }
+      else {
+        printf("Static object!\n");
+      }
+    }
+
+    if (motion_known) {
+      if (track_is_static) {
+        // The object is known to be static.
+        continue;
+      }
+      else if (should_reconstruct) {
+        // TODO(andrei): Don't allocate a view every time!
+        // Dynamic object which we should reconstruct, such as a car
+        auto view = track.GetLastFrame().instance_view.GetView();
+        auto rgb_segment_h = view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+        auto depth_segment_h = view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+
+        ProcessSilhouette_CPU(rgb_data_h,
+                              depth_data_h,
+                              rgb_segment_h,
+                              depth_segment_h,
+                              frame_size,
+                              track.GetLastFrame().instance_view.GetInstanceDetection(),
+                              scene_flow);
+      }
+      else if (possibly_dynamic) {
+        cout << "Dynamic object with known motion we can't reconstruct. Removing." << endl;
+        // Dynamic object which we can't or don't want to reconstruct, such as a pedestrian.
+        // In this case, we simply remove the object from view.
+        RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
+                             track.GetLastFrame().instance_view.GetInstanceDetection());
+      }
+      else {
+        // Warn if we detect a moving potted plant.
+        cerr << "Warning: found dynamic object of class [" << track.GetClassName() << "], which is "
+             << "an unexpected type of dynamic object." << endl;
+      }
+    }
+    else {
+      if (possibly_dynamic) {
+        printf("Unknown motion for possibly dynamic object of class %s; cutting away!\n",
+               track.GetClassName().c_str());
+        // Unknown motion and possibly dynamic object.
+        RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
+                             track.GetLastFrame().instance_view.GetInstanceDetection());
+      }
+      else {
+        // Static class with unknown motion. Likely safe to put in main map.
+      }
+    }
+
+  }   // end track motion estimation loop
+
   this->ProcessReconstructions();
 
   // Update the GPU image after we've (if applicable) removed the dynamic objects from it.

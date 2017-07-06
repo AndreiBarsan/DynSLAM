@@ -9,8 +9,6 @@
 
 #include <Eigen/Core>
 
-#include "DepthProvider.h"
-
 namespace dynslam {
 namespace utils {
 

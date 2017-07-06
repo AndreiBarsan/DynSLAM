@@ -78,6 +78,7 @@ string Track::GetAsciiArt() const {
   return out.str();
 }
 
+// TODO clean this method up
 dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
   assert(frame_idx < GetFrames().size() && "Cannot get the relative pose of a non-existent frame.");
 
@@ -85,24 +86,29 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) co
   bool found_good_pose = false;
   Eigen::Matrix4d *pose = new Eigen::Matrix4d;
   pose->setIdentity();
-  Eigen::Matrix4d last_good_relative_pose = Eigen::Matrix4d::Identity();
+//  Eigen::Matrix4d last_good_relative_pose = Eigen::Matrix4d::Identity();
 
+  // TODO we should probably put the relative pose in the track frame, not in the instance view
   // Start from 1 since we care about relative pose to 1st frame.
   for (size_t i = 1; i <= frame_idx; ++i) {
-    if(frames_[i].instance_view.HasRelativePose()) {
+//    if(frames_[i].instance_view.HasRelativePose()) {
+    if (frames_[i].relative_pose.IsPresent()) {
       found_good_pose = true;
 //      cout << "Track #" << id_ << ": Good pose at frame " << i << " (" << frames_[i].frame_idx << ")." << endl;
 
-      Eigen::Matrix4d rel_pose = frames_[i].instance_view.GetRelativePose();
+//      Eigen::Matrix4d rel_pose = frames_[i].instance_view.GetRelativePose();
+      const Eigen::Matrix4d &rel_pose = frames_[i].relative_pose.Get();
       *pose = rel_pose * (*pose);
-      last_good_relative_pose = rel_pose;
+//      last_good_relative_pose = rel_pose;
     }
     else {
       if (found_good_pose) {
+        throw std::runtime_error("This should not happen");
+      }
 //        cerr << "Found good pose followed by an estimation error at i=" << i <<". "
 //            "Assuming constant velocity (poor man's Kalman filter)." << endl;
-        *pose = last_good_relative_pose * (*pose);
-      }
+//        *pose = last_good_relative_pose * (*pose);
+//      }
     }
   }
 
