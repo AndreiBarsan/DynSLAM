@@ -39,6 +39,10 @@ class Input {
     // dataset), or from a single-file ground truth, as provided with the kitti-odometry dataset.
     bool odometry_oxts = false;   // TODO(andrei): Support this.
     std::string odometry_fname = "";
+
+    /// \brief The velodyne LIDAR data used only for evaluation.
+    std::string velodyne_folder = "";
+    std::string velodyne_fname_format = "";
   };
 
   /// We don't use constants here in order to make the code easier to read.
@@ -59,6 +63,9 @@ class Input {
 
     config.odometry_oxts          = false;
     config.odometry_fname         = "ground-truth-poses.txt";
+
+    config.velodyne_folder        = "velodyne";
+    config.velodyne_fname_format  = "%06d.bin";
 
     return config;
   };
