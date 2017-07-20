@@ -182,69 +182,7 @@ void RemoveSilhouette_CPU(ORUtils::Vector4<unsigned char> *source_rgb,
 }
 
 
-Option<Eigen::Matrix4d>* EstimateInstanceMotion(
-    const vector<RawFlow> &instance_raw_flow,
-    const SparseSFProvider &ssf_provider
-) {
-  // This is a good conservative value, but we can definitely do better.
-  uint32_t kMinFlowVectorsForPoseEst = 25;   // TODO experiment and set proper value;
-//  uint32_t kMinFlowVectorsForPoseEst = 12;
-  // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
-  // we're being a little paranoid).
-  size_t flow_count = instance_raw_flow.size();
-
-  // TODO(andrei): Since we're not doing egomotion computation, the nr of inputs is much lower
-  // than in the full viso case => fewer RANSAC iterations than the default should be OK,
-  // especially if we then use a direct method for refinement.
-  if (instance_raw_flow.size() >= kMinFlowVectorsForPoseEst) {
-    vector<double> instance_motion_delta = ssf_provider.ExtractMotion(instance_raw_flow);
-    if (instance_motion_delta.size() != 6) {
-      // track information not available yet; idea: we could move this computation into the
-      // track object, and use data from many more frames (if available).
-          cerr << "Could not compute instance delta motion from " << flow_count << " matches." << endl;
-      return new Option<Eigen::Matrix4d>();
-    } else {
-          cout << "Successfully estimated the relative instance pose from " << flow_count
-               << " matches." << endl;
-      Matrix delta_mx = VisualOdometry::transformationVectorToMatrix(instance_motion_delta);
-
-      // TODO(andrei): Make this a utility. Note: The '~' transposes the matrix...
-      auto *md_mat = new Eigen::Matrix4d((~delta_mx).val[0]);
-      return new Option<Eigen::Matrix4d>(md_mat);
-    }
-  }
-  else {
-    cout << "Only " << flow_count << " scene flow points. Not estimating relative pose." << endl;
-    return new Option<Eigen::Matrix4d>();
-  }
-}
-
-// TODO: move this to the track object, and make it easy to convert to proper tracker/motion
-// predictor if possible.
-Option<Eigen::Matrix4d>* EstimateTrackMotion(const Track &track, const SparseSFProvider &ssf_provider) {
-  Option<Eigen::Matrix4d> *relative_pose = EstimateInstanceMotion(
-      track.GetLastFrame().instance_view.GetFlow(),
-      ssf_provider);
-
-  if (relative_pose->IsPresent()) {
-    return relative_pose;
-  }
-
-  return new Option<Eigen::Matrix4d>();
-
-//  if (track.GetSize() > 1) {
-//    const TrackFrame &previous_frame = track.GetFrame(static_cast<int>(track.GetSize() - 2));
-//    if (previous_frame.relative_pose->IsPresent()) {
-//      // TODO better memory management
-//      return new dynslam::utils::Option<Eigen::Matrix4d>(new Eigen::Matrix4d(previous_frame.relative_pose->Get()));
-//    }
-//  }
-
-//  return new Option<Eigen::Matrix4d>();
-}
-
 // TODO(andrei): Refactor this BEHEMOTH before it gets >500 LOC in size and devours us all.
-// TODO(andrei): Keep tracking static things, but don't attempt to reconstruct them, since it wastes memory.
 void InstanceReconstructor::ProcessFrame(
     const dynslam::DynSlam *dyn_slam,
     ITMLib::Objects::ITMView *main_view,
@@ -313,47 +251,19 @@ void InstanceReconstructor::ProcessFrame(
     }
   }
 
-  // TODO(andrei): Move or remove this wall of text.
-  // Limitation: how to deal with thresholding if the object's reconstruction has already started?
-  // Possible answer: if a track was at some point labeled as moving, which should be quite accurate
-  // in this new setup, then assume it never stops. For the other case (stopped and starts moving),
-  // we can simply start reconstruction from the point in time when the car starts moving, since the
-  // old halo can now get updated in theory. Note that these events may be very rare (or may not
-  // exist) in the KITTI dataset.
-  //
-  // 1. Loop through detections, and associate them with scene flow.
-  // 2. Perform track associations.
-  // 3. Evaluate each active object's current motion, based either on the latest estimate, or on a
-  //    constant-velocity assumption. We could also extend this part in the future with a proper
-  //    KF/particle filter tracker. Moreover, doing this would allow us, if applicable, to
-  //    initialize the relative pose estimator RANSAC using the known velocity.
-  // 4. First thresholding. If the object is clearly static, stop and fuse it.
-  // 5. (New) Use a direct method for finer-grained tracking, possibly initializing it with the
-  //    coarse estimate of the relative pose. This could be something similar to what Peidong
-  //    suggested, or something like ICP (though bear in mind you need to initialize a reconstruction
-  //    for ICP to work, OR you could hack out the code if you can).
-  // 6. (New) Second thresholding. If the object is still clearly moving, fuse it into its own
-  //    volume.
-
   // A limitation of libviso for small object could be the fact that it's ignoring color information.
-  // TODO(andrei): Ghetto object relative pose estimation improvement idea: force a grid of features
-  // to be generated for a dynamic object.
 
   // Associate this frame's detection(s) with those from previous frames.
   this->instance_tracker_->ProcessInstanceViews(frame_idx_, new_instance_views, dyn_slam->GetPose());
 
+  // TODO think about this code A LOT and ensure it makes sense. Make flowcharts and put them in
+  // the thesis. Maybe even add pseudocode to thesis in an algorithm box.
   // TODO make iteration less dumb
   for (auto &pair : instance_tracker_->GetActiveTracks()) {
     int id = pair.first;
     Track &track = instance_tracker_->GetTrack(id);
 
-    // TODO think about this code A LOT and ensure it makes sense. Make flowcharts and put them in
-    // the thesis. Maybe even add pseudocode to thesis in an algorithm box.
-
-    // TODO should we move this into the tracker as well?
-    Option<Eigen::Matrix4d> *motion_delta = EstimateTrackMotion(track, ssf_provider);
-    track.GetLastFrame().relative_pose = motion_delta;
-    track.UpdateState(egomotion);
+    track.Update(egomotion, ssf_provider, false);
 
     bool should_reconstruct = (find(
         classes_to_reconstruct_voc2012.begin(),
@@ -363,6 +273,7 @@ void InstanceReconstructor::ProcessFrame(
         possibly_dynamic_classes_voc2012.cbegin(),
         possibly_dynamic_classes_voc2012.cend(),
         track.GetClassName()) != possibly_dynamic_classes_voc2012.cend());
+    auto instance_view = track.GetLastFrame().instance_view.GetView();
 
     if (track.GetState() == TrackState::kUncertain) {
       if (possibly_dynamic) {
@@ -371,19 +282,18 @@ void InstanceReconstructor::ProcessFrame(
         // Unknown motion and possibly dynamic object.
         RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
                              track.GetLastFrame().instance_view.GetInstanceDetection());
+
+        instance_view->rgb->UpdateDeviceFromHost();
+        instance_view->depth->UpdateDeviceFromHost();
       }
-      else {
-        // Static class with unknown motion. Likely safe to put in main map.
-      }
+      // Else: Static class with unknown motion. Likely safe to put in main map.
     }
     else if (track.GetState() == TrackState::kDynamic || always_separate) {
-
       if (should_reconstruct) {
         // TODO(andrei): Don't allocate a view every time!
         // Dynamic object which we should reconstruct, such as a car
-        auto view = track.GetLastFrame().instance_view.GetView();
-        auto rgb_segment_h = view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
-        auto depth_segment_h = view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+        auto rgb_segment_h = instance_view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+        auto depth_segment_h = instance_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
         ProcessSilhouette_CPU(rgb_data_h,
                               depth_data_h,
@@ -393,19 +303,18 @@ void InstanceReconstructor::ProcessFrame(
                               track.GetLastFrame().instance_view.GetInstanceDetection(),
                               scene_flow);
 
-        view->rgb->UpdateDeviceFromHost();
-        view->depth->UpdateDeviceFromHost();
+        instance_view->rgb->UpdateDeviceFromHost();
+        instance_view->depth->UpdateDeviceFromHost();
       }
       else if (possibly_dynamic) {
-        auto view = track.GetLastFrame().instance_view.GetView();
         cout << "Dynamic object with known motion we can't reconstruct. Removing." << endl;
         // Dynamic object which we can't or don't want to reconstruct, such as a pedestrian.
         // In this case, we simply remove the object from view.
         RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
                              track.GetLastFrame().instance_view.GetInstanceDetection());
 
-        view->rgb->UpdateDeviceFromHost();
-        view->depth->UpdateDeviceFromHost();
+        instance_view->rgb->UpdateDeviceFromHost();
+        instance_view->depth->UpdateDeviceFromHost();
       }
       else {
         // Warn if we detect a moving potted plant.
@@ -419,8 +328,10 @@ void InstanceReconstructor::ProcessFrame(
       continue;
     }
     else {
-      assert(false && "Unexpected track state.");
+      throw runtime_error("Unexpected track state.");
     }
+
+    throw runtime_error("Refactor me so that the loop just calls a method, and the loop is itself in a neat separate method.");
 
   }   // end track motion estimation loop
 
@@ -557,14 +468,6 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     // We have the ITM instance up and running, so we can even perform ICP or some dense alignment
     // method here if we wish.
     instance_driver.SetPose(rel_dyn_pose_f.inverse());
-
-//    if (frame_idx > 2) {
-//      auto *v = frame.instance_view.GetView();
-//      cv::Mat1s depthm((int)v->calib->intrinsics_rgb.sizeY, (int)v->calib->intrinsics_rgb.sizeX);
-//      dynslam::drivers::ItmToCv(*v->depth, &depthm);
-//      cv::imshow("foo", depthm);
-//      cv::waitKey();
-//    }
 
     try {
       instance_driver.Integrate();

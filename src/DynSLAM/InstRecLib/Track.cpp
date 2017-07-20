@@ -2,6 +2,7 @@
 
 #include "Track.h"
 #include "InstanceTracker.h"
+#include "../../libviso2/src/viso.h"
 
 namespace instreclib {
 namespace reconstruction {
@@ -119,32 +120,80 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) co
   return Option<Eigen::Matrix4d>(pose);
 }
 
-void Track::UpdateState(const Eigen::Matrix4f &egomotion) {
-  // TODO(andrei): Clean up and document.
-  using namespace dynslam::utils;
 
+Option<Eigen::Matrix4d>* EstimateInstanceMotion(
+    const vector<RawFlow> &instance_raw_flow,
+    const SparseSFProvider &ssf_provider
+) {
+  // This is a good conservative value, but we can definitely do better.
+  // TODO(andrei): Try setting the minimum to 6-10, but threshold based on the final RMSE, discarding
+  // estimates which are above some value.
+  uint32_t kMinFlowVectorsForPoseEst = 25;   // TODO experiment and set proper value;
+//  uint32_t kMinFlowVectorsForPoseEst = 12;
+  // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
+  // we're being a little paranoid).
+  size_t flow_count = instance_raw_flow.size();
+
+  // TODO(andrei): Since we're not doing egomotion computation, the nr of inputs is much lower
+  // than in the full viso case => fewer RANSAC iterations than the default should be OK,
+  // especially if we then use a direct method for refinement.
+  if (instance_raw_flow.size() >= kMinFlowVectorsForPoseEst) {
+    vector<double> instance_motion_delta = ssf_provider.ExtractMotion(instance_raw_flow);
+    if (instance_motion_delta.size() != 6) {
+      // track information not available yet; idea: we could move this computation into the
+      // track object, and use data from many more frames (if available).
+      cerr << "Could not compute instance delta motion from " << flow_count << " matches." << endl;
+      return new Option<Eigen::Matrix4d>();
+    } else {
+      cout << "Successfully estimated the relative instance pose from " << flow_count
+           << " matches." << endl;
+      Matrix delta_mx = VisualOdometry::transformationVectorToMatrix(instance_motion_delta);
+
+      // TODO(andrei): Make this a utility. Note: The '~' transposes the matrix...
+      auto *md_mat = new Eigen::Matrix4d((~delta_mx).val[0]);
+      return new Option<Eigen::Matrix4d>(md_mat);
+    }
+  }
+  else {
+    cout << "Only " << flow_count << " scene flow points. Not estimating relative pose." << endl;
+    return new Option<Eigen::Matrix4d>();
+  }
+}
+
+
+void Track::Update(const Eigen::Matrix4f &egomotion,
+                   const instreclib::SparseSFProvider &ssf_provider,
+                   bool verbose) {
+  Option<Eigen::Matrix4d> *motion_delta = EstimateInstanceMotion(
+      GetLastFrame().instance_view.GetFlow(),
+      ssf_provider);
+  GetLastFrame().relative_pose = motion_delta;
   auto &latest_motion = GetLastFrame().relative_pose;
   int current_frame_idx = GetLastFrame().frame_idx;
-  int kMaxUncertainFramesStatic = 3;
-  int kMaxUncertainFramesDynamic = 2;
 
   switch(track_state_) {
     case kUncertain:
       if (latest_motion->IsPresent()) {
         Eigen::Matrix4f error = egomotion * latest_motion->Get().cast<float>();
-        float kTransErrorTreshold = 0.20f;
         float trans_error = TranslationError(error);
 
-        printf("Object %d has %.4f trans error wrt my egomotion: ", id_, trans_error);
-        cout << endl << "ME: " << endl << egomotion << endl;
-        cout << endl << "Object: " << endl << latest_motion->Get() << endl;
+        if (verbose) {
+          cout << "Object " << id_ << " has " << setw(8) << setprecision(4) << trans_error
+               << " translational error w.r.t. the egomotion." << endl;
+          cout << endl << "ME: " << endl << egomotion << endl;
+          cout << endl << "Object: " << endl << latest_motion->Get() << endl;
+        }
 
         if (trans_error > kTransErrorTreshold) {
-          printf("Uncertain -> Dynamic object!\n");
+          if (verbose) {
+            cout << "Uncertain -> Dynamic object!" << endl;
+          }
           this->track_state_ = kDynamic;
         }
         else {
-          printf("Uncertain -> Static object!\n");
+          if (verbose) {
+            cout << "Uncertain -> Static object!" << endl;
+          }
           this->track_state_ = kStatic;
         }
 
@@ -167,17 +216,14 @@ void Track::UpdateState(const Eigen::Matrix4f &egomotion) {
       else {
         int motion_age = current_frame_idx - last_known_motion_time_;
         if (motion_age > frameThreshold) {
-          printf("%s -> Uncertain because the relative motion couldn't be evaluated over the "
-                     "last %d frames.\n",
-                 GetStateLabel().c_str(),
-                 kMaxUncertainFramesDynamic);
+          if (verbose) {
+            cout << GetStateLabel() << " -> Uncertain because the relative motion couldn't be "
+                 << "evaluated over the last " << frameThreshold << " frames.\n" << endl;
+          }
 
           this->track_state_ = kUncertain;
         }
         else {
-          printf("No relative pose available, but we assume constant motion. Age of last good "
-                     "motion: %d\n", motion_age);
-
           // Assume constant motion for small gaps in the track.
           GetLastFrame().relative_pose = new Option<Eigen::Matrix4d>(
               new Eigen::Matrix4d(last_known_motion_));

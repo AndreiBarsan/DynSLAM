@@ -109,9 +109,11 @@ void DynSlam::ProcessFrame(Input *input) {
 
     // Idea: trigger decay not based on frame gap, but using translation-based threshold.
     // Decay old, possibly noisy, voxels to improve map quality and reduce its memory footprint.
-    utils::Tic("Map decay");
-    static_scene_->Decay();
-    utils::TocMicro();
+    if (enable_map_decay_) {
+      utils::Tic("Map decay");
+      static_scene_->Decay();
+      utils::TocMicro();
+    }
   }
 
   // TODO(andrei): Easy way to toggle this on/off.
@@ -119,7 +121,6 @@ void DynSlam::ProcessFrame(Input *input) {
   evaluation_->EvaluateFrame(input, this);
   utils::Toc();
 
-//  utils::Tic("Final error check");
   // Final sanity check after the frame is processed: individual components should check for errors.
   // If something slips through and gets here, it's bad and we want to stop execution.
   ITMSafeCall(cudaDeviceSynchronize());
@@ -130,7 +131,6 @@ void DynSlam::ProcessFrame(Input *input) {
     // Trigger the regular error response.
     ITMSafeCall(last_error);
   }
-//  utils::Toc();
 
   current_frame_no_++;
 }

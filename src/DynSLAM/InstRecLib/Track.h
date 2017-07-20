@@ -44,6 +44,15 @@ enum TrackState {
 ///       subsequent frame, in order to aid with tracking.
 class Track {
  public:
+  /// \brief The maximum number of frames with relative motion estimation failure before a static
+  ///        object is reverted to the "Uncertain" state.
+  int kMaxUncertainFramesStatic = 3;
+  /// \see kMaxUncertainFramesStatic
+  int kMaxUncertainFramesDynamic = 2;
+
+  /// \brief Translation error threshold used to differentiate static from dynamic objects.
+  float kTransErrorTreshold = 0.20f;
+
   Track(int id) : id_(id),
                   reconstruction_(nullptr),
                   needs_cleanup_(false),
@@ -56,7 +65,10 @@ class Track {
     }
   }
 
-  void UpdateState(const Eigen::Matrix4f &egomotion);
+  /// \brief Updates the track's state, and, if applicable, populates the most recent relative pose.
+  void Update(const Eigen::Matrix4f &egomotion,
+              const instreclib::SparseSFProvider &ssf_provider,
+              bool verbose);
 
   /// \brief Evaluates how well this new frame would fit the existing track.
   /// \returns A goodness score between 0 and 1, where 0 means the new frame would not match this
