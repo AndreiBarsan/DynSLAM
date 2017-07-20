@@ -92,12 +92,12 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) co
   // Start from 1 since we care about relative pose to 1st frame.
   for (size_t i = 1; i <= frame_idx; ++i) {
 //    if(frames_[i].instance_view.HasRelativePose()) {
-    if (frames_[i].relative_pose.IsPresent()) {
+    if (frames_[i].relative_pose->IsPresent()) {
       found_good_pose = true;
 //      cout << "Track #" << id_ << ": Good pose at frame " << i << " (" << frames_[i].frame_idx << ")." << endl;
 
 //      Eigen::Matrix4d rel_pose = frames_[i].instance_view.GetRelativePose();
-      const Eigen::Matrix4d &rel_pose = frames_[i].relative_pose.Get();
+      const Eigen::Matrix4d &rel_pose = frames_[i].relative_pose->Get();
       *pose = rel_pose * (*pose);
 //      last_good_relative_pose = rel_pose;
     }

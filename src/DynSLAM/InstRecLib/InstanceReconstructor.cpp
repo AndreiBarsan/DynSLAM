@@ -235,9 +235,9 @@ Option<Eigen::Matrix4d>* EstimateTrackMotion(const Track &track, const SparseSFP
 
   if (track.GetSize() > 1) {
     const TrackFrame &previous_frame = track.GetFrame(static_cast<int>(track.GetSize() - 2));
-    if (previous_frame.relative_pose.IsPresent()) {
+    if (previous_frame.relative_pose->IsPresent()) {
       // TODO better memory management
-      return new dynslam::utils::Option<Eigen::Matrix4d>(new Eigen::Matrix4d(previous_frame.relative_pose.Get()));
+      return new dynslam::utils::Option<Eigen::Matrix4d>(new Eigen::Matrix4d(previous_frame.relative_pose->Get()));
     }
   }
 
@@ -373,7 +373,7 @@ void InstanceReconstructor::ProcessFrame(
     Track &track = instance_tracker_->GetTrack(id);
 
     Option<Eigen::Matrix4d> *motion_delta = EstimateTrackMotion(track, ssf_provider);
-    track.GetLastFrame().relative_pose = *motion_delta;
+    track.GetLastFrame().relative_pose = motion_delta;
 
     bool motion_known = false;
     bool track_is_static = true;

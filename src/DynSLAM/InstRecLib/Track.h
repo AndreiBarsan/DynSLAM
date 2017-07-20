@@ -22,7 +22,7 @@ struct TrackFrame {
   Eigen::Matrix4f camera_pose;
 
   /// \brief The relative pose to the previous frame in the track, if it could be computed.
-  dynslam::utils::Option<Eigen::Matrix4d> relative_pose;
+  dynslam::utils::Option<Eigen::Matrix4d> *relative_pose;
 
   TrackFrame(int frame_idx, const InstanceView& instance_view, const Eigen::Matrix4f camera_pose)
       : frame_idx(frame_idx), instance_view(instance_view), camera_pose(camera_pose) {}
