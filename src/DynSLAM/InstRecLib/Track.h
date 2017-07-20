@@ -30,6 +30,12 @@ struct TrackFrame {
   SUPPORT_EIGEN_FIELDS;
 };
 
+enum TrackState {
+  kStatic,
+  kDynamic,
+  kUncertain
+};
+
 /// \brief A detected object's track through multiple frames.
 /// Modeled as a series of detections, contained in the 'frames' field. Note that there can be
 /// gaps in this list, due to frames where this particular object was not detected.
@@ -38,11 +44,79 @@ struct TrackFrame {
 ///       subsequent frame, in order to aid with tracking.
 class Track {
  public:
-  Track(int id) : id_(id), reconstruction(nullptr) {}
+  Track(int id) : id_(id),
+                  reconstruction_(nullptr),
+                  needs_cleanup_(false),
+                  track_state_(TrackState::kUncertain)
+  {}
 
   virtual ~Track() {
-    if (reconstruction.get() != nullptr) {
+    if (reconstruction_.get() != nullptr) {
       fprintf(stderr, "Deleting track [%d] and its associated reconstruction!\n", id_);
+    }
+  }
+
+  // TODO(andrei): Clean up and document.
+  void UpdateState(const Eigen::Matrix4f &egomotion) {
+    using namespace dynslam::utils;
+
+    auto &latest_motion = GetLastFrame().relative_pose;
+    int current_frame_idx = GetLastFrame().frame_idx;
+    int kMaxUncertainFramesStatic = 5;
+    int kMaxUncertainFramesDynamic = 3;
+
+    switch(track_state_) {
+      case kUncertain:
+        if (latest_motion->IsPresent()) {
+          Eigen::Matrix4f error = egomotion * latest_motion->Get().cast<float>();
+          float kTransErrorTreshold = 0.20f;
+          float trans_error = TranslationError(error);
+
+          printf("Object %d has %.4f trans error wrt my egomotion: ", id_, trans_error);
+          cout << endl << "ME: " << endl << egomotion << endl;
+          cout << endl << "Object: " << endl << latest_motion->Get() << endl;
+
+          if (trans_error > kTransErrorTreshold) {
+            printf("Uncertain -> Dynamic object!\n");
+            this->track_state_ = kDynamic;
+          }
+          else {
+            printf("Uncertain -> Static object!\n");
+            this->track_state_ = kStatic;
+          }
+
+          this->last_known_motion_ = latest_motion->Get();
+          this->last_known_motion_time_ = current_frame_idx;
+        }
+        break;
+
+      case kStatic:
+      case kDynamic:
+        assert(last_known_motion_time_ >= 0);
+
+        int frameThreshold = (track_state_ == kStatic) ? kMaxUncertainFramesStatic :
+                             kMaxUncertainFramesDynamic;
+
+        if (latest_motion->IsPresent()) {
+          this->last_known_motion_ = latest_motion->Get();
+          this->last_known_motion_time_ = current_frame_idx;
+        }
+        else {
+          if (current_frame_idx - last_known_motion_time_ > frameThreshold) {
+            printf("%s -> Uncertain because the relative motion couldn't be evaluated over the "
+                    "last %d frames.\n",
+                   GetTypeLabel().c_str(),
+                   kMaxUncertainFramesDynamic);
+
+            this->track_state_ = kUncertain;
+          }
+          else {
+            // Assume constant motion for small gaps in the track.
+            GetLastFrame().relative_pose = new Option<Eigen::Matrix4d>(
+                new Eigen::Matrix4d(last_known_motion_));
+          }
+        }
+        break;
     }
   }
 
@@ -81,22 +155,19 @@ class Track {
   ///    [                                 11 12 13      16]
   std::string GetAsciiArt() const;
 
-  bool HasReconstruction() const { return reconstruction.get() != nullptr; }
+  bool HasReconstruction() const { return reconstruction_.get() != nullptr; }
 
   std::shared_ptr<dynslam::drivers::InfiniTamDriver>& GetReconstruction() {
-    return reconstruction;
+    return reconstruction_;
   }
 
   const std::shared_ptr<dynslam::drivers::InfiniTamDriver>& GetReconstruction() const {
-    return reconstruction;
+    return reconstruction_;
   }
 
   /// \brief Uses a series of goodness heuristics to establish whether the information contained in
   /// this track's frames is good enough for a 3D reconstruction.
   bool EligibleForReconstruction() const {
-    // TODO(andrei): Moonshot---use a classifier to do this based on, e.g., track length, some
-    // pose info, frame sizes, etc. Main challenge: how to get training data?
-
     // For now, use this simple heuristic: at least k frames in track.
     return GetSize() >= 6;
   }
@@ -112,6 +183,23 @@ class Track {
     this->needs_cleanup_ = needs_cleanup;
   }
 
+  TrackState GetType() const {
+    return track_state_;
+  }
+
+  string GetTypeLabel() const {
+    switch (track_state_) {
+      case TrackState::kDynamic:
+        return "Dynamic";
+      case TrackState::kStatic:
+        return "Static";
+      case TrackState::kUncertain:
+        return "Uncertain";
+      default:
+        throw runtime_error("Unsupported track type.");
+    }
+  }
+
  private:
   /// \brief A unique identifier for this particular track.
   int id_;
@@ -119,10 +207,18 @@ class Track {
 
   /// \brief A pointer to a 3D reconstruction of the object in this track.
   /// Is set to `nullptr` if no reconstruction is available.
-  std::shared_ptr<dynslam::drivers::InfiniTamDriver> reconstruction;
+  std::shared_ptr<dynslam::drivers::InfiniTamDriver> reconstruction_;
 
   /// \brief Whether the reconstruction is pending a full voxel decay iteration.
   bool needs_cleanup_;
+
+  TrackState track_state_;
+
+  // Used for the constant velocity assumption in tracking.
+  int last_known_motion_time_ = -1;
+  Eigen::Matrix4d last_known_motion_;
+
+  SUPPORT_EIGEN_FIELDS;
 };
 
 }  // namespace reconstruction

@@ -94,7 +94,8 @@ void DynSlam::ProcessFrame(Input *input) {
         static_scene_->GetView(),
         *segmentationResult,
         sparse_sf_provider_->GetFlow(),
-        *sparse_sf_provider_);
+        *sparse_sf_provider_,
+        always_reconstruct_objects_);
   }
   utils::Toc();
 
