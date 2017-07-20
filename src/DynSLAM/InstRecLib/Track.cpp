@@ -119,5 +119,73 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) co
   return Option<Eigen::Matrix4d>(pose);
 }
 
+void Track::UpdateState(const Eigen::Matrix4f &egomotion) {
+  // TODO(andrei): Clean up and document.
+  using namespace dynslam::utils;
+
+  auto &latest_motion = GetLastFrame().relative_pose;
+  int current_frame_idx = GetLastFrame().frame_idx;
+  int kMaxUncertainFramesStatic = 3;
+  int kMaxUncertainFramesDynamic = 2;
+
+  switch(track_state_) {
+    case kUncertain:
+      if (latest_motion->IsPresent()) {
+        Eigen::Matrix4f error = egomotion * latest_motion->Get().cast<float>();
+        float kTransErrorTreshold = 0.20f;
+        float trans_error = TranslationError(error);
+
+        printf("Object %d has %.4f trans error wrt my egomotion: ", id_, trans_error);
+        cout << endl << "ME: " << endl << egomotion << endl;
+        cout << endl << "Object: " << endl << latest_motion->Get() << endl;
+
+        if (trans_error > kTransErrorTreshold) {
+          printf("Uncertain -> Dynamic object!\n");
+          this->track_state_ = kDynamic;
+        }
+        else {
+          printf("Uncertain -> Static object!\n");
+          this->track_state_ = kStatic;
+        }
+
+        this->last_known_motion_ = latest_motion->Get();
+        this->last_known_motion_time_ = current_frame_idx;
+      }
+      break;
+
+    case kStatic:
+    case kDynamic:
+      assert(last_known_motion_time_ >= 0);
+
+      int frameThreshold = (track_state_ == kStatic) ? kMaxUncertainFramesStatic :
+                           kMaxUncertainFramesDynamic;
+
+      if (latest_motion->IsPresent()) {
+        this->last_known_motion_ = latest_motion->Get();
+        this->last_known_motion_time_ = current_frame_idx;
+      }
+      else {
+        int motion_age = current_frame_idx - last_known_motion_time_;
+        if (motion_age > frameThreshold) {
+          printf("%s -> Uncertain because the relative motion couldn't be evaluated over the "
+                     "last %d frames.\n",
+                 GetStateLabel().c_str(),
+                 kMaxUncertainFramesDynamic);
+
+          this->track_state_ = kUncertain;
+        }
+        else {
+          printf("No relative pose available, but we assume constant motion. Age of last good "
+                     "motion: %d\n", motion_age);
+
+          // Assume constant motion for small gaps in the track.
+          GetLastFrame().relative_pose = new Option<Eigen::Matrix4d>(
+              new Eigen::Matrix4d(last_known_motion_));
+        }
+      }
+      break;
+  }
+}
+
 }  // namespace reconstruction
 }  // namespace instreclib

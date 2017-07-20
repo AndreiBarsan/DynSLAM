@@ -191,7 +191,7 @@ private:
   int input_height_;
 
   /// Whether to force instance reconstruction even for static ones.
-  bool always_reconstruct_objects_ = true;
+  bool always_reconstruct_objects_ = false;
 
   /// \brief Returns a path to the folder where the dataset's meshes should be dumped, creating it
   ///        using a naive system call if it does not exist.

@@ -230,16 +230,17 @@ Option<Eigen::Matrix4d>* EstimateTrackMotion(const Track &track, const SparseSFP
     return relative_pose;
   }
 
-  if (track.GetSize() > 1) {
-    const TrackFrame &previous_frame = track.GetFrame(static_cast<int>(track.GetSize() - 2));
-    if (previous_frame.relative_pose->IsPresent()) {
-      // TODO better memory management
-      return new dynslam::utils::Option<Eigen::Matrix4d>(new Eigen::Matrix4d(previous_frame.relative_pose->Get()));
-    }
-  }
-
-  // Motion is completely unknown
   return new Option<Eigen::Matrix4d>();
+
+//  if (track.GetSize() > 1) {
+//    const TrackFrame &previous_frame = track.GetFrame(static_cast<int>(track.GetSize() - 2));
+//    if (previous_frame.relative_pose->IsPresent()) {
+//      // TODO better memory management
+//      return new dynslam::utils::Option<Eigen::Matrix4d>(new Eigen::Matrix4d(previous_frame.relative_pose->Get()));
+//    }
+//  }
+
+//  return new Option<Eigen::Matrix4d>();
 }
 
 // TODO(andrei): Refactor this BEHEMOTH before it gets >500 LOC in size and devours us all.
@@ -363,7 +364,7 @@ void InstanceReconstructor::ProcessFrame(
         possibly_dynamic_classes_voc2012.cend(),
         track.GetClassName()) != possibly_dynamic_classes_voc2012.cend());
 
-    if (track.GetType() == TrackState::kUncertain) {
+    if (track.GetState() == TrackState::kUncertain) {
       if (possibly_dynamic) {
         printf("Unknown motion for possibly dynamic object of class %s; cutting away!\n",
                track.GetClassName().c_str());
@@ -375,7 +376,7 @@ void InstanceReconstructor::ProcessFrame(
         // Static class with unknown motion. Likely safe to put in main map.
       }
     }
-    else if (track.GetType() == TrackState::kDynamic || always_separate) {
+    else if (track.GetState() == TrackState::kDynamic || always_separate) {
 
       if (should_reconstruct) {
         // TODO(andrei): Don't allocate a view every time!
@@ -391,13 +392,20 @@ void InstanceReconstructor::ProcessFrame(
                               frame_size,
                               track.GetLastFrame().instance_view.GetInstanceDetection(),
                               scene_flow);
+
+        view->rgb->UpdateDeviceFromHost();
+        view->depth->UpdateDeviceFromHost();
       }
       else if (possibly_dynamic) {
+        auto view = track.GetLastFrame().instance_view.GetView();
         cout << "Dynamic object with known motion we can't reconstruct. Removing." << endl;
         // Dynamic object which we can't or don't want to reconstruct, such as a pedestrian.
         // In this case, we simply remove the object from view.
         RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
                              track.GetLastFrame().instance_view.GetInstanceDetection());
+
+        view->rgb->UpdateDeviceFromHost();
+        view->depth->UpdateDeviceFromHost();
       }
       else {
         // Warn if we detect a moving potted plant.
@@ -406,7 +414,7 @@ void InstanceReconstructor::ProcessFrame(
       }
 
     }
-    else if (track.GetType() == TrackState::kStatic) {
+    else if (track.GetState() == TrackState::kStatic) {
       // The object is known to be static; we don't have to do anything.
       continue;
     }
@@ -416,7 +424,7 @@ void InstanceReconstructor::ProcessFrame(
 
   }   // end track motion estimation loop
 
-  this->ProcessReconstructions();
+  this->ProcessReconstructions(always_separate);
 
   // Update the GPU image after we've (if applicable) removed the dynamic objects from it.
   main_view->rgb->UpdateDeviceFromHost();
@@ -454,7 +462,7 @@ ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) 
   return tracks.at(idx).GetLastFrame().instance_view.GetView()->depth;
 }
 
-void InstanceReconstructor::ProcessReconstructions() {
+void InstanceReconstructor::ProcessReconstructions(bool always_separate) {
   // TODO loop through keys only since we want to do all track accesses through the instance tracker for constness reasons
   for (auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
@@ -481,7 +489,8 @@ void InstanceReconstructor::ProcessReconstructions() {
     }
 
     if (! track.HasReconstruction()) {
-      bool eligible = track.EligibleForReconstruction();
+      bool eligible = track.EligibleForReconstruction() &&
+          (track.GetState() == TrackState::kDynamic || always_separate);
 
       if (! eligible) {
         // The frame data we have is insufficient, so we won't try to reconstruct the object
@@ -525,6 +534,12 @@ void InstanceReconstructor::ProcessReconstructions() {
 void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
   InfiniTamDriver &instance_driver = *track.GetReconstruction();
 
+  if (track.GetState() == TrackState::kUncertain) {
+    // We can't deal with tracks of uncertain state, because there's no available relative
+    // transforms between frames, so we can't register measurements.
+    return;
+  }
+
   TrackFrame &frame = track.GetFrame(frame_idx);
   instance_driver.SetView(frame.instance_view.GetView());
   Option<Eigen::Matrix4d> rel_dyn_pose = track.GetFramePose(frame_idx);
@@ -536,7 +551,7 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
   if (rel_dyn_pose.IsPresent()) {
     Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
 
-    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
+//    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
 
     // TODO(andrei): Replace this with fine tracking initialized by this coarse relative pose.
     // We have the ITM instance up and running, so we can even perform ICP or some dense alignment

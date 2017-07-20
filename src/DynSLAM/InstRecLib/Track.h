@@ -56,69 +56,7 @@ class Track {
     }
   }
 
-  // TODO(andrei): Clean up and document.
-  void UpdateState(const Eigen::Matrix4f &egomotion) {
-    using namespace dynslam::utils;
-
-    auto &latest_motion = GetLastFrame().relative_pose;
-    int current_frame_idx = GetLastFrame().frame_idx;
-    int kMaxUncertainFramesStatic = 5;
-    int kMaxUncertainFramesDynamic = 3;
-
-    switch(track_state_) {
-      case kUncertain:
-        if (latest_motion->IsPresent()) {
-          Eigen::Matrix4f error = egomotion * latest_motion->Get().cast<float>();
-          float kTransErrorTreshold = 0.20f;
-          float trans_error = TranslationError(error);
-
-          printf("Object %d has %.4f trans error wrt my egomotion: ", id_, trans_error);
-          cout << endl << "ME: " << endl << egomotion << endl;
-          cout << endl << "Object: " << endl << latest_motion->Get() << endl;
-
-          if (trans_error > kTransErrorTreshold) {
-            printf("Uncertain -> Dynamic object!\n");
-            this->track_state_ = kDynamic;
-          }
-          else {
-            printf("Uncertain -> Static object!\n");
-            this->track_state_ = kStatic;
-          }
-
-          this->last_known_motion_ = latest_motion->Get();
-          this->last_known_motion_time_ = current_frame_idx;
-        }
-        break;
-
-      case kStatic:
-      case kDynamic:
-        assert(last_known_motion_time_ >= 0);
-
-        int frameThreshold = (track_state_ == kStatic) ? kMaxUncertainFramesStatic :
-                             kMaxUncertainFramesDynamic;
-
-        if (latest_motion->IsPresent()) {
-          this->last_known_motion_ = latest_motion->Get();
-          this->last_known_motion_time_ = current_frame_idx;
-        }
-        else {
-          if (current_frame_idx - last_known_motion_time_ > frameThreshold) {
-            printf("%s -> Uncertain because the relative motion couldn't be evaluated over the "
-                    "last %d frames.\n",
-                   GetTypeLabel().c_str(),
-                   kMaxUncertainFramesDynamic);
-
-            this->track_state_ = kUncertain;
-          }
-          else {
-            // Assume constant motion for small gaps in the track.
-            GetLastFrame().relative_pose = new Option<Eigen::Matrix4d>(
-                new Eigen::Matrix4d(last_known_motion_));
-          }
-        }
-        break;
-    }
-  }
+  void UpdateState(const Eigen::Matrix4f &egomotion);
 
   /// \brief Evaluates how well this new frame would fit the existing track.
   /// \returns A goodness score between 0 and 1, where 0 means the new frame would not match this
@@ -183,11 +121,11 @@ class Track {
     this->needs_cleanup_ = needs_cleanup;
   }
 
-  TrackState GetType() const {
+  TrackState GetState() const {
     return track_state_;
   }
 
-  string GetTypeLabel() const {
+  string GetStateLabel() const {
     switch (track_state_) {
       case TrackState::kDynamic:
         return "Dynamic";
