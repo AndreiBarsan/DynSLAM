@@ -34,18 +34,23 @@ class InstanceReconstructor {
   /// \brief Uses the segmentation result to remove dynamic objects from the main view and save
   ///        them to separate buffers, which are then used for individual object reconstruction.
   ///
-  /// This is the ``meat'' of the reconstruction engine.
+  /// This is the core of the reconstruction engine.
   ///
   /// \param dyn_slam The owner of this component.
   /// \param main_view The original InfiniTAM view of the scene. Gets mutated!
   /// \param segmentation_result The output of the view's semantic segmentation.
+  /// \param always_separate Whether to always separately reconstruct car models, even if they're
+  ///                        static (more expensive, but also more robust to cars changing their
+  ///                        state from static to dynamic.
   void ProcessFrame(
       const dynslam::DynSlam* dyn_slam,
       ITMLib::Objects::ITMView *main_view,
       const segmentation::InstanceSegmentationResult &segmentation_result,
       // TODO(andrei): Organize these args better.
       const SparseSceneFlow &scene_flow,
-      const SparseSFProvider &ssf_provider);
+      const SparseSFProvider &ssf_provider,
+      bool always_separate
+  );
 
   const InstanceTracker &GetInstanceTracker() const { return *instance_tracker_; }
 

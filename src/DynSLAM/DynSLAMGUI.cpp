@@ -178,21 +178,21 @@ public:
              9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,
           0, 0, 0, 1;
 
-      Tic("LIDAR render (naive)");
-      PreviewLidar(lidar, P0, Tr, rgb_view_);
-      Toc(true);
+//      Tic("LIDAR render (naive)");
+//      PreviewLidar(lidar, P0, Tr, rgb_view_);
+//      Toc(true);
 
-//      if (display_raw_previews_->Get()) {
-//        UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
-//      }
-//      else {
-//        UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_);
-//      }
-//      pane_texture_->RenderToViewport(true);
-//
-//      if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
-//        PreviewSparseSF(dyn_slam_->GetLatestFlow().matches, rgb_view_);
-//      }
+      if (display_raw_previews_->Get()) {
+        UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
+      }
+      else {
+        UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_);
+      }
+      pane_texture_->RenderToViewport(true);
+
+      if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
+        PreviewSparseSF(dyn_slam_->GetLatestFlow().matches, rgb_view_);
+      }
 
       depth_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
@@ -298,8 +298,8 @@ public:
 
       stringstream info_label;
       info_label << latest_detection.GetClassName() << "#" << track.GetId()
-                 << "@" << setprecision(2)
-                 << latest_detection.class_probability;
+//                 << "@" << setprecision(2) << latest_detection.class_probability
+                 << " [" << track.GetTypeLabel().substr(0, 1) << "].";
       glColor3f(1.0f, 0.0f, 0.0f);
       font.Text(info_label.str()).Draw(gl_pos[0], gl_pos[1], 0);
     }

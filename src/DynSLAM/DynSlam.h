@@ -190,7 +190,10 @@ private:
   int input_width_;
   int input_height_;
 
-  /// \brief Returns a path to the folder where the dataset's meshes should be dump, creating it
+  /// Whether to force instance reconstruction even for static ones.
+  bool always_reconstruct_objects_ = true;
+
+  /// \brief Returns a path to the folder where the dataset's meshes should be dumped, creating it
   ///        using a naive system call if it does not exist.
   std::string EnsureDumpFolderExists(const string& dataset_name) {
     // TODO-LOW(andrei): Make this more cross-platform and more secure.
