@@ -299,7 +299,7 @@ public:
       stringstream info_label;
       info_label << latest_detection.GetClassName() << "#" << track.GetId()
 //                 << "@" << setprecision(2) << latest_detection.class_probability
-                 << " [" << track.GetTypeLabel().substr(0, 1) << "].";
+                 << " [" << track.GetStateLabel().substr(0, 1) << "].";
       glColor3f(1.0f, 0.0f, 0.0f);
       font.Text(info_label.str()).Draw(gl_pos[0], gl_pos[1], 0);
     }

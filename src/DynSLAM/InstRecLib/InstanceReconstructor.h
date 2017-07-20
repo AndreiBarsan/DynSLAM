@@ -108,7 +108,7 @@ class InstanceReconstructor {
   /// \brief Whether to use voxel decay for regularizing the reconstructed objects.
   bool use_decay_;
 
-  void ProcessReconstructions();
+  void ProcessReconstructions(bool always_separate);
 
   /// \brief Fuses the specified frame into the track's 3D reconstruction.
   void FuseFrame(Track &track, size_t frame_idx) const;
