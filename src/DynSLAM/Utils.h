@@ -1,6 +1,7 @@
 #ifndef DYNSLAM_UTILS_H
 #define DYNSLAM_UTILS_H
 
+#include <cmath>
 #include <map>
 #include <string>
 #include <sys/stat.h>
@@ -238,6 +239,22 @@ int64_t Toc(bool quiet = false);
 /// \brief Stops the most recent timer and gets the total measured duration in microseconds.
 int64_t TocMicro(bool quiet = false);
 
+/// \brief Computes a relative pose rotation error using the metric from the KITTI odometry evaluation.
+inline float RotationError(const Eigen::Matrix4f &pose_error) {
+  float a = pose_error(0, 0);
+  float b = pose_error(1, 1);
+  float c = pose_error(2, 2);
+  double d = 0.5 * (a + b + c - 1.0);
+  return static_cast<float>(acos(std::max(std::min(d, 1.0), -1.0)));
+}
+
+/// \brief Computes a relative pose translation error using the metric from the KITTI odometry evaluation.
+inline float TranslationError(const Eigen::Matrix4f &pose_error) {
+  float dx = pose_error(0, 3);
+  float dy = pose_error(1, 3);
+  float dz = pose_error(2, 3);
+  return sqrt(dx * dx + dy * dy + dz * dz);
+}
 
 } // namespace utils
 } // namespace dynslam

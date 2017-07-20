@@ -187,14 +187,11 @@ Option<Eigen::Matrix4d>* EstimateInstanceMotion(
     const SparseSFProvider &ssf_provider
 ) {
   // This is a good conservative value, but we can definitely do better.
-//  uint32_t kMinFlowVectorsForPoseEst = 25;   // TODO experiment and set proper value;
-  uint32_t kMinFlowVectorsForPoseEst = 12;
+  uint32_t kMinFlowVectorsForPoseEst = 25;   // TODO experiment and set proper value;
+//  uint32_t kMinFlowVectorsForPoseEst = 12;
   // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
   // we're being a little paranoid).
   size_t flow_count = instance_raw_flow.size();
-
-  // TODO(andrei): Consider doing these computations in the tracker, or lazily, only when the
-  // system decides to start reconstructing something, maybe?
 
   // TODO(andrei): Since we're not doing egomotion computation, the nr of inputs is much lower
   // than in the full viso case => fewer RANSAC iterations than the default should be OK,
@@ -245,23 +242,6 @@ Option<Eigen::Matrix4d>* EstimateTrackMotion(const Track &track, const SparseSFP
   return new Option<Eigen::Matrix4d>();
 }
 
-/// \brief Computes a relative pose rotation error using the metric from the KITTI odometry evaluation.
-inline float rotationError(const Eigen::Matrix4f &pose_error) {
-  float a = pose_error(0, 0);
-  float b = pose_error(1, 1);
-  float c = pose_error(2, 2);
-  double d = 0.5 * (a + b + c - 1.0);
-  return static_cast<float>(acos(max(min(d, 1.0), -1.0)));
-}
-
-/// \brief Computes a relative pose translation error using the metric from the KITTI odometry evaluation.
-inline float translationError(const Eigen::Matrix4f &pose_error) {
-  float dx = pose_error(0, 3);
-  float dy = pose_error(1, 3);
-  float dz = pose_error(2, 3);
-  return sqrt(dx * dx + dy * dy + dz * dz);
-}
-
 // TODO(andrei): Refactor this BEHEMOTH before it gets >500 LOC in size and devours us all.
 // TODO(andrei): Keep tracking static things, but don't attempt to reconstruct them, since it wastes memory.
 void InstanceReconstructor::ProcessFrame(
@@ -269,10 +249,10 @@ void InstanceReconstructor::ProcessFrame(
     ITMLib::Objects::ITMView *main_view,
     const segmentation::InstanceSegmentationResult &segmentation_result,
     const SparseSceneFlow &scene_flow,
-    const SparseSFProvider &ssf_provider
+    const SparseSFProvider &ssf_provider,
+    bool always_separate
 ) {
   Eigen::Matrix4f egomotion = dyn_slam->GetLastEgomotion();
-  bool alwaysSeparate = false;   // Whether to always separately reconstruct car models, even if they're static.
 
   // TODO(andrei): Perform this slicing 100% on the GPU.
   main_view->rgb->UpdateHostFromDevice();
@@ -281,11 +261,6 @@ void InstanceReconstructor::ProcessFrame(
   ORUtils::Vector4<unsigned char> *rgb_data_h =
       main_view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
   float *depth_data_h = main_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
-
-//  cerr << "TODO: but why not at least attempt to perform motion analysis on these dudes, in case "
-//      "there's something like a stationary bike, or train, even if we never plan on attempting to "
-//      "reconstruct them... For persons, it might often fail, but in that case we may just default "
-//      "to deleting them out of the frame anyway..." << endl;
 
   // Note: for a real self-driving cars, you definitely want a completely generic obstacle detector.
   const vector<string> classes_to_reconstruct_voc2012 = { "car" };
@@ -298,13 +273,12 @@ void InstanceReconstructor::ProcessFrame(
       "car",
       "cat",
       "cow",
-      "dog",        // No, Timmy, Lassie went to live on Auntie's farm. Totally didn't get ran
-                    // over by self-driving car or anything.
+      "dog",
       "horse",
       "motorbike",
       "person",
       "sheep",      // If we're driving in Romania.
-      "train"       // MNC is shit at segmenting trains anyway
+      "train"       // MNC is not very good at segmenting trains anyway
   };
 
   Vector2i frame_size_itm = main_view->rgb->noDims;
@@ -372,11 +346,14 @@ void InstanceReconstructor::ProcessFrame(
     int id = pair.first;
     Track &track = instance_tracker_->GetTrack(id);
 
+    // TODO think about this code A LOT and ensure it makes sense. Make flowcharts and put them in
+    // the thesis. Maybe even add pseudocode to thesis in an algorithm box.
+
+    // TODO should we move this into the tracker as well?
     Option<Eigen::Matrix4d> *motion_delta = EstimateTrackMotion(track, ssf_provider);
     track.GetLastFrame().relative_pose = motion_delta;
+    track.UpdateState(egomotion);
 
-    bool motion_known = false;
-    bool track_is_static = true;
     bool should_reconstruct = (find(
         classes_to_reconstruct_voc2012.begin(),
         classes_to_reconstruct_voc2012.end(),
@@ -386,34 +363,21 @@ void InstanceReconstructor::ProcessFrame(
         possibly_dynamic_classes_voc2012.cend(),
         track.GetClassName()) != possibly_dynamic_classes_voc2012.cend());
 
-    if (motion_delta->IsPresent()) {
-      motion_known = true;
-      // Since the egomotion is already expressed as the inverse motion in the camera frame,
-      // there's no need to invert it here again.
-      Eigen::Matrix4f error = egomotion * motion_delta->Get().cast<float>();
-      float kTransErrorTreshold = 0.25f;
-      float transError = translationError(error);
-      printf("Frame %d has %.4f trans error wrt my egomotion: ", id, transError);
-
-      cout << "ME: " << endl << egomotion << endl;
-      cout << "Object: " << motion_delta->Get() << endl;
-
-
-      if (transError > kTransErrorTreshold) {
-        printf("Dynamic object!\n");
-        track_is_static = false;
+    if (track.GetType() == TrackState::kUncertain) {
+      if (possibly_dynamic) {
+        printf("Unknown motion for possibly dynamic object of class %s; cutting away!\n",
+               track.GetClassName().c_str());
+        // Unknown motion and possibly dynamic object.
+        RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
+                             track.GetLastFrame().instance_view.GetInstanceDetection());
       }
       else {
-        printf("Static object!\n");
+        // Static class with unknown motion. Likely safe to put in main map.
       }
     }
+    else if (track.GetType() == TrackState::kDynamic || always_separate) {
 
-    if (motion_known) {
-      if (track_is_static) {
-        // The object is known to be static.
-        continue;
-      }
-      else if (should_reconstruct) {
+      if (should_reconstruct) {
         // TODO(andrei): Don't allocate a view every time!
         // Dynamic object which we should reconstruct, such as a car
         auto view = track.GetLastFrame().instance_view.GetView();
@@ -440,18 +404,14 @@ void InstanceReconstructor::ProcessFrame(
         cerr << "Warning: found dynamic object of class [" << track.GetClassName() << "], which is "
              << "an unexpected type of dynamic object." << endl;
       }
+
+    }
+    else if (track.GetType() == TrackState::kStatic) {
+      // The object is known to be static; we don't have to do anything.
+      continue;
     }
     else {
-      if (possibly_dynamic) {
-        printf("Unknown motion for possibly dynamic object of class %s; cutting away!\n",
-               track.GetClassName().c_str());
-        // Unknown motion and possibly dynamic object.
-        RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
-                             track.GetLastFrame().instance_view.GetInstanceDetection());
-      }
-      else {
-        // Static class with unknown motion. Likely safe to put in main map.
-      }
+      assert(false && "Unexpected track state.");
     }
 
   }   // end track motion estimation loop
@@ -570,16 +530,26 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
   Option<Eigen::Matrix4d> rel_dyn_pose = track.GetFramePose(frame_idx);
 
   // Only fuse the information if the relative pose could be established.
-  // TODO(andrei): This would require modifying libviso a little, but in the even that we miss a
+  // TODO-LOW(andrei): This would require modifying libviso a little, but in the even that we miss a
   // frame, i.e., we are unable to estimate the relative pose from frame k to frame k+1, we could
   // still try to estimate it from k to k+2.
   if (rel_dyn_pose.IsPresent()) {
     Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
 
-//    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
+    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
 
     // TODO(andrei): Replace this with fine tracking initialized by this coarse relative pose.
+    // We have the ITM instance up and running, so we can even perform ICP or some dense alignment
+    // method here if we wish.
     instance_driver.SetPose(rel_dyn_pose_f.inverse());
+
+//    if (frame_idx > 2) {
+//      auto *v = frame.instance_view.GetView();
+//      cv::Mat1s depthm((int)v->calib->intrinsics_rgb.sizeY, (int)v->calib->intrinsics_rgb.sizeX);
+//      dynslam::drivers::ItmToCv(*v->depth, &depthm);
+//      cv::imshow("foo", depthm);
+//      cv::waitKey();
+//    }
 
     try {
       instance_driver.Integrate();
