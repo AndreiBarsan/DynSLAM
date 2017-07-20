@@ -33,8 +33,7 @@ void InstanceTracker::ProcessInstanceViews(int frame_idx,
   }
 
   // 3. Iterate through existing tracks, find ``expired'' ones, and discard them.
-  cerr << "XXX: Not pruning old tracks." << endl;
-//  this->PruneTracks(frame_idx);
+  this->PruneTracks(frame_idx);
 }
 
 void InstanceTracker::PruneTracks(int current_frame_idx) {
