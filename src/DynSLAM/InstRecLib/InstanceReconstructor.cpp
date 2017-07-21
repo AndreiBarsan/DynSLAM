@@ -45,7 +45,8 @@ void ProcessSilhouette_CPU(Vector4u *source_rgb,
                            Vector4u *dest_rgb,
                            DEPTH_T *dest_depth,
                            Eigen::Vector2i sourceDims,
-                           const InstanceDetection &detection) {
+                           const Mask &copy_mask,
+                           const Mask &delete_mask) {
   // Blanks out the detection's silhouette in the 'source' frames, and writes its pixels into the
   // output frames. Initially, the dest frames will be the same size as the source ones, but this
   // is wasteful in terms of memory: we should use bbox+1-sized buffers in the future, since most
@@ -59,7 +60,7 @@ void ProcessSilhouette_CPU(Vector4u *source_rgb,
 
   int frame_width = sourceDims[0];
   int frame_height = sourceDims[1];
-  const BoundingBox &bbox = detection.GetBoundingBox();
+  const BoundingBox &bbox = detection.GetCopyBoundingBox();
 
   int box_width = bbox.GetWidth();
   int box_height = bbox.GetHeight();
@@ -82,7 +83,7 @@ void ProcessSilhouette_CPU(Vector4u *source_rgb,
       }
 
       int frame_idx = frame_row * frame_width + frame_col;
-      u_char mask_val = detection.mask->GetMaskData()->at<u_char>(row, col);
+      u_char mask_val = detection.copy_mask->GetData()->at<u_char>(row, col);
       if (mask_val == 1) {
         dest_rgb[frame_idx].r = source_rgb[frame_idx].r;
         dest_rgb[frame_idx].g = source_rgb[frame_idx].g;
@@ -112,11 +113,11 @@ template<typename TDepth>
 void RemoveSilhouette_CPU(ORUtils::Vector4<unsigned char> *source_rgb,
                           TDepth *source_depth,
                           Eigen::Vector2i source_dimensions,
-                          const segmentation::InstanceDetection &detection) {
+                          const Mask &mask) {
 
   int frame_width = source_dimensions[0];
   int frame_height = source_dimensions[1];
-  const BoundingBox &bbox = detection.GetBoundingBox();
+  const BoundingBox &bbox = mask.GetBoundingBox();
 
   int box_width = bbox.GetWidth();
   int box_height = bbox.GetHeight();
@@ -132,7 +133,7 @@ void RemoveSilhouette_CPU(ORUtils::Vector4<unsigned char> *source_rgb,
       }
 
       int frame_idx = frame_row * frame_width + frame_col;
-      u_char mask_val = detection.mask->GetMaskData()->at<u_char>(row, col);
+      u_char mask_val = mask.GetData()->at<u_char>(row, col);
       if (mask_val == 1) {
         source_rgb[frame_idx].r = 0;
         source_rgb[frame_idx].g = 0;
@@ -538,7 +539,7 @@ void InstanceReconstructor::ExtractSceneFlow(const SparseSceneFlow &scene_flow,
 
     if (flow_bbox.ContainsPoint(fx, fy)) {
       // Use the larger mask so we only filter out truly ridiculous SF values
-      if (!check_sf_start || detection.mask->GetBoundingBox().ContainsPoint(fx_prev, fy_prev)) {
+      if (!check_sf_start || detection.copy_mask->GetBoundingBox().ContainsPoint(fx_prev, fy_prev)) {
         coord_to_flow.emplace(pair<pair<int, int>, RawFlow>(pair<int, int>(fx, fy), match));
       }
     }
@@ -553,7 +554,7 @@ void InstanceReconstructor::ExtractSceneFlow(const SparseSceneFlow &scene_flow,
         continue;
       }
 
-      u_char c_mask_val = detection.conservative_mask->GetMaskData()->at<u_char>(cons_row, cons_col);
+      u_char c_mask_val = detection.conservative_mask->GetData()->at<u_char>(cons_row, cons_col);
       if (c_mask_val == 1) {
         auto coord_pair = pair<int, int>(const_frame_col, cons_frame_row);
         if (coord_to_flow.find(coord_pair) != coord_to_flow.cend()) {
