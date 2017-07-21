@@ -106,19 +106,19 @@ class DynSlam {
     return evaluation_;
   }
 
-  int GetInputWidth() {
+  int GetInputWidth() const {
     return input_width_;
   }
 
-  int GetInputHeight() {
+  int GetInputHeight() const {
     return input_height_;
   }
 
-  int GetCurrentFrameNo() {
+  int GetCurrentFrameNo() const {
     return current_frame_no_;
   }
 
-  void SaveStaticMap(const std::string &dataset_name, const std::string &depth_name) {
+  void SaveStaticMap(const std::string &dataset_name, const std::string &depth_name) const {
     string target_folder = EnsureDumpFolderExists(dataset_name);
     string map_fpath = utils::Format("%s/static-%s-mesh-%06d-frames.obj",
                                      target_folder.c_str(),
@@ -128,7 +128,7 @@ class DynSlam {
     static_scene_->SaveSceneToMesh(map_fpath.c_str());
   }
 
-  void SaveDynamicObject(const std::string &dataset_name, const std::string &depth_name, int object_id) {
+  void SaveDynamicObject(const std::string &dataset_name, const std::string &depth_name, int object_id) const {
     cout << "Saving mesh for object #" << object_id << "'s reconstruction..." << endl;
     string target_folder = EnsureDumpFolderExists(dataset_name);
     string instance_fpath = utils::Format("%s/instance-%s-%06d-mesh.obj",
@@ -197,7 +197,7 @@ private:
 
   /// \brief Returns a path to the folder where the dataset's meshes should be dumped, creating it
   ///        using a naive system call if it does not exist.
-  std::string EnsureDumpFolderExists(const string& dataset_name) {
+  std::string EnsureDumpFolderExists(const string& dataset_name) const {
     // TODO-LOW(andrei): Make this more cross-platform and more secure.
     string today_folder = utils::GetDate();
     string target_folder = "mesh_out/" + dataset_name + "/" + today_folder;
