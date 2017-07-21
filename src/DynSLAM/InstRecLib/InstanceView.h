@@ -36,6 +36,11 @@ class InstanceView {
     return sparse_sf_;
   }
 
+  /// \brief Deallocates the view object and any GPU memory it may have allocated.
+  void DiscardView() {
+    view_.reset();
+  }
+
  private:
   /// \brief Holds label, mask, and bounding box information.
   instreclib::segmentation::InstanceDetection instance_detection_;

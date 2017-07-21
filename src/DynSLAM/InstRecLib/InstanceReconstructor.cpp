@@ -153,7 +153,6 @@ void InstanceReconstructor::ProcessFrame(
     const SparseSFProvider &ssf_provider,
     bool always_separate
 ) {
-  Eigen::Matrix4f egomotion = dyn_slam->GetLastEgomotion();
   main_view->rgb->UpdateHostFromDevice();
   main_view->depth->UpdateHostFromDevice();
 
@@ -164,7 +163,7 @@ void InstanceReconstructor::ProcessFrame(
   // Associate this frame's detection(s) with those from previous frames.
   this->instance_tracker_->ProcessInstanceViews(frame_idx_, new_instance_views, dyn_slam->GetPose());
   // Estimate relative object motion and update track states.
-  this->UpdateTracks(scene_flow, ssf_provider, always_separate, main_view, egomotion, frame_size);
+  this->UpdateTracks(dyn_slam, scene_flow, ssf_provider, always_separate, main_view, frame_size);
   // Update 3D models for tracks undergoing reconstruction.
   this->ProcessReconstructions(always_separate);
 
@@ -182,18 +181,20 @@ void InstanceReconstructor::ProcessFrame(
   frame_idx_++;
 }
 
-void InstanceReconstructor::UpdateTracks(const SparseSceneFlow &scene_flow,
+void InstanceReconstructor::UpdateTracks(const dynslam::DynSlam *dyn_slam,
+                                         const SparseSceneFlow &scene_flow,
                                          const SparseSFProvider &ssf_provider,
                                          bool always_separate,
                                          ITMLib::Objects::ITMView *main_view,
-                                         const Eigen::Matrix4f &egomotion,
                                          const Eigen::Vector2i &frame_size) const
 {
   for (const auto &pair : instance_tracker_->GetActiveTracks()) {
     Track &track = instance_tracker_->GetTrack(pair.first);
     bool verbose = false;
-    track.Update(egomotion, ssf_provider, verbose);
-    ProcessSilhouette(track, main_view, frame_size, scene_flow, always_separate);
+    track.Update(dyn_slam->GetLastEgomotion(), ssf_provider, verbose);
+    if (track.GetLastFrame().frame_idx == dyn_slam->GetCurrentFrameNo() - 1) {
+      ProcessSilhouette(track, main_view, frame_size, scene_flow, always_separate);
+    }
   }
 }
 
@@ -207,6 +208,7 @@ void InstanceReconstructor::ProcessSilhouette(Track &track,
   bool possibly_dynamic = IsPossiblyDynamic(track.GetClassName());
   auto &latest_frame = track.GetLastFrame();
   auto *instance_view = latest_frame.instance_view.GetView();
+  assert(instance_view != nullptr);
 
   ORUtils::Vector4<uchar> *rgb_data_h = main_view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
   float *depth_data_h = main_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
@@ -347,6 +349,7 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
           driver_->GetView()->rgb->noDims,
           driver_->GetView()->rgb->noDims);
 
+  // TODO(andrei): This may not work for the (Stat/dyn) -> Unc -> (stat/dyn) situation!
   // If we already have some frames, integrate them into the new volume.
   int first_idx = track.GetFirstFusableFrameIndex();
   if (first_idx > -1) {
@@ -408,6 +411,17 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     }
 
     track.SetNeedsCleanup(true);
+    // Free up memory now that we've fused the frame!
+    frame.instance_view.DiscardView();
+
+    // TODO remove if unnecessary cleanup
+//    track.SetNeedsCleanup(true);
+//    // Free up memory from the previous frame.
+//    int prev_idx = static_cast<int>(frame_idx) - 1;
+//    if (prev_idx >= 0) {
+//      auto prev_frame = track.GetFrame(prev_idx);
+//      prev_frame.instance_view.DiscardView();
+//    }
   }
   else {
     cout << "Could not fuse instance data for track #" << track.GetId() << " due to missing pose "
