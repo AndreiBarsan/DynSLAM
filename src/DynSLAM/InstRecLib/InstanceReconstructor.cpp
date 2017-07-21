@@ -18,58 +18,6 @@ using namespace instreclib::utils;
 
 using namespace ITMLib::Objects;
 
-/// \brief Masks the scene flow using the (smaller) conservative mask.
-void ExtractSceneFlow(
-    const SparseSceneFlow &scene_flow,
-    vector<RawFlow> &out_instance_flow_vectors,
-    const InstanceDetection &detection,
-    const Eigen::Vector2i &frame_size,
-    bool check_sf_start = true
-) {
-  const BoundingBox &flow_bbox = detection.conservative_mask->GetBoundingBox();
-  map<pair<int, int>, RawFlow> coord_to_flow;
-  int frame_width = frame_size(0);
-  int frame_height = frame_size(1);
-
-  // Instead of expensively doing a per-pixel for every SF vector (ouch!), we just use the bounding
-  // boxes, since we'll be using those vectors for RANSAC anyway. In the future, we could maybe
-  // use some sort of hashing/sparse matrix for the scene flow and support per-pixel stuff.
-  for(const auto &match : scene_flow.matches) {
-    // TODO(andrei): Store old motion of car in track and use to initialize RANSAC under a constant
-    // motion assumption (poor man's Kalman filtering).
-    int fx = static_cast<int>(match.curr_left(0));
-    int fy = static_cast<int>(match.curr_left(1));
-    int fx_prev = static_cast<int>(match.prev_left(0));
-    int fy_prev = static_cast<int>(match.prev_left(1));
-
-    if (flow_bbox.ContainsPoint(fx, fy)) {
-      // Use the larger mask so we only filter out truly ridiculous SF values
-      if (!check_sf_start || detection.mask->GetBoundingBox().ContainsPoint(fx_prev, fy_prev)) {
-        coord_to_flow.emplace(pair<pair<int, int>, RawFlow>(pair<int, int>(fx, fy), match));
-      }
-    }
-  }
-
-  for (int cons_row = 0; cons_row < flow_bbox.GetHeight(); ++cons_row) {
-    for (int cons_col = 0; cons_col < flow_bbox.GetWidth(); ++cons_col) {
-      int cons_frame_row = cons_row + flow_bbox.r.y0;
-      int const_frame_col = cons_col + flow_bbox.r.x0;
-
-      if (cons_frame_row >= frame_height || const_frame_col >= frame_width) {
-        continue;
-      }
-
-      u_char c_mask_val = detection.conservative_mask->GetMaskData()->at<u_char>(cons_row, cons_col);
-      if (c_mask_val == 1) {
-        auto coord_pair = pair<int, int>(const_frame_col, cons_frame_row);
-        if (coord_to_flow.find(coord_pair) != coord_to_flow.cend()) {
-          out_instance_flow_vectors.push_back(coord_to_flow.find(coord_pair)->second);
-        }
-      }
-    }
-  }
-}
-
 // TODO(andrei): Implement this in CUDA. It should be easy.
 template <typename DEPTH_T>
 void ProcessSilhouette_CPU(Vector4u *source_rgb,
@@ -196,9 +144,6 @@ const vector<string> InstanceReconstructor::possibly_dynamic_classes_voc2012 = {
     "train"       // MNC is not very good at segmenting trains anyway
 };
 
-
-
-// TODO(andrei): Refactor this BEHEMOTH before it gets >500 LOC in size and devours us all.
 void InstanceReconstructor::ProcessFrame(
     const dynslam::DynSlam *dyn_slam,
     ITMLib::Objects::ITMView *main_view,
@@ -213,52 +158,21 @@ void InstanceReconstructor::ProcessFrame(
 
   Vector2i frame_size_itm = main_view->rgb->noDims;
   Eigen::Vector2i frame_size(frame_size_itm.x, frame_size_itm.y);
-  vector<InstanceView> new_instance_views;
-  for (const InstanceDetection &instance_detection : segmentation_result.instance_detections) {
-    if (find(possibly_dynamic_classes_voc2012.cbegin(),
-             possibly_dynamic_classes_voc2012.cend(),
-             instance_detection.GetClassName()) != possibly_dynamic_classes_voc2012.end()
-    ) {
-      // bool use_gpu = main_view->rgb->isAllocated_CUDA; // May need to modify 'MemoryBlock' to
-      // check this, since the field is private.
-      bool use_gpu = true;
-
-      // The ITMView takes ownership of this.
-      ITMRGBDCalib *calibration = new ITMRGBDCalib;
-      *calibration = *main_view->calib;
-
-      // todo XXX(andrei): Only create this if we're actually interested in reconstructing the thing.
-      auto view = make_shared<ITMView>(calibration, frame_size_itm, frame_size_itm, use_gpu);
-      vector<RawFlow> instance_flow_vectors;
-      ExtractSceneFlow(
-          scene_flow,
-          instance_flow_vectors,
-          instance_detection,
-          frame_size);
-
-      new_instance_views.emplace_back(instance_detection,
-                                      view,
-                                      instance_flow_vectors);
-    }
-  }
+  vector<InstanceView> new_instance_views = CreateInstanceViews(segmentation_result, main_view, scene_flow);
 
   // Associate this frame's detection(s) with those from previous frames.
   this->instance_tracker_->ProcessInstanceViews(frame_idx_, new_instance_views, dyn_slam->GetPose());
-  UpdateTracks(scene_flow,
-               ssf_provider,
-               always_separate,
-               main_view,
-               egomotion,
-               frame_size);
-
+  // Estimate relative object motion and update track states.
+  this->UpdateTracks(scene_flow, ssf_provider, always_separate, main_view, egomotion, frame_size);
+  // Update 3D models for tracks undergoing reconstruction.
   this->ProcessReconstructions(always_separate);
 
   // Update the GPU image after we've (if applicable) removed the dynamic objects from it.
   main_view->rgb->UpdateDeviceFromHost();
   main_view->depth->UpdateDeviceFromHost();
 
-  // ``Graphically'' display the object tracks for debugging.
   /*
+  // ``Graphically'' display the object tracks for debugging.
   for (const auto &pair: this->instance_tracker_->GetActiveTracks()) {
     cout << "Track: " << pair.second.GetAsciiArt() << endl;
   }
@@ -274,8 +188,6 @@ void InstanceReconstructor::UpdateTracks(const SparseSceneFlow &scene_flow,
                                          const Eigen::Matrix4f &egomotion,
                                          const Eigen::Vector2i &frame_size) const
 {
-  // TODO think about this code A LOT and ensure it makes sense. Make flowcharts and put them in
-  // the thesis. Maybe even add pseudocode to thesis in an algorithm box.
   for (const auto &pair : instance_tracker_->GetActiveTracks()) {
     Track &track = instance_tracker_->GetTrack(pair.first);
     bool verbose = true;
@@ -495,14 +407,33 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
   }
 }
 
+void InstanceReconstructor::GetInstanceRaycastPreview(ITMUChar4Image *out,
+                                                      int object_idx,
+                                                      const pangolin::OpenGlMatrix &model_view,
+                                                      dynslam::PreviewType preview_type) {
+  if (instance_tracker_->HasTrack(object_idx)) {
+    Track& track = instance_tracker_->GetTrack(object_idx);
+    if (track.HasReconstruction()) {
+      track.GetReconstruction()->GetImage(
+          out,
+          preview_type,
+          model_view);
+
+      return;
+    }
+  }
+
+  // If we're not tracking the object, or if it has no reconstruction available, then there's
+  // nothing to display.
+  out->Clear();
+}
+
 void InstanceReconstructor::SaveObjectToMesh(int object_id, const string &fpath) {
-  // TODO nicer error handling
   if(! instance_tracker_->HasTrack(object_id)) {
-    throw std::runtime_error("Unknown track");
+    throw std::runtime_error(dynslam::utils::Format("Unknown track ID: %d", object_id));
   }
 
   const Track& track = instance_tracker_->GetTrack(object_id);
-
   if(! track.HasReconstruction()) {
     throw std::runtime_error("Track exists but has no reconstruction.");
   }
@@ -518,13 +449,6 @@ void InstanceReconstructor::SaveObjectToMesh(int object_id, const string &fpath)
                                  ? MEMORYDEVICE_CUDA
                                  : MEMORYDEVICE_CPU);
   ITMMesh *mesh = new ITMMesh(deviceType, settings->sdfLocalBlockNum);
-
-  cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess) {
-    cerr << "Warning: we seem to have inherited an error here. Meshing should work OK but you "
-         << "should look into this..." << endl;
-  }
-
   meshing_engine->MeshScene(mesh, track.GetReconstruction()->GetScene());
   mesh->WriteOBJ(fpath.c_str());
 //    mesh->WriteSTL(fpath.c_str());
@@ -532,6 +456,92 @@ void InstanceReconstructor::SaveObjectToMesh(int object_id, const string &fpath)
   // TODO(andrei): This is obviously wasteful!
   delete mesh;
   delete meshing_engine;
+}
+
+vector<InstanceView> InstanceReconstructor::CreateInstanceViews(
+    const InstanceSegmentationResult &segmentation_result,
+    ITMLib::Objects::ITMView *main_view,
+    const SparseSceneFlow &scene_flow
+) {
+  Vector2i frame_size_itm = main_view->rgb->noDims;
+  Eigen::Vector2i frame_size(frame_size_itm.x, frame_size_itm.y);
+
+  vector<InstanceView> instance_views;
+  for (const InstanceDetection &instance_detection : segmentation_result.instance_detections) {
+    if (IsPossiblyDynamic(instance_detection.GetClassName())) {
+      // bool use_gpu = main_view->rgb->isAllocated_CUDA; // May need to modify 'MemoryBlock' to
+      // check this, since the field is private.
+      bool use_gpu = true;
+
+      // The ITMView takes ownership of this.
+      ITMRGBDCalib *calibration = new ITMRGBDCalib;
+      *calibration = *main_view->calib;
+
+      // todo XXX(andrei): Only create this if we're actually interested in reconstructing the thing.
+      auto view = make_shared<ITMView>(calibration, frame_size_itm, frame_size_itm, use_gpu);
+      vector<RawFlow> instance_flow_vectors;
+      ExtractSceneFlow(
+          scene_flow,
+          instance_flow_vectors,
+          instance_detection,
+          frame_size);
+
+      instance_views.emplace_back(instance_detection,
+                                  view,
+                                  instance_flow_vectors);
+    }
+  }
+
+  return instance_views;
+}
+
+void InstanceReconstructor::ExtractSceneFlow(const SparseSceneFlow &scene_flow,
+                                             vector<RawFlow> &out_instance_flow_vectors,
+                                             const InstanceDetection &detection,
+                                             const Eigen::Vector2i &frame_size,
+                                             bool check_sf_start) {
+  const BoundingBox &flow_bbox = detection.conservative_mask->GetBoundingBox();
+  map<pair<int, int>, RawFlow> coord_to_flow;
+  int frame_width = frame_size(0);
+  int frame_height = frame_size(1);
+
+  // Instead of expensively doing a per-pixel for every SF vector (ouch!), we just use the bounding
+  // boxes, since we'll be using those vectors for RANSAC anyway. In the future, we could maybe
+  // use some sort of hashing/sparse matrix for the scene flow and support per-pixel stuff.
+  for(const auto &match : scene_flow.matches) {
+    // TODO(andrei): Store old motion of car in track and use to initialize RANSAC under a constant
+    // motion assumption (poor man's Kalman filtering).
+    int fx = static_cast<int>(match.curr_left(0));
+    int fy = static_cast<int>(match.curr_left(1));
+    int fx_prev = static_cast<int>(match.prev_left(0));
+    int fy_prev = static_cast<int>(match.prev_left(1));
+
+    if (flow_bbox.ContainsPoint(fx, fy)) {
+      // Use the larger mask so we only filter out truly ridiculous SF values
+      if (!check_sf_start || detection.mask->GetBoundingBox().ContainsPoint(fx_prev, fy_prev)) {
+        coord_to_flow.emplace(pair<pair<int, int>, RawFlow>(pair<int, int>(fx, fy), match));
+      }
+    }
+  }
+
+  for (int cons_row = 0; cons_row < flow_bbox.GetHeight(); ++cons_row) {
+    for (int cons_col = 0; cons_col < flow_bbox.GetWidth(); ++cons_col) {
+      int cons_frame_row = cons_row + flow_bbox.r.y0;
+      int const_frame_col = cons_col + flow_bbox.r.x0;
+
+      if (cons_frame_row >= frame_height || const_frame_col >= frame_width) {
+        continue;
+      }
+
+      u_char c_mask_val = detection.conservative_mask->GetMaskData()->at<u_char>(cons_row, cons_col);
+      if (c_mask_val == 1) {
+        auto coord_pair = pair<int, int>(const_frame_col, cons_frame_row);
+        if (coord_to_flow.find(coord_pair) != coord_to_flow.cend()) {
+          out_instance_flow_vectors.push_back(coord_to_flow.find(coord_pair)->second);
+        }
+      }
+    }
+  }
 }
 
 }  // namespace reconstruction

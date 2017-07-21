@@ -1,5 +1,3 @@
-
-
 #ifndef INSTRECLIB_INSTANCEVIEW_H
 #define INSTRECLIB_INSTANCEVIEW_H
 
@@ -46,7 +44,6 @@ class InstanceView {
   /// \brief Holds the depth and RGB information about the object.
   std::shared_ptr<ITMLib::Objects::ITMView> view_;
 
-  // TODO(andrei): We could probably get rid of this.
   /// \brief The scene scene flow data associated with this instance at this time.
   std::vector<RawFlow> sparse_sf_;
 };
