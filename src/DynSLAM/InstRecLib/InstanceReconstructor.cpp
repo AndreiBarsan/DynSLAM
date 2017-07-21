@@ -18,6 +18,26 @@ using namespace instreclib::utils;
 
 using namespace ITMLib::Objects;
 
+
+const vector<string> InstanceReconstructor::kClassesToReconstructVoc2012 = { "car" };
+// Note: for a real self-driving cars, you definitely want a completely generic obstacle detector.
+const vector<string> InstanceReconstructor::kPossiblyDynamicClassesVoc2012 = {
+    "airplane",   // you never know...
+    "bicycle",
+    "bird",       // stupid pigeons
+    "boat",       // again, you never know...
+    "bus",
+    "car",
+    "cat",
+    "cow",
+    "dog",
+    "horse",
+    "motorbike",
+    "person",
+    "sheep",      // If we're driving in Romania.
+    "train"       // MNC is not very good at segmenting trains anyway
+};
+
 // TODO(andrei): Implement this in CUDA. It should be easy.
 template <typename DEPTH_T>
 void ProcessSilhouette_CPU(Vector4u *source_rgb,
@@ -125,25 +145,6 @@ void RemoveSilhouette_CPU(ORUtils::Vector4<unsigned char> *source_rgb,
 
 }
 
-// Note: for a real self-driving cars, you definitely want a completely generic obstacle detector.
-const vector<string> InstanceReconstructor::classes_to_reconstruct_voc2012 = { "car" };
-const vector<string> InstanceReconstructor::possibly_dynamic_classes_voc2012 = {
-    "airplane",   // you never know...
-    "bicycle",
-    "bird",       // stupid pigeons
-    "boat",       // again, you never know...
-    "bus",
-    "car",
-    "cat",
-    "cow",
-    "dog",
-    "horse",
-    "motorbike",
-    "person",
-    "sheep",      // If we're driving in Romania.
-    "train"       // MNC is not very good at segmenting trains anyway
-};
-
 void InstanceReconstructor::ProcessFrame(
     const dynslam::DynSlam *dyn_slam,
     ITMLib::Objects::ITMView *main_view,
@@ -190,7 +191,7 @@ void InstanceReconstructor::UpdateTracks(const SparseSceneFlow &scene_flow,
 {
   for (const auto &pair : instance_tracker_->GetActiveTracks()) {
     Track &track = instance_tracker_->GetTrack(pair.first);
-    bool verbose = true;
+    bool verbose = false;
     track.Update(egomotion, ssf_provider, verbose);
     ProcessSilhouette(track, main_view, frame_size, scene_flow, always_separate);
   }
@@ -344,8 +345,12 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
           driver_->GetView()->rgb->noDims);
 
   // If we already have some frames, integrate them into the new volume.
-  for(size_t i = 0; i < track.GetSize(); ++i) {
-    FuseFrame(track, i);
+  int first_idx = track.GetFirstFusableFrameIndex();
+  if (first_idx > -1) {
+    cout << "Starting reconstruction from index " << first_idx << endl;
+    for (size_t i = first_idx; i < track.GetSize(); ++i) {
+      FuseFrame(track, i);
+    }
   }
 }
 
@@ -361,7 +366,7 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     return;
   }
 
-  cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
+//  cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
   InfiniTamDriver &instance_driver = *track.GetReconstruction();
 
   TrackFrame &frame = track.GetFrame(frame_idx);
@@ -374,11 +379,13 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
   // still try to estimate it from k to k+2.
   if (rel_dyn_pose.IsPresent()) {
     Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
-//    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
+    // TODO(andrei): Make sure you're not forgetting to integrate the first frame we can. The first
+    // frame with a relative pose means we can start integrating from the frame right before it, if
+    // it is available.
+    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
 
-    // TODO(andrei): Replace this with fine tracking initialized by this coarse relative pose.
-    // We have the ITM instance up and running, so we can even perform ICP or some dense alignment
-    // method here if we wish.
+    // Note: We have the ITM instance up and running, so we can even perform ICP or some dense
+    // alignment method here if we wish.
     instance_driver.SetPose(rel_dyn_pose_f.inverse());
 
     try {
