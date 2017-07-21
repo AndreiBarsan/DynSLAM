@@ -57,6 +57,10 @@ class InstanceReconstructor {
   /// \param dyn_slam The owner of this component.
   /// \param main_view The original InfiniTAM view of the scene. Gets mutated!
   /// \param segmentation_result The output of the view's semantic segmentation.
+  /// \param scene_flow The sparse scene flow for the entire input.
+  /// \param ssf_provider (Hacky) Sparse scene flow provider which can also be used for computing
+  ///                     an object's relative pose between two frames, based on its associated
+  ///                     scene flow vectors.
   /// \param always_separate Whether to always separately reconstruct car models, even if they're
   ///                        static (more expensive, but also more robust to cars changing their
   ///                        state from static to dynamic.
@@ -64,7 +68,6 @@ class InstanceReconstructor {
       const dynslam::DynSlam* dyn_slam,
       ITMLib::Objects::ITMView *main_view,
       const segmentation::InstanceSegmentationResult &segmentation_result,
-      // TODO(andrei): Organize these args better.
       const SparseSceneFlow &scene_flow,
       const SparseSFProvider &ssf_provider,
       bool always_separate
@@ -88,23 +91,7 @@ class InstanceReconstructor {
       int object_idx,
       const pangolin::OpenGlMatrix &model_view = pangolin::IdentityMatrix(),
       dynslam::PreviewType preview_type = dynslam::PreviewType::kNormal
-  ) {
-    if (instance_tracker_->HasTrack(object_idx)) {
-      Track& track = instance_tracker_->GetTrack(object_idx);
-      if (track.HasReconstruction()) {
-        track.GetReconstruction()->GetImage(
-            out,
-            preview_type,
-            model_view);
-
-        return;
-      }
-    }
-
-    // If we're not tracking the object, or if it has no reconstruction available, then there's
-    // nothing to display.
-    out->Clear();
-  }
+  );
 
   void SaveObjectToMesh(int object_id, const string &fpath);
 
@@ -126,9 +113,10 @@ class InstanceReconstructor {
   /// \brief Whether to use voxel decay for regularizing the reconstructed objects.
   bool use_decay_;
 
+  /// \brief Updates the reconstruction associated with the object tracks, where applicable.
   void ProcessReconstructions(bool always_separate);
 
-  /// \brief Fuses the specified frame into the track's 3D reconstruction.
+  /// \brief Fuses the frame with the specified ID into the track's 3D reconstruction.
   void FuseFrame(Track &track, size_t frame_idx) const;
 
   /// \brief Processes the latest frame of the given track, copying it to the appropriate
@@ -139,13 +127,36 @@ class InstanceReconstructor {
                          const SparseSceneFlow &scene_flow,
                          bool always_separate) const;
 
+  /// \brief Estimates object motion for every track, and populates instance views.
+  /// The instance view are populated with RGB, depth, and scene flow information based on the
+  /// semantic segmentation result.
   void UpdateTracks(const SparseSceneFlow &scene_flow,
                     const SparseSFProvider &ssf_provider,
                     bool always_separate,
                     ITMLib::Objects::ITMView *main_view,
                     const Eigen::Matrix4f &egomotion,
                     const Eigen::Vector2i &frame_size) const;
+
+  /// \brief Allocates and InfiniTAM instance for reconstructing the given object and fuses all the
+  ///        available frames in the track.
   void InitializeReconstruction(Track &track) const;
+
+  /// \brief Masks the scene flow using the (smaller) conservative mask of the instance detection.
+  void ExtractSceneFlow(
+      const SparseSceneFlow &scene_flow,
+      vector<RawFlow> &out_instance_flow_vectors,
+      const segmentation::InstanceDetection &detection,
+      const Eigen::Vector2i &frame_size,
+      bool check_sf_start = true
+  );
+
+  /// \brief Converts segmentation results into "InstanceView" objects with associated RGB, depth,
+  ///        and scene flow data.
+  vector<InstanceView> CreateInstanceViews(
+      const segmentation::InstanceSegmentationResult &segmentation_result,
+      ITMLib::Objects::ITMView *main_view,
+      const SparseSceneFlow &scene_flow
+  );
 };
 
 }  // namespace reconstruction
