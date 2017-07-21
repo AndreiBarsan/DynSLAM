@@ -15,8 +15,8 @@ using namespace instreclib::utils;
 float Track::ScoreMatch(const TrackFrame& new_frame) const {
   // TODO(andrei): Use fine mask, not just bounding box.
   // TODO(andrei): Ensure this is modular enough to allow many different matching strategies.
-  // TODO-LOW(andrei): Take time into account---if I overlap perfectly but with
-  // a very old track, the score should probably be discounted.
+  // TODO-LOW(andrei): Take time into account---if I overlap perfectly but with a very old track,
+  // the score should probably be discounted.
 
   assert(!this->frames_.empty() && "A track with no frames cannot exist.");
   const TrackFrame& latest_frame = this->frames_[this->frames_.size() - 1];
@@ -79,37 +79,30 @@ string Track::GetAsciiArt() const {
   return out.str();
 }
 
-// TODO clean this method up
-dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
+Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
   assert(frame_idx < GetFrames().size() && "Cannot get the relative pose of a non-existent frame.");
 
   // Skip the original very distant frames with no relative pose info.
   bool found_good_pose = false;
   Eigen::Matrix4d *pose = new Eigen::Matrix4d;
   pose->setIdentity();
-//  Eigen::Matrix4d last_good_relative_pose = Eigen::Matrix4d::Identity();
 
-  // TODO we should probably put the relative pose in the track frame, not in the instance view
   // Start from 1 since we care about relative pose to 1st frame.
   for (size_t i = 1; i <= frame_idx; ++i) {
-//    if(frames_[i].instance_view.HasRelativePose()) {
     if (frames_[i].relative_pose->IsPresent()) {
       found_good_pose = true;
-//      cout << "Track #" << id_ << ": Good pose at frame " << i << " (" << frames_[i].frame_idx << ")." << endl;
 
-//      Eigen::Matrix4d rel_pose = frames_[i].instance_view.GetRelativePose();
       const Eigen::Matrix4d &rel_pose = frames_[i].relative_pose->Get();
       *pose = rel_pose * (*pose);
-//      last_good_relative_pose = rel_pose;
     }
     else {
+      // Gap caused by instances switching (static/dynamic) -> uncertain -> (static/dynamic).
       if (found_good_pose) {
-        throw std::runtime_error("This should not happen");
+        cout << "(static/dynamic) -> uncertain -> (static/dynamic) case detected; ignoring first "
+            << "reconstruction attempt." << endl;
+        found_good_pose = false;
+        pose->setIdentity();
       }
-//        cerr << "Found good pose followed by an estimation error at i=" << i <<". "
-//            "Assuming constant velocity (poor man's Kalman filter)." << endl;
-//        *pose = last_good_relative_pose * (*pose);
-//      }
     }
   }
 
@@ -128,7 +121,7 @@ Option<Eigen::Matrix4d>* EstimateInstanceMotion(
   // This is a good conservative value, but we can definitely do better.
   // TODO(andrei): Try setting the minimum to 6-10, but threshold based on the final RMSE, discarding
   // estimates which are above some value.
-  uint32_t kMinFlowVectorsForPoseEst = 25;   // TODO experiment and set proper value;
+  uint32_t kMinFlowVectorsForPoseEst = 25;
 //  uint32_t kMinFlowVectorsForPoseEst = 12;
   // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
   // we're being a little paranoid).
@@ -186,13 +179,13 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
 
         if (trans_error > kTransErrorTreshold) {
           if (verbose) {
-            cout << "Uncertain -> Dynamic object!" << endl;
+            cout << id_ << ": Uncertain -> Dynamic object!" << endl;
           }
           this->track_state_ = kDynamic;
         }
         else {
           if (verbose) {
-            cout << "Uncertain -> Static object!" << endl;
+            cout << id_ << ": Uncertain -> Static object!" << endl;
           }
           this->track_state_ = kStatic;
         }
@@ -200,6 +193,19 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
         this->last_known_motion_ = latest_motion->Get();
         this->last_known_motion_time_ = current_frame_idx;
       }
+
+      if (track_state_ != kUncertain) {
+        // We just switched states
+        if (HasReconstruction()) {
+          // Corner case: an instance which was static or dynamic, started being reconstructed, then
+          // became uncertain again, and then was labeled as static or dynamic once again. In this
+          // case, we have no way of registering our new measurements to the existing
+          // reconstruction, so we discard it in order to start fresh.
+          reconstruction_->SetView(nullptr);    // Prevent view double-free
+          reconstruction_.reset();
+        }
+      }
+
       break;
 
     case kStatic:
@@ -217,8 +223,9 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
         int motion_age = current_frame_idx - last_known_motion_time_;
         if (motion_age > frameThreshold) {
           if (verbose) {
-            cout << GetStateLabel() << " -> Uncertain because the relative motion couldn't be "
-                 << "evaluated over the last " << frameThreshold << " frames.\n" << endl;
+            cout << id_ << ": " << GetStateLabel() << " -> Uncertain because the relative motion "
+                 << "could not be evaluated over the last " << frameThreshold << " frames."
+                 << endl;
           }
 
           this->track_state_ = kUncertain;
