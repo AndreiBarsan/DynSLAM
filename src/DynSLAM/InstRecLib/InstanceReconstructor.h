@@ -25,22 +25,21 @@ using namespace dynslam::drivers;
 /// \brief Pipeline component responsible for reconstructing the individual object instances.
 class InstanceReconstructor {
  public:
-
-  static const vector<string> classes_to_reconstruct_voc2012;
-  static const vector<string> possibly_dynamic_classes_voc2012;
+  static const vector<string> kClassesToReconstructVoc2012;
+  static const vector<string> kPossiblyDynamicClassesVoc2012;
 
   static bool ShouldReconstruct(const std::string &class_name) {
     return (find(
-        classes_to_reconstruct_voc2012.begin(),
-        classes_to_reconstruct_voc2012.end(),
-        class_name) != classes_to_reconstruct_voc2012.end());
+        kClassesToReconstructVoc2012.begin(),
+        kClassesToReconstructVoc2012.end(),
+        class_name) != kClassesToReconstructVoc2012.end());
   }
 
   static bool IsPossiblyDynamic(const std::string &class_name) {
     return (find(
-        possibly_dynamic_classes_voc2012.cbegin(),
-        possibly_dynamic_classes_voc2012.cend(),
-        class_name) != possibly_dynamic_classes_voc2012.cend());
+        kPossiblyDynamicClassesVoc2012.cbegin(),
+        kPossiblyDynamicClassesVoc2012.cend(),
+        class_name) != kPossiblyDynamicClassesVoc2012.cend());
   }
 
   InstanceReconstructor(InfiniTamDriver *driver, bool use_decay = true)

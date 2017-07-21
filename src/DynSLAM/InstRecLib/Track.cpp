@@ -106,9 +106,11 @@ Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
     }
   }
 
-  if (!found_good_pose && frame_idx > 0) {
-    return Option<Eigen::Matrix4d>::Empty();
-  }
+  // Experimental code based on "GetFirstFusableFrameIndex".
+//  if (!found_good_pose && frame_idx > 0) {
+//  if (!found_good_pose) {
+//    return Option<Eigen::Matrix4d>::Empty();
+//  }
 
   return Option<Eigen::Matrix4d>(pose);
 }
@@ -119,8 +121,8 @@ Option<Eigen::Matrix4d>* EstimateInstanceMotion(
     const SparseSFProvider &ssf_provider
 ) {
   // This is a good conservative value, but we can definitely do better.
-  // TODO(andrei): Try setting the minimum to 6-10, but threshold based on the final RMSE, discarding
-  // estimates which are above some value.
+  // TODO(andrei): Try setting the minimum to 6-10, but threshold based on the final RMSE, flagging
+  // pose estimates whose residual is above some value as invalid.
   uint32_t kMinFlowVectorsForPoseEst = 25;
 //  uint32_t kMinFlowVectorsForPoseEst = 12;
   // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
