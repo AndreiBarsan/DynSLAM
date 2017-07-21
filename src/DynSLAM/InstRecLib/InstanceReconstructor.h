@@ -129,11 +129,11 @@ class InstanceReconstructor {
   /// \brief Estimates object motion for every track, and populates instance views.
   /// The instance view are populated with RGB, depth, and scene flow information based on the
   /// semantic segmentation result.
-  void UpdateTracks(const SparseSceneFlow &scene_flow,
+  void UpdateTracks(const dynslam::DynSlam *dyn_slam,
+                    const SparseSceneFlow &scene_flow,
                     const SparseSFProvider &ssf_provider,
                     bool always_separate,
                     ITMLib::Objects::ITMView *main_view,
-                    const Eigen::Matrix4f &egomotion,
                     const Eigen::Vector2i &frame_size) const;
 
   /// \brief Allocates and InfiniTAM instance for reconstructing the given object and fuses all the

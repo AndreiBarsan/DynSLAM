@@ -133,7 +133,7 @@ void InfiniTamDriver::GetImage(ITMUChar4Image *out,
   if (nullptr != this->view) {
     ITMPose itm_freeview_pose = PoseFromPangolin(model_view);
 
-    ITMIntrinsics intrinsics = this->view->calib->intrinsics_d;
+    ITMIntrinsics intrinsics = this->viewBuilder->GetCalib()->intrinsics_d;
     ITMMainEngine::GetImage(
         out,
         GetItmVisualization(get_image_type),
