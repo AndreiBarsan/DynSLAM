@@ -18,7 +18,10 @@ using namespace instreclib::utils;
 using namespace dynslam::utils;
 
 /// \brief Rescale factor used for RGB and depth masking of object instances.
-float kMaskRescaleFactor = 1.25f;
+//float kMaskRescaleFactor = 1.25f;
+
+float kCopyMaskRescaleFactor = 1.15f;
+float kDeleteMaskRescaleFactor = 1.0f;
 
 /// \brief Rescale factor used for scene flow masking of instances.
 /// Smaller => fewer sparse scene flow vectors from, e.g., the background behind the object.
@@ -121,19 +124,18 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
         CV_8UC1,
         (void*) mask_pixels
     );
-    auto mask = make_shared<Mask>(bounding_box, mask_cv_mat);
-    auto conservative_mask = make_shared<Mask>(*mask);
+
+    auto copy_mask = make_shared<Mask>(bounding_box, mask_cv_mat);
+    auto delete_mask = make_shared<Mask>(*copy_mask);
+    auto conservative_mask = make_shared<Mask>(*copy_mask);
 //    dynslam::utils::Toc();
 
-    // TODO(andrei): Consider maintaining some overlap--we could use the 1.2 mask for sending info
-    // to the reconstruction and e.g., 1.0 for sending it to the static map. However, the ambiguous
-    // band could maybe be flagged with a lower update weight. Now that we have decay this should
-    // TOTALLY be a thing. put 1.2x into car, but pretend the car is still 1.0x or even 0.9x when
-    // you're cutting it out of the main map.
-    mask->Rescale(kMaskRescaleFactor);
+    copy_mask->Rescale(kCopyMaskRescaleFactor);
+    delete_mask->Rescale(kDeleteMaskRescaleFactor);
     conservative_mask->Rescale(kConservativeMaskRescaleFactor);
 
-    detections.emplace_back(class_probability, class_id, mask, conservative_mask, this->dataset_used);
+    detections.emplace_back(class_probability, class_id, copy_mask, delete_mask, conservative_mask,
+                            this->dataset_used);
     instance_idx++;
   }
 

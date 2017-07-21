@@ -16,8 +16,6 @@ namespace segmentation {
 
 class InstanceSegmentationResult;
 
-// TODO(andrei): Consider storing an entire class prob. distribution in each detection object.
-
 /// \brief Describes a single object instance detected semantically in an input frame.
 /// This is a component of InstanceSegmentationResult.
 class InstanceDetection {
@@ -31,8 +29,11 @@ class InstanceDetection {
   /// the associated `SegmentationDataset`.
   int class_id;
 
-  /// \brief 2D mask of this detection in its source image frame.
-  std::shared_ptr<instreclib::utils::Mask> mask;
+  /// \brief Mask used to copy this object's data to the reconstruction system.
+  std::shared_ptr<instreclib::utils::Mask> copy_mask;
+
+  /// \brief Mask used for deleting the object in the source frame.
+  std::shared_ptr<instreclib::utils::Mask> delete_mask;
 
   /// \brief Smaller, more conservative mask used for scene-flow association.
   /// Allows faster and more robust computation of object motion by reducing the amount of outlier
@@ -45,27 +46,30 @@ class InstanceDetection {
 
   std::string GetClassName() const;
 
-  instreclib::utils::BoundingBox& GetBoundingBox() { return mask->GetBoundingBox(); }
+  instreclib::utils::BoundingBox& GetCopyBoundingBox() { return copy_mask->GetBoundingBox(); }
+  const instreclib::utils::BoundingBox& GetCopyBoundingBox() const { return copy_mask->GetBoundingBox(); }
 
-  const instreclib::utils::BoundingBox& GetBoundingBox() const { return mask->GetBoundingBox(); }
+  instreclib::utils::BoundingBox& GetDeleteBoundingBox() { return delete_mask->GetBoundingBox(); }
+  const instreclib::utils::BoundingBox& GetDeleteBoundingBox() const { return delete_mask->GetBoundingBox(); }
 
   /// \brief Initializes the detection with bounding box, class, and mask information.
-  /// \note This object takes ownership of `mask` and `conservative_mask`.
   InstanceDetection(float class_probability,
                     int class_id,
-                    std::shared_ptr<instreclib::utils::Mask> mask,
+                    std::shared_ptr<instreclib::utils::Mask> copy_mask,
+                    std::shared_ptr<instreclib::utils::Mask> delete_mask,
                     std::shared_ptr<instreclib::utils::Mask> conservative_mask,
                     const SegmentationDataset* segmentation_dataset)
       : class_probability(class_probability),
         class_id(class_id),
-        mask(mask),
+        copy_mask(copy_mask),
+        delete_mask(delete_mask),
         conservative_mask(conservative_mask),
         segmentation_dataset(segmentation_dataset) {}
 
   virtual ~InstanceDetection() {}
 };
 
-/// \brief Supports pretty-printing segmentation result objects.
+/// \brief Pretty-prints a single instance detection objects.
 std::ostream& operator<<(std::ostream& out, const InstanceDetection& detection);
 
 /// \brief The result of performing instance-aware semantic segmentation on an input frame.
