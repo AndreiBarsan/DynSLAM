@@ -25,6 +25,24 @@ using namespace dynslam::drivers;
 /// \brief Pipeline component responsible for reconstructing the individual object instances.
 class InstanceReconstructor {
  public:
+
+  static const vector<string> classes_to_reconstruct_voc2012;
+  static const vector<string> possibly_dynamic_classes_voc2012;
+
+  static bool ShouldReconstruct(const std::string &class_name) {
+    return (find(
+        classes_to_reconstruct_voc2012.begin(),
+        classes_to_reconstruct_voc2012.end(),
+        class_name) != classes_to_reconstruct_voc2012.end());
+  }
+
+  static bool IsPossiblyDynamic(const std::string &class_name) {
+    return (find(
+        possibly_dynamic_classes_voc2012.cbegin(),
+        possibly_dynamic_classes_voc2012.cend(),
+        class_name) != possibly_dynamic_classes_voc2012.cend());
+  }
+
   InstanceReconstructor(InfiniTamDriver *driver, bool use_decay = true)
       : instance_tracker_(new InstanceTracker()),
         frame_idx_(0),
@@ -112,6 +130,22 @@ class InstanceReconstructor {
 
   /// \brief Fuses the specified frame into the track's 3D reconstruction.
   void FuseFrame(Track &track, size_t frame_idx) const;
+
+  /// \brief Processes the latest frame of the given track, copying it to the appropriate
+  ///        instance-specific frame if necessary.
+  void ProcessSilhouette(Track &track,
+                         ITMLib::Objects::ITMView *main_view,
+                         const Eigen::Vector2i &frame_size,
+                         const SparseSceneFlow &scene_flow,
+                         bool always_separate) const;
+
+  void UpdateTracks(const SparseSceneFlow &scene_flow,
+                    const SparseSFProvider &ssf_provider,
+                    bool always_separate,
+                    ITMLib::Objects::ITMView *main_view,
+                    const Eigen::Matrix4f &egomotion,
+                    const Eigen::Vector2i &frame_size) const;
+  void InitializeReconstruction(Track &track) const;
 };
 
 }  // namespace reconstruction

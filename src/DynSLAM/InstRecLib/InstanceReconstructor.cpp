@@ -77,8 +77,7 @@ void ProcessSilhouette_CPU(Vector4u *source_rgb,
                            Vector4u *dest_rgb,
                            DEPTH_T *dest_depth,
                            Eigen::Vector2i sourceDims,
-                           const InstanceDetection &detection,
-                           const SparseSceneFlow &scene_flow) {
+                           const InstanceDetection &detection) {
   // Blanks out the detection's silhouette in the 'source' frames, and writes its pixels into the
   // output frames. Initially, the dest frames will be the same size as the source ones, but this
   // is wasteful in terms of memory: we should use bbox+1-sized buffers in the future, since most
@@ -109,9 +108,6 @@ void ProcessSilhouette_CPU(Vector4u *source_rgb,
     for (int col = 0; col < box_width; ++col) {
       int frame_row = row + bbox.r.y0;
       int frame_col = col + bbox.r.x0;
-      // TODO(andrei): Are the CPU-specific InfiniTAM functions doing this in a nicer way, or are
-      // they also just looping?
-
       if (frame_row < 0 || frame_row >= frame_height ||
           frame_col < 0 || frame_col >= frame_width) {
         continue;
@@ -181,6 +177,26 @@ void RemoveSilhouette_CPU(ORUtils::Vector4<unsigned char> *source_rgb,
 
 }
 
+// Note: for a real self-driving cars, you definitely want a completely generic obstacle detector.
+const vector<string> InstanceReconstructor::classes_to_reconstruct_voc2012 = { "car" };
+const vector<string> InstanceReconstructor::possibly_dynamic_classes_voc2012 = {
+    "airplane",   // you never know...
+    "bicycle",
+    "bird",       // stupid pigeons
+    "boat",       // again, you never know...
+    "bus",
+    "car",
+    "cat",
+    "cow",
+    "dog",
+    "horse",
+    "motorbike",
+    "person",
+    "sheep",      // If we're driving in Romania.
+    "train"       // MNC is not very good at segmenting trains anyway
+};
+
+
 
 // TODO(andrei): Refactor this BEHEMOTH before it gets >500 LOC in size and devours us all.
 void InstanceReconstructor::ProcessFrame(
@@ -192,39 +208,13 @@ void InstanceReconstructor::ProcessFrame(
     bool always_separate
 ) {
   Eigen::Matrix4f egomotion = dyn_slam->GetLastEgomotion();
-
-  // TODO(andrei): Perform this slicing 100% on the GPU.
   main_view->rgb->UpdateHostFromDevice();
   main_view->depth->UpdateHostFromDevice();
-
-  ORUtils::Vector4<unsigned char> *rgb_data_h =
-      main_view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
-  float *depth_data_h = main_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
-
-  // Note: for a real self-driving cars, you definitely want a completely generic obstacle detector.
-  const vector<string> classes_to_reconstruct_voc2012 = { "car" };
-  const vector<string> possibly_dynamic_classes_voc2012 = {
-      "airplane",   // you never know...
-      "bicycle",
-      "bird",       // stupid pigeons
-      "boat",       // again, you never know...
-      "bus",
-      "car",
-      "cat",
-      "cow",
-      "dog",
-      "horse",
-      "motorbike",
-      "person",
-      "sheep",      // If we're driving in Romania.
-      "train"       // MNC is not very good at segmenting trains anyway
-  };
 
   Vector2i frame_size_itm = main_view->rgb->noDims;
   Eigen::Vector2i frame_size(frame_size_itm.x, frame_size_itm.y);
   vector<InstanceView> new_instance_views;
   for (const InstanceDetection &instance_detection : segmentation_result.instance_detections) {
-
     if (find(possibly_dynamic_classes_voc2012.cbegin(),
              possibly_dynamic_classes_voc2012.cend(),
              instance_detection.GetClassName()) != possibly_dynamic_classes_voc2012.end()
@@ -237,6 +227,7 @@ void InstanceReconstructor::ProcessFrame(
       ITMRGBDCalib *calibration = new ITMRGBDCalib;
       *calibration = *main_view->calib;
 
+      // todo XXX(andrei): Only create this if we're actually interested in reconstructing the thing.
       auto view = make_shared<ITMView>(calibration, frame_size_itm, frame_size_itm, use_gpu);
       vector<RawFlow> instance_flow_vectors;
       ExtractSceneFlow(
@@ -251,89 +242,14 @@ void InstanceReconstructor::ProcessFrame(
     }
   }
 
-  // A limitation of libviso for small object could be the fact that it's ignoring color information.
-
   // Associate this frame's detection(s) with those from previous frames.
   this->instance_tracker_->ProcessInstanceViews(frame_idx_, new_instance_views, dyn_slam->GetPose());
-
-  // TODO think about this code A LOT and ensure it makes sense. Make flowcharts and put them in
-  // the thesis. Maybe even add pseudocode to thesis in an algorithm box.
-  // TODO make iteration less dumb
-  for (auto &pair : instance_tracker_->GetActiveTracks()) {
-    int id = pair.first;
-    Track &track = instance_tracker_->GetTrack(id);
-
-    track.Update(egomotion, ssf_provider, false);
-
-    bool should_reconstruct = (find(
-        classes_to_reconstruct_voc2012.begin(),
-        classes_to_reconstruct_voc2012.end(),
-        track.GetClassName()) != classes_to_reconstruct_voc2012.end());
-    bool possibly_dynamic = (find(
-        possibly_dynamic_classes_voc2012.cbegin(),
-        possibly_dynamic_classes_voc2012.cend(),
-        track.GetClassName()) != possibly_dynamic_classes_voc2012.cend());
-    auto instance_view = track.GetLastFrame().instance_view.GetView();
-
-    if (track.GetState() == TrackState::kUncertain) {
-      if (possibly_dynamic) {
-        printf("Unknown motion for possibly dynamic object of class %s; cutting away!\n",
-               track.GetClassName().c_str());
-        // Unknown motion and possibly dynamic object.
-        RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
-                             track.GetLastFrame().instance_view.GetInstanceDetection());
-
-        instance_view->rgb->UpdateDeviceFromHost();
-        instance_view->depth->UpdateDeviceFromHost();
-      }
-      // Else: Static class with unknown motion. Likely safe to put in main map.
-    }
-    else if (track.GetState() == TrackState::kDynamic || always_separate) {
-      if (should_reconstruct) {
-        // TODO(andrei): Don't allocate a view every time!
-        // Dynamic object which we should reconstruct, such as a car
-        auto rgb_segment_h = instance_view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
-        auto depth_segment_h = instance_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
-
-        ProcessSilhouette_CPU(rgb_data_h,
-                              depth_data_h,
-                              rgb_segment_h,
-                              depth_segment_h,
-                              frame_size,
-                              track.GetLastFrame().instance_view.GetInstanceDetection(),
-                              scene_flow);
-
-        instance_view->rgb->UpdateDeviceFromHost();
-        instance_view->depth->UpdateDeviceFromHost();
-      }
-      else if (possibly_dynamic) {
-        cout << "Dynamic object with known motion we can't reconstruct. Removing." << endl;
-        // Dynamic object which we can't or don't want to reconstruct, such as a pedestrian.
-        // In this case, we simply remove the object from view.
-        RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
-                             track.GetLastFrame().instance_view.GetInstanceDetection());
-
-        instance_view->rgb->UpdateDeviceFromHost();
-        instance_view->depth->UpdateDeviceFromHost();
-      }
-      else {
-        // Warn if we detect a moving potted plant.
-        cerr << "Warning: found dynamic object of class [" << track.GetClassName() << "], which is "
-             << "an unexpected type of dynamic object." << endl;
-      }
-
-    }
-    else if (track.GetState() == TrackState::kStatic) {
-      // The object is known to be static; we don't have to do anything.
-      continue;
-    }
-    else {
-      throw runtime_error("Unexpected track state.");
-    }
-
-    throw runtime_error("Refactor me so that the loop just calls a method, and the loop is itself in a neat separate method.");
-
-  }   // end track motion estimation loop
+  UpdateTracks(scene_flow,
+               ssf_provider,
+               always_separate,
+               main_view,
+               egomotion,
+               frame_size);
 
   this->ProcessReconstructions(always_separate);
 
@@ -349,6 +265,85 @@ void InstanceReconstructor::ProcessFrame(
   // */
 
   frame_idx_++;
+}
+
+void InstanceReconstructor::UpdateTracks(const SparseSceneFlow &scene_flow,
+                                         const SparseSFProvider &ssf_provider,
+                                         bool always_separate,
+                                         ITMLib::Objects::ITMView *main_view,
+                                         const Eigen::Matrix4f &egomotion,
+                                         const Eigen::Vector2i &frame_size) const
+{
+  // TODO think about this code A LOT and ensure it makes sense. Make flowcharts and put them in
+  // the thesis. Maybe even add pseudocode to thesis in an algorithm box.
+  for (const auto &pair : instance_tracker_->GetActiveTracks()) {
+    Track &track = instance_tracker_->GetTrack(pair.first);
+    bool verbose = true;
+    track.Update(egomotion, ssf_provider, verbose);
+    ProcessSilhouette(track, main_view, frame_size, scene_flow, always_separate);
+  }
+}
+
+void InstanceReconstructor::ProcessSilhouette(Track &track,
+                                              ITMLib::Objects::ITMView *main_view,
+                                              const Eigen::Vector2i &frame_size,
+                                              const SparseSceneFlow &scene_flow,
+                                              bool always_separate) const
+{
+  bool should_reconstruct = ShouldReconstruct(track.GetClassName());
+  bool possibly_dynamic = IsPossiblyDynamic(track.GetClassName());
+  auto &latest_frame = track.GetLastFrame();
+  auto instance_view = latest_frame.instance_view.GetView();
+  ORUtils::Vector4<uchar> *rgb_data_h = main_view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+  float *depth_data_h = main_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+
+  if (track.GetState() == kUncertain) {
+      if (possibly_dynamic) {
+        printf("Unknown motion for possibly dynamic object of class %s; cutting away!\n",
+               track.GetClassName().c_str());
+        RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
+                             latest_frame.instance_view.GetInstanceDetection());
+        instance_view->rgb->UpdateDeviceFromHost();
+        instance_view->depth->UpdateDeviceFromHost();
+      }
+      // else: Static class with unknown motion. Likely safe to put in main map.
+    }
+    else if (track.GetState() == kDynamic || always_separate) {
+      if (should_reconstruct) {
+        // Dynamic object which we should reconstruct, such as a car
+        auto rgb_segment_h = instance_view->rgb->GetData(MEMORYDEVICE_CPU);
+        auto depth_segment_h = instance_view->depth->GetData(MEMORYDEVICE_CPU);
+
+        ProcessSilhouette_CPU(rgb_data_h, depth_data_h,
+                              rgb_segment_h, depth_segment_h,
+                              frame_size,
+                              latest_frame.instance_view.GetInstanceDetection());
+        instance_view->rgb->UpdateDeviceFromHost();
+        instance_view->depth->UpdateDeviceFromHost();
+      }
+      else if (possibly_dynamic) {
+        cout << "Dynamic object with known motion we can't reconstruct. Removing." << endl;
+        // Dynamic object which we can't or don't want to reconstruct, such as a pedestrian.
+        // In this case, we simply remove the object from view.
+        RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
+                             latest_frame.instance_view.GetInstanceDetection());
+
+        instance_view->rgb->UpdateDeviceFromHost();
+        instance_view->depth->UpdateDeviceFromHost();
+      }
+      else {
+        // Warn if we detect a moving potted plant.
+        cerr << "Warning: found dynamic object of class [" << track.GetClassName() << "], which is "
+             << "an unexpected type of dynamic object." << endl;
+      }
+    }
+    else if (track.GetState() == kStatic) {
+      // The object is known to be static; we don't have to do anything.
+      return;
+    }
+    else {
+      throw runtime_error("Unexpected track state.");
+    }
 }
 
 ITMUChar4Image *InstanceReconstructor::GetInstancePreviewRGB(size_t track_idx) {
@@ -374,13 +369,11 @@ ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) 
 }
 
 void InstanceReconstructor::ProcessReconstructions(bool always_separate) {
-  // TODO loop through keys only since we want to do all track accesses through the instance tracker for constness reasons
-  for (auto &pair : instance_tracker_->GetActiveTracks()) {
+  for (const auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
 
     // If we don't have any new information in this track, there's nothing to fuse.
     if(track.GetLastFrame().frame_idx != frame_idx_) {
-
       // TODO(andrei): Do this in a smarter way.
       // However, if we just encountered a gap in the track (or its end), let's do a full,
       // aggressive cleanup of the reconstruction, if applicable.
@@ -403,65 +396,72 @@ void InstanceReconstructor::ProcessReconstructions(bool always_separate) {
       bool eligible = track.EligibleForReconstruction() &&
           (track.GetState() == TrackState::kDynamic || always_separate);
 
-      if (! eligible) {
+      if (eligible) {
+        // No reconstruction allocated yet; let's initialize one.
+        InitializeReconstruction(track);
+      }
+      else {
         // The frame data we have is insufficient, so we won't try to reconstruct the object
         // (yet).
         continue;
       }
+    } else {
+      // Fuse the latest frame into the volume.
+      FuseFrame(track, track.GetSize() - 1);
+    }
+  }
+}
 
-      // No reconstruction allocated yet; let's initialize one.
-      cout << endl << endl;
-      cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl << endl;
-      ITMLibSettings *settings = new ITMLibSettings(*driver_->GetSettings());
+void InstanceReconstructor::InitializeReconstruction(Track &track) const {
+  cout << endl << endl;
+  cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl << endl;
+  ITMLibSettings *settings = new ITMLibSettings(*driver_->GetSettings());
 
-      // Set a much smaller voxel block number for the reconstruction, since individual objects
-      // occupy a limited amount of space in the scene.
-      // TODO(andrei): Set this limit based on some physical specification, such as 10m x 10m x
-      // 10m.
-      settings->sdfLocalBlockNum = 20000;
-      // We don't want to create an (expensive) meshing engine for every instance.
-      settings->createMeshingEngine = false;
+  // Set a much smaller voxel block number for the reconstruction, since individual objects
+  // occupy a limited amount of space in the scene.
+  // TODO(andrei): Set this limit based on some physical specification, such as 10m x 10m x
+  // 10m.
+  settings->sdfLocalBlockNum = 20000;
+  // We don't want to create an (expensive) meshing engine for every instance.
+  settings->createMeshingEngine = false;
 
-      track.GetReconstruction() = make_shared<InfiniTamDriver>(
+  track.GetReconstruction() = make_shared<InfiniTamDriver>(
           settings,
           driver_->GetView()->calib,
           driver_->GetView()->rgb->noDims,
           driver_->GetView()->rgb->noDims);
 
-      // If we already have some frames, integrate them into the new volume.
-      for(size_t i = 0; i < track.GetSize(); ++i) {
-        // TODO(andrei): This accounts for gaps in tracks for static objects, but not for dynamic ones.
-        FuseFrame(track, i);
-      }
-    } else {
-      cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
-      // Fuse the latest frame into the volume.
-      FuseFrame(track, track.GetSize() - 1);
-    }
-
+  // If we already have some frames, integrate them into the new volume.
+  for(size_t i = 0; i < track.GetSize(); ++i) {
+    FuseFrame(track, i);
   }
 }
 
+// TODO(andrei): IDEA in poor man KF mode, of if using proper KF, can use the inverse (magnitude
+// of?) the variance as an update weight. That is, if we, say, are unable to estimate relative
+// motion for a particular vehicle over 1-2 frames, we can reduce the weight of subsequent updates.
+// Similarly, we could even adjust it based on the final residual from the pose estimation/dense
+// alignment.
 void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
-  InfiniTamDriver &instance_driver = *track.GetReconstruction();
-
   if (track.GetState() == TrackState::kUncertain) {
     // We can't deal with tracks of uncertain state, because there's no available relative
     // transforms between frames, so we can't register measurements.
     return;
   }
 
+  cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
+  InfiniTamDriver &instance_driver = *track.GetReconstruction();
+
   TrackFrame &frame = track.GetFrame(frame_idx);
   instance_driver.SetView(frame.instance_view.GetView());
   Option<Eigen::Matrix4d> rel_dyn_pose = track.GetFramePose(frame_idx);
 
   // Only fuse the information if the relative pose could be established.
-  // TODO-LOW(andrei): This would require modifying libviso a little, but in the even that we miss a
-  // frame, i.e., we are unable to estimate the relative pose from frame k to frame k+1, we could
+  // TODO-LOW(andrei): This would require modifying libviso a little, but in the event that we miss
+  // a frame, i.e., we are unable to estimate the relative pose from frame k to frame k+1, we could
   // still try to estimate it from k to k+2.
   if (rel_dyn_pose.IsPresent()) {
     Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
-
 //    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
 
     // TODO(andrei): Replace this with fine tracking initialized by this coarse relative pose.
@@ -482,7 +482,7 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
 
     instance_driver.PrepareNextStep();
 
-    // TODO(andrei): Consider making this a parameter of the driver. Maybe put it in its config.
+    // TODO(andrei): Make this sync with the similar flag in 'DynSlam'.
     if (use_decay_) {
       instance_driver.Decay();
     }
