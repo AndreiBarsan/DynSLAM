@@ -48,7 +48,7 @@ class Mask {
 
   BoundingBox& GetBoundingBox() { return bounding_box_; }
 
-  const cv::Mat* GetMaskData() const { return mask_data_; }
+  const cv::Mat* GetData() const { return mask_data_; }
 
   /// \brief Resizes the mask and its bounding box, maintaining its aspect ratio.
   /// \param amount A value greater than zero. Values smaller than one cause the mask to shrink in

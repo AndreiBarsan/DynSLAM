@@ -37,8 +37,8 @@ float Track::ScoreMatch(const TrackFrame& new_frame) const {
     return 0.0f;
   }
 
-  const BoundingBox& new_bbox = new_detection.GetBoundingBox();
-  const BoundingBox& last_bbox = latest_detection.GetBoundingBox();
+  const BoundingBox& new_bbox = new_detection.GetCopyBoundingBox();
+  const BoundingBox& last_bbox = latest_detection.GetCopyBoundingBox();
   // Using the max makes sure we prefer matching to previous tracks with larger areas if the new
   // detection is also large. This increases robustness to small spurious detections, preventing
   // them from latching onto good tracks.

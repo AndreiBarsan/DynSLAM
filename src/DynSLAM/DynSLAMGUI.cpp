@@ -291,7 +291,7 @@ public:
       }
 
       InstanceDetection latest_detection = track.GetLastFrame().instance_view.GetInstanceDetection();
-      const auto &bbox = latest_detection.mask->GetBoundingBox();
+      const auto &bbox = latest_detection.copy_mask->GetBoundingBox();
       cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(bbox.r.x0, bbox.r.y0 - font.Height()),
                                     Eigen::Vector2f(width_, height_),
                                     segment_view_);
