@@ -166,6 +166,9 @@ class Track {
     return -1;
   }
 
+  /// \brief The number of frames fused in the reconstruction.
+  int fused_frames_ = 0;
+
  private:
   /// \brief A unique identifier for this particular track.
   int id_;

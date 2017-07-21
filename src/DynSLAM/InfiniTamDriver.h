@@ -191,8 +191,9 @@ public:
   /// \brief Aggressive decay which ignores the minimum age requirement and acts on ALL voxels.
   /// Typically used to clean up finished reconstructions. Can be much slower than `Decay`, even by
   /// a few orders of magnitude if used on the full static map.
-  void Reap() {
-    denseMapper->Decay(scene, renderState_live, aggressive_max_decay_weight_, 0, true);
+  void Reap(int max_decay_weight) {
+    // TODO(andrei): If this works OK, then just get rid of agressive decay param(s).
+    denseMapper->Decay(scene, renderState_live, max_decay_weight, 0, true);
   }
 
   size_t GetVoxelSizeBytes() const {

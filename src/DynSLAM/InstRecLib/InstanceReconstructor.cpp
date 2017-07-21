@@ -39,6 +39,7 @@ const vector<string> InstanceReconstructor::kPossiblyDynamicClassesVoc2012 = {
 };
 
 // TODO(andrei): Implement this in CUDA. It should be easy.
+// TODO(andrei): Consider renaming to copysilhouette or something.
 template <typename DEPTH_T>
 void ProcessSilhouette_CPU(Vector4u *source_rgb,
                            DEPTH_T *source_depth,
@@ -58,12 +59,18 @@ void ProcessSilhouette_CPU(Vector4u *source_rgb,
   // e.g., 5-6 full-size output buffers from the same kernel may end up using up way too much GPU
   // memory.
 
+  // TODO(andrei): Check if this assumption is still necessary.
+  // Assumes that the copy mask is larger than the delete mask.
+
   int frame_width = sourceDims[0];
   int frame_height = sourceDims[1];
-  const BoundingBox &bbox = detection.GetCopyBoundingBox();
+  const BoundingBox &copy_bbox = copy_mask.GetBoundingBox();
+//  const BoundingBox &delete_bbox = delete_mask.GetBoundingBox();
 
-  int box_width = bbox.GetWidth();
-  int box_height = bbox.GetHeight();
+  int copy_box_width = copy_bbox.GetWidth();
+  int copy_box_height = copy_bbox.GetHeight();
+//  int delete_box_width = delete_bbox.GetWidth();
+//  int delete_box_height = delete_bbox.GetHeight();
 
   memset(dest_rgb, 0, frame_width * frame_height * sizeof(*source_rgb));
   memset(dest_depth, 0, frame_width * frame_height * sizeof(DEPTH_T));
@@ -73,37 +80,62 @@ void ProcessSilhouette_CPU(Vector4u *source_rgb,
   float min_depth = numeric_limits<float>::max();
   const float kInvalidDepth = -1.0f;
 
-  for (int row = 0; row < box_height; ++row) {
-    for (int col = 0; col < box_width; ++col) {
-      int frame_row = row + bbox.r.y0;
-      int frame_col = col + bbox.r.x0;
-      if (frame_row < 0 || frame_row >= frame_height ||
-          frame_col < 0 || frame_col >= frame_width) {
+  for (int row = 0; row < copy_box_height; ++row) {
+    for (int col = 0; col < copy_box_width; ++col) {
+      int copy_row = row + copy_bbox.r.y0;
+      int copy_col = col + copy_bbox.r.x0;
+
+      if (copy_row < 0 || copy_row >= frame_height || copy_col < 0 || copy_col >= frame_width) {
         continue;
       }
 
-      int frame_idx = frame_row * frame_width + frame_col;
-      u_char mask_val = detection.copy_mask->GetData()->at<u_char>(row, col);
-      if (mask_val == 1) {
-        dest_rgb[frame_idx].r = source_rgb[frame_idx].r;
-        dest_rgb[frame_idx].g = source_rgb[frame_idx].g;
-        dest_rgb[frame_idx].b = source_rgb[frame_idx].b;
-        dest_rgb[frame_idx].a = source_rgb[frame_idx].a;
-        source_rgb[frame_idx].r = 0;
-        source_rgb[frame_idx].g = 0;
-        source_rgb[frame_idx].b = 0;
-        source_rgb[frame_idx].a = 0;
-
-        float depth = source_depth[frame_idx];
-        dest_depth[frame_idx] = depth;
-        source_depth[frame_idx] = 0.0f;
+      int copy_idx = copy_row * frame_width + copy_col;
+      u_char copy_mask_val = copy_mask.GetData()->at<u_char>(row, col);
+      if (copy_mask_val == 1) {
+        dest_rgb[copy_idx].r = source_rgb[copy_idx].r;
+        dest_rgb[copy_idx].g = source_rgb[copy_idx].g;
+        dest_rgb[copy_idx].b = source_rgb[copy_idx].b;
+        dest_rgb[copy_idx].a = source_rgb[copy_idx].a;
+        float depth = source_depth[copy_idx];
+        dest_depth[copy_idx] = depth;
 
         if (depth != kInvalidDepth && depth < min_depth) {
           min_depth = depth;
         }
       }
+
+        u_char delete_mask_val = delete_mask.GetData()->at<u_char>(row, col);
+
+//      int frame_row = row + copy_bbox.r.y0;
+//      int frame_col = col + copy_bbox.r.x0;
+//      if (frame_row < 0 || frame_row >= frame_height ||
+//          frame_col < 0 || frame_col >= frame_width) {
+//        continue;
+//      }
+//
+//      int frame_idx = frame_row * frame_width + frame_col;
+//      u_char mask_val = detection.copy_mask->GetData()->at<u_char>(row, col);
+//      if (mask_val == 1) {
+//        dest_rgb[frame_idx].r = source_rgb[frame_idx].r;
+//        dest_rgb[frame_idx].g = source_rgb[frame_idx].g;
+//        dest_rgb[frame_idx].b = source_rgb[frame_idx].b;
+//        dest_rgb[frame_idx].a = source_rgb[frame_idx].a;
+//        source_rgb[frame_idx].r = 0;
+//        source_rgb[frame_idx].g = 0;
+//        source_rgb[frame_idx].b = 0;
+//        source_rgb[frame_idx].a = 0;
+//
+//        float depth = source_depth[frame_idx];
+//        dest_depth[frame_idx] = depth;
+//        source_depth[frame_idx] = 0.0f;
+//
+//        if (depth != kInvalidDepth && depth < min_depth) {
+//          min_depth = depth;
+//        }
+//      }
     }
   }
+
 
   // TODO(andrei): Store min depth somewhere.
 //  cout << "Instance frame min depth: " << min_depth << endl;
@@ -214,12 +246,13 @@ void InstanceReconstructor::ProcessSilhouette(Track &track,
   ORUtils::Vector4<uchar> *rgb_data_h = main_view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
   float *depth_data_h = main_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
+  InstanceDetection &latest_detection = latest_frame.instance_view.GetInstanceDetection();
   if (track.GetState() == kUncertain) {
       if (possibly_dynamic) {
         printf("Unknown motion for possibly dynamic object of class %s; cutting away!\n",
                track.GetClassName().c_str());
         RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
-                             latest_frame.instance_view.GetInstanceDetection());
+                             *(latest_detection.delete_mask));
       }
       // else: Static class with unknown motion. Likely safe to put in main map.
     }
@@ -232,7 +265,9 @@ void InstanceReconstructor::ProcessSilhouette(Track &track,
         ProcessSilhouette_CPU(rgb_data_h, depth_data_h,
                               rgb_segment_h, depth_segment_h,
                               frame_size,
-                              latest_frame.instance_view.GetInstanceDetection());
+                              *(latest_detection.copy_mask), *(latest_detection.delete_mask));
+        // TODO(andrei): Really think whether there's a clean way of doing these two operations together.
+        RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size, *(latest_detection.delete_mask));
         instance_view->rgb->UpdateDeviceFromHost();
         instance_view->depth->UpdateDeviceFromHost();
       }
@@ -241,7 +276,7 @@ void InstanceReconstructor::ProcessSilhouette(Track &track,
         // Dynamic object which we can't or don't want to reconstruct, such as a pedestrian.
         // In this case, we simply remove the object from view.
         RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
-                             latest_frame.instance_view.GetInstanceDetection());
+                             *(latest_detection.delete_mask));
       }
       else {
         // Warn if we detect a moving potted plant.
@@ -302,7 +337,10 @@ void InstanceReconstructor::ProcessReconstructions(bool always_separate) {
                    track.GetId(),
                    track.GetLastFrame().frame_idx,
                    gap_size));
-        track.GetReconstruction()->Reap();
+
+        int reap_weight = max(1, min(5, static_cast<int>(0.33 * track.fused_frames_)));
+        cout << "Reaping track with max weight [" << reap_weight << "]." << endl;
+        track.GetReconstruction()->Reap(reap_weight);
         TocMicro();
 
         track.SetNeedsCleanup(false);
@@ -374,7 +412,7 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     return;
   }
 
-//  cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
+  //  cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
   InfiniTamDriver &instance_driver = *track.GetReconstruction();
 
   TrackFrame &frame = track.GetFrame(frame_idx);
@@ -414,6 +452,8 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     track.SetNeedsCleanup(true);
     // Free up memory now that we've fused the frame!
     frame.instance_view.DiscardView();
+
+    track.fused_frames_ += 1;
 
     // TODO remove if unnecessary cleanup
 //    track.SetNeedsCleanup(true);
