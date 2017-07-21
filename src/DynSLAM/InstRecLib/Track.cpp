@@ -106,12 +106,6 @@ Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
     }
   }
 
-  // Experimental code based on "GetFirstFusableFrameIndex".
-//  if (!found_good_pose && frame_idx > 0) {
-//  if (!found_good_pose) {
-//    return Option<Eigen::Matrix4d>::Empty();
-//  }
-
   return Option<Eigen::Matrix4d>(pose);
 }
 
