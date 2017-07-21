@@ -22,7 +22,6 @@ class InstanceView {
   virtual ~InstanceView() { }
 
   ITMLib::Objects::ITMView* GetView() { return view_.get(); }
-
   const ITMLib::Objects::ITMView* GetView() const { return view_.get(); }
 
   instreclib::segmentation::InstanceDetection& GetInstanceDetection() {

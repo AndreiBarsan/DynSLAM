@@ -206,7 +206,8 @@ void InstanceReconstructor::ProcessSilhouette(Track &track,
   bool should_reconstruct = ShouldReconstruct(track.GetClassName());
   bool possibly_dynamic = IsPossiblyDynamic(track.GetClassName());
   auto &latest_frame = track.GetLastFrame();
-  auto instance_view = latest_frame.instance_view.GetView();
+  auto *instance_view = latest_frame.instance_view.GetView();
+
   ORUtils::Vector4<uchar> *rgb_data_h = main_view->rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
   float *depth_data_h = main_view->depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
@@ -216,14 +217,12 @@ void InstanceReconstructor::ProcessSilhouette(Track &track,
                track.GetClassName().c_str());
         RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
                              latest_frame.instance_view.GetInstanceDetection());
-        instance_view->rgb->UpdateDeviceFromHost();
-        instance_view->depth->UpdateDeviceFromHost();
       }
       // else: Static class with unknown motion. Likely safe to put in main map.
     }
     else if (track.GetState() == kDynamic || always_separate) {
       if (should_reconstruct) {
-        // Dynamic object which we should reconstruct, such as a car
+        // Dynamic object which we should reconstruct, such as a car.
         auto rgb_segment_h = instance_view->rgb->GetData(MEMORYDEVICE_CPU);
         auto depth_segment_h = instance_view->depth->GetData(MEMORYDEVICE_CPU);
 
@@ -240,9 +239,6 @@ void InstanceReconstructor::ProcessSilhouette(Track &track,
         // In this case, we simply remove the object from view.
         RemoveSilhouette_CPU(rgb_data_h, depth_data_h, frame_size,
                              latest_frame.instance_view.GetInstanceDetection());
-
-        instance_view->rgb->UpdateDeviceFromHost();
-        instance_view->depth->UpdateDeviceFromHost();
       }
       else {
         // Warn if we detect a moving potted plant.
@@ -264,7 +260,13 @@ ITMUChar4Image *InstanceReconstructor::GetInstancePreviewRGB(size_t track_idx) {
     return nullptr;
   }
 
-  return instance_tracker_->GetTrack(track_idx).GetLastFrame().instance_view.GetView()->rgb;
+  auto *view = instance_tracker_->GetTrack(track_idx).GetLastFrame().instance_view.GetView();
+  if (view == nullptr) {
+    return nullptr;
+  }
+  else {
+    return view->rgb;
+  }
 }
 
 ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) {
@@ -273,12 +275,13 @@ ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) 
     return nullptr;
   }
 
-  size_t idx = track_idx;
-  if (idx >= tracks.size()) {
-    idx = tracks.size() - 1;
+  auto *view = instance_tracker_->GetTrack(track_idx).GetLastFrame().instance_view.GetView();
+  if (view == nullptr) {
+    return nullptr;
   }
-
-  return tracks.at(idx).GetLastFrame().instance_view.GetView()->depth;
+  else {
+    return view->depth;
+  }
 }
 
 void InstanceReconstructor::ProcessReconstructions(bool always_separate) {
@@ -354,9 +357,10 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
   }
 }
 
-// TODO(andrei): IDEA in poor man KF mode, of if using proper KF, can use the inverse (magnitude
-// of?) the variance as an update weight. That is, if we, say, are unable to estimate relative
-// motion for a particular vehicle over 1-2 frames, we can reduce the weight of subsequent updates.
+// TODO-LOW(andrei): IDEA: in poor man KF mode, of if using proper KF, can use the inverse
+// (magnitude of?) the variance as an update weight. That is, if we, say, are unable to estimate
+// relative motion for a particular vehicle over 1-2 frames, we can reduce the weight of subsequent
+// updates.
 // Similarly, we could even adjust it based on the final residual from the pose estimation/dense
 // alignment.
 void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
@@ -379,10 +383,7 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
   // still try to estimate it from k to k+2.
   if (rel_dyn_pose.IsPresent()) {
     Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
-    // TODO(andrei): Make sure you're not forgetting to integrate the first frame we can. The first
-    // frame with a relative pose means we can start integrating from the frame right before it, if
-    // it is available.
-    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
+//    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
 
     // Note: We have the ITM instance up and running, so we can even perform ICP or some dense
     // alignment method here if we wish.
@@ -483,8 +484,6 @@ vector<InstanceView> InstanceReconstructor::CreateInstanceViews(
       // The ITMView takes ownership of this.
       ITMRGBDCalib *calibration = new ITMRGBDCalib;
       *calibration = *main_view->calib;
-
-      // todo XXX(andrei): Only create this if we're actually interested in reconstructing the thing.
       auto view = make_shared<ITMView>(calibration, frame_size_itm, frame_size_itm, use_gpu);
       vector<RawFlow> instance_flow_vectors;
       ExtractSceneFlow(
