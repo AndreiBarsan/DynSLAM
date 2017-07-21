@@ -118,7 +118,7 @@ public:
 
     Matrix4f new_pose = this->trackingState->pose_d->GetInvM();
     *(this->last_egomotion_) = ItmToEigen(old_pose_inv * new_pose);
-    cout << "My new car egomotion: " << endl << *this->last_egomotion_ << endl;
+//    cout << "My new car egomotion: " << endl << *this->last_egomotion_ << endl;
   }
 
   // TODO(andrei): Document better.

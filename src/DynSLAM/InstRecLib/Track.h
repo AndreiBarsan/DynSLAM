@@ -150,6 +150,22 @@ class Track {
     }
   }
 
+  /// \brief Finds the first frame with a known relative pose, and returns the index of the frame
+  ///        right before it.
+  int GetFirstFusableFrameIndex() const {
+    if (frames_.empty()) {
+      return -1;
+    }
+
+    for (int i = 0; i < static_cast<int>(frames_.size()); ++i) {
+      if (frames_[i].relative_pose->IsPresent()) {
+        return max(0, i - 1);
+      }
+    }
+
+    return -1;
+  }
+
  private:
   /// \brief A unique identifier for this particular track.
   int id_;
