@@ -112,7 +112,8 @@ Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
 
 Option<Pose>* EstimateInstanceMotion(
     const vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &instance_raw_flow,
-    const SparseSFProvider &ssf_provider
+    const SparseSFProvider &ssf_provider,
+    const vector<double> &initial_estimate
 ) {
   // This is a good conservative value, but we can definitely do better.
   // TODO(andrei): Try setting the minimum to 6-10, but threshold based on the final RMSE, flagging
@@ -126,8 +127,6 @@ Option<Pose>* EstimateInstanceMotion(
   size_t flow_count = instance_raw_flow.size();
 
   if (instance_raw_flow.size() >= kMinFlowVectorsForPoseEst) {
-    // TODO(andrei): Store previous estimate and plug in here if available.
-    vector<double> initial_estimate = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
     vector<double> instance_motion_delta = ssf_provider.ExtractMotion(instance_raw_flow, initial_estimate);
     if (instance_motion_delta.size() != 6) {
       // track information not available yet; idea: we could move this computation into the
@@ -158,16 +157,25 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
                    bool verbose) {
 
   long prev_frame_idx = static_cast<long>(frames_.size()) - 2;
+  vector<double> initial_estimate = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+
   if (prev_frame_idx >= 0) {
     auto prev_pose = frames_[prev_frame_idx].relative_pose;
     if (prev_pose->IsPresent()) {
-      cout << "I could do a warm start!" << endl;
+      cout << "I will do a warm start!" << endl;
+      initial_estimate = prev_pose->Get().se3_form;
+
+      cout << "Initial estimate will now be: ";
+      for(int i = 0; i < 6; ++i) cout << initial_estimate[i] << ", ";
+      cout << endl;
     }
   }
 
   Option<Pose> *motion_delta = EstimateInstanceMotion(
       GetLastFrame().instance_view.GetFlow(),
-      ssf_provider);
+      ssf_provider,
+      initial_estimate
+  );
   GetLastFrame().relative_pose = motion_delta;
   auto &latest_motion = GetLastFrame().relative_pose;
   int current_frame_idx = GetLastFrame().frame_idx;
