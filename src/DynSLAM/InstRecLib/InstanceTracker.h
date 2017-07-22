@@ -34,7 +34,8 @@ const int kDefaultInactiveFrameThreshold = 3;
 // TODO(andrei): Once complete, refactor this into an interface + MaxOverlapTracker.
 class InstanceTracker {
  private:
-  std::map<int, Track> id_to_active_track_;
+  using TrackMap = std::map<int, Track, std::less<int>, Eigen::aligned_allocator<std::pair<const int, Track>>>;
+  TrackMap id_to_active_track_;
 
   /// \brief The maximum age of the latest frame in a track, before it is discarded.
   /// The higher this is, the more tracks are held in memory.
@@ -63,7 +64,7 @@ class InstanceTracker {
 
  public:
   InstanceTracker()
-      : id_to_active_track_(std::map<int, Track>()),
+      : id_to_active_track_(TrackMap()),
         inactive_frame_threshold_(kDefaultInactiveFrameThreshold),
         track_count_(0) {}
 
@@ -93,7 +94,7 @@ class InstanceTracker {
     return id_to_active_track_.at(id);
   }
 
-  const std::map<int, Track>& GetActiveTracks() const {
+  const TrackMap& GetActiveTracks() const {
     return id_to_active_track_;
   };
 };
