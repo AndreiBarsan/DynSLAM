@@ -30,6 +30,18 @@ struct TrackFrame {
   SUPPORT_EIGEN_FIELDS;
 };
 
+// Very naive holder of a SE3 transform + its matrix form.
+struct Pose {
+  Eigen::Matrix<double, 6, 1> se3_form;
+  Eigen::Matrix4d matrix_form;
+
+  SUPPORT_EIGEN_FIELDS;
+};
+
+/// \brief The states of an active track, which depend on the ability to estimate the relative pose
+///        between subsequent frames. A track is uncertain until the relative motion between two
+///        frames can be computed. It then switches to either static or dynamic depending on whether
+///        the object's motion is significantly different from the camera's egomotion.
 enum TrackState {
   kStatic,
   kDynamic,

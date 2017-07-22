@@ -103,36 +103,6 @@ void ProcessSilhouette_CPU(Vector4u *source_rgb,
           min_depth = depth;
         }
       }
-
-        u_char delete_mask_val = delete_mask.GetData()->at<u_char>(row, col);
-
-//      int frame_row = row + copy_bbox.r.y0;
-//      int frame_col = col + copy_bbox.r.x0;
-//      if (frame_row < 0 || frame_row >= frame_height ||
-//          frame_col < 0 || frame_col >= frame_width) {
-//        continue;
-//      }
-//
-//      int frame_idx = frame_row * frame_width + frame_col;
-//      u_char mask_val = detection.copy_mask->GetData()->at<u_char>(row, col);
-//      if (mask_val == 1) {
-//        dest_rgb[frame_idx].r = source_rgb[frame_idx].r;
-//        dest_rgb[frame_idx].g = source_rgb[frame_idx].g;
-//        dest_rgb[frame_idx].b = source_rgb[frame_idx].b;
-//        dest_rgb[frame_idx].a = source_rgb[frame_idx].a;
-//        source_rgb[frame_idx].r = 0;
-//        source_rgb[frame_idx].g = 0;
-//        source_rgb[frame_idx].b = 0;
-//        source_rgb[frame_idx].a = 0;
-//
-//        float depth = source_depth[frame_idx];
-//        dest_depth[frame_idx] = depth;
-//        source_depth[frame_idx] = 0.0f;
-//
-//        if (depth != kInvalidDepth && depth < min_depth) {
-//          min_depth = depth;
-//        }
-//      }
     }
   }
 

@@ -39,7 +39,8 @@ class VisoSparseSFProvider : public SparseSFProvider {
     return latest_flow_;
   }
 
-  std::vector<double> ExtractMotion(const std::vector<RawFlow> &flow) const override;
+  std::vector<double> ExtractMotion(const std::vector<RawFlow> &flow,
+                                    const std::vector<double> &initial_estimate) const override;
 
  private:
   VisualOdometryStereo *stereo_vo_;
