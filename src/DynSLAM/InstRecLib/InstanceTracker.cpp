@@ -2,8 +2,6 @@
 
 #include "InstanceTracker.h"
 
-#include <cassert>
-
 namespace instreclib {
 namespace reconstruction {
 
@@ -11,11 +9,11 @@ using namespace std;
 using namespace instreclib::segmentation;
 
 void InstanceTracker::ProcessInstanceViews(int frame_idx,
-                                           const vector<InstanceView> &new_views,
+                                           const vector<InstanceView, Eigen::aligned_allocator<InstanceView>> &new_views,
                                            const Eigen::Matrix4f current_camera_pose
 ) {
   // 0. Convert the instance segmentation result (`new_views`) into track frame objects.
-  list<TrackFrame> new_track_frames;
+  list<TrackFrame, Eigen::aligned_allocator<TrackFrame>> new_track_frames;
   for (const InstanceView &view : new_views) {
     new_track_frames.emplace_back(frame_idx, view, current_camera_pose);
   }
@@ -82,7 +80,7 @@ pair<Track *, float> InstanceTracker::FindBestTrack(const TrackFrame &track_fram
   return std::pair<Track *, float>(best_track, best_score);
 }
 
-void InstanceTracker::AssignToTracks(std::list<TrackFrame> &new_detections) {
+void InstanceTracker::AssignToTracks(std::list<TrackFrame, Eigen::aligned_allocator<TrackFrame>> &new_detections) {
   auto it = new_detections.begin();
   while (it != new_detections.end()) {
     pair<Track *, float> match = FindBestTrack(*it);

@@ -145,7 +145,7 @@ class InstanceReconstructor {
   /// \brief Masks the scene flow using the (smaller) conservative mask of the instance detection.
   void ExtractSceneFlow(
       const SparseSceneFlow &scene_flow,
-      vector<RawFlow> &out_instance_flow_vectors,
+      vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &out_instance_flow_vectors,
       const segmentation::InstanceDetection &detection,
       const Eigen::Vector2i &frame_size,
       bool check_sf_start = true
@@ -153,7 +153,7 @@ class InstanceReconstructor {
 
   /// \brief Converts segmentation results into "InstanceView" objects with associated RGB, depth,
   ///        and scene flow data.
-  vector<InstanceView> CreateInstanceViews(
+  vector<InstanceView, Eigen::aligned_allocator<InstanceView>> CreateInstanceViews(
       const segmentation::InstanceSegmentationResult &segmentation_result,
       ITMLib::Objects::ITMView *main_view,
       const SparseSceneFlow &scene_flow

@@ -47,7 +47,7 @@ void VisoSparseSFProvider::ComputeSparseSF(const ViewPair &, const ViewPair &cur
   else {
 //      Tic("get matches");
     // Just marshal the data from the viso-specific format to DynSLAM format.
-    std::vector<RawFlow> flow;
+    std::vector<RawFlow, Eigen::aligned_allocator<RawFlow>> flow;
     for (const Matcher::p_match &match : stereo_vo_->getRawMatches()) {
       flow.emplace_back(match.u1c, match.v1c, match.i1c, match.u2c, match.v2c, match.i2c,
                         match.u1p, match.v1p, match.i1p, match.u2p, match.v2p, match.i2p);
@@ -62,7 +62,7 @@ void VisoSparseSFProvider::ComputeSparseSF(const ViewPair &, const ViewPair &cur
   }
 }
 
-std::vector<double> VisoSparseSFProvider::ExtractMotion(const std::vector<RawFlow> &flow,
+std::vector<double> VisoSparseSFProvider::ExtractMotion(const std::vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &flow,
                                                         const std::vector<double> &initial_estimate
 ) const {
   // TODO-LOW(andrei): Extract helper method for this.

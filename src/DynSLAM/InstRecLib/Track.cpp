@@ -92,7 +92,7 @@ Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
     if (frames_[i].relative_pose->IsPresent()) {
       found_good_pose = true;
 
-      const Eigen::Matrix4d &rel_pose = frames_[i].relative_pose->Get();
+      const Eigen::Matrix4d &rel_pose = frames_[i].relative_pose->Get().matrix_form;
       *pose = rel_pose * (*pose);
     }
     else {
@@ -110,8 +110,8 @@ Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
 }
 
 
-Option<Eigen::Matrix4d>* EstimateInstanceMotion(
-    const vector<RawFlow> &instance_raw_flow,
+Option<Pose>* EstimateInstanceMotion(
+    const vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &instance_raw_flow,
     const SparseSFProvider &ssf_provider
 ) {
   // This is a good conservative value, but we can definitely do better.
@@ -133,20 +133,22 @@ Option<Eigen::Matrix4d>* EstimateInstanceMotion(
       // track information not available yet; idea: we could move this computation into the
       // track object, and use data from many more frames (if available).
       cerr << "Could not compute instance delta motion from " << flow_count << " matches." << endl;
-      return new Option<Eigen::Matrix4d>();
+      return new Option<Pose>;
     } else {
       cout << "Successfully estimated the relative instance pose from " << flow_count
            << " matches." << endl;
       Matrix delta_mx = VisualOdometry::transformationVectorToMatrix(instance_motion_delta);
 
       // TODO(andrei): Make this a utility. Note: The '~' transposes the matrix...
-      auto *md_mat = new Eigen::Matrix4d((~delta_mx).val[0]);
-      return new Option<Eigen::Matrix4d>(md_mat);
+      return new Option<Pose>(new Pose(
+          instance_motion_delta,
+          Eigen::Matrix4d((~delta_mx).val[0])
+      ));
     }
   }
   else {
     cout << "Only " << flow_count << " scene flow points. Not estimating relative pose." << endl;
-    return new Option<Eigen::Matrix4d>();
+    return new Option<Pose>();
   }
 }
 
@@ -154,7 +156,16 @@ Option<Eigen::Matrix4d>* EstimateInstanceMotion(
 void Track::Update(const Eigen::Matrix4f &egomotion,
                    const instreclib::SparseSFProvider &ssf_provider,
                    bool verbose) {
-  Option<Eigen::Matrix4d> *motion_delta = EstimateInstanceMotion(
+
+  long prev_frame_idx = static_cast<long>(frames_.size()) - 2;
+  if (prev_frame_idx >= 0) {
+    auto prev_pose = frames_[prev_frame_idx].relative_pose;
+    if (prev_pose->IsPresent()) {
+      cout << "I could do a warm start!" << endl;
+    }
+  }
+
+  Option<Pose> *motion_delta = EstimateInstanceMotion(
       GetLastFrame().instance_view.GetFlow(),
       ssf_provider);
   GetLastFrame().relative_pose = motion_delta;
@@ -164,7 +175,7 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
   switch(track_state_) {
     case kUncertain:
       if (latest_motion->IsPresent()) {
-        Eigen::Matrix4f error = egomotion * latest_motion->Get().cast<float>();
+        Eigen::Matrix4f error = egomotion * latest_motion->Get().matrix_form.cast<float>();
         float trans_error = TranslationError(error);
         float rot_error = RotationError(error);
 
@@ -173,7 +184,7 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
                << " translational error w.r.t. the egomotion." << endl;
           cout << "Rotation error: " << rot_error << "(currently unused)" << endl;
           cout << endl << "ME: " << endl << egomotion << endl;
-          cout << endl << "Object: " << endl << latest_motion->Get() << endl;
+          cout << endl << "Object: " << endl << latest_motion->Get().matrix_form << endl;
         }
 
         if (trans_error > kTransErrorTreshold) {
@@ -231,8 +242,7 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
         }
         else {
           // Assume constant motion for small gaps in the track.
-          GetLastFrame().relative_pose = new Option<Eigen::Matrix4d>(
-              new Eigen::Matrix4d(last_known_motion_));
+          GetLastFrame().relative_pose = new Option<Pose>(new Pose(last_known_motion_));
         }
       }
       break;

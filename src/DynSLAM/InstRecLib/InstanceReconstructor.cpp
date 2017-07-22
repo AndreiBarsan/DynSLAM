@@ -1,6 +1,6 @@
 
 #include <algorithm>
-#include <vector>
+#include <Eigen/StdVector>
 
 #include "InstanceReconstructor.h"
 #include "InstanceView.h"
@@ -161,7 +161,8 @@ void InstanceReconstructor::ProcessFrame(
 
   Vector2i frame_size_itm = main_view->rgb->noDims;
   Eigen::Vector2i frame_size(frame_size_itm.x, frame_size_itm.y);
-  vector<InstanceView> new_instance_views = CreateInstanceViews(segmentation_result, main_view, scene_flow);
+  vector<InstanceView, Eigen::aligned_allocator<InstanceView>> new_instance_views =
+      CreateInstanceViews(segmentation_result, main_view, scene_flow);
 
   // Associate this frame's detection(s) with those from previous frames.
   this->instance_tracker_->ProcessInstanceViews(frame_idx_, new_instance_views, dyn_slam->GetPose());
@@ -501,7 +502,7 @@ void InstanceReconstructor::SaveObjectToMesh(int object_id, const string &fpath)
   delete meshing_engine;
 }
 
-vector<InstanceView> InstanceReconstructor::CreateInstanceViews(
+vector<InstanceView, Eigen::aligned_allocator<InstanceView>> InstanceReconstructor::CreateInstanceViews(
     const InstanceSegmentationResult &segmentation_result,
     ITMLib::Objects::ITMView *main_view,
     const SparseSceneFlow &scene_flow
@@ -509,7 +510,7 @@ vector<InstanceView> InstanceReconstructor::CreateInstanceViews(
   Vector2i frame_size_itm = main_view->rgb->noDims;
   Eigen::Vector2i frame_size(frame_size_itm.x, frame_size_itm.y);
 
-  vector<InstanceView> instance_views;
+  vector<InstanceView, Eigen::aligned_allocator<InstanceView>> instance_views;
   for (const InstanceDetection &instance_detection : segmentation_result.instance_detections) {
     if (IsPossiblyDynamic(instance_detection.GetClassName())) {
       // bool use_gpu = main_view->rgb->isAllocated_CUDA; // May need to modify 'MemoryBlock' to
@@ -520,7 +521,7 @@ vector<InstanceView> InstanceReconstructor::CreateInstanceViews(
       ITMRGBDCalib *calibration = new ITMRGBDCalib;
       *calibration = *main_view->calib;
       auto view = make_shared<ITMView>(calibration, frame_size_itm, frame_size_itm, use_gpu);
-      vector<RawFlow> instance_flow_vectors;
+      vector<RawFlow, Eigen::aligned_allocator<RawFlow>> instance_flow_vectors;
       ExtractSceneFlow(
           scene_flow,
           instance_flow_vectors,
@@ -537,7 +538,7 @@ vector<InstanceView> InstanceReconstructor::CreateInstanceViews(
 }
 
 void InstanceReconstructor::ExtractSceneFlow(const SparseSceneFlow &scene_flow,
-                                             vector<RawFlow> &out_instance_flow_vectors,
+                                             vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &out_instance_flow_vectors,
                                              const InstanceDetection &detection,
                                              const Eigen::Vector2i &frame_size,
                                              bool check_sf_start) {
