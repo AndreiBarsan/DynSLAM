@@ -5,6 +5,7 @@
 
 #include <opencv/cv.h>
 #include "../../libviso2/src/matcher.h"
+#include "../../DynSLAM/Defines.h"
 
 #include <Eigen/Dense>
 
@@ -36,13 +37,15 @@ struct RawFlow {
         prev_left_idx(p_left_idx),
         prev_right(p_right_x, p_right_y),
         prev_right_idx(p_right_idx) { }
+
+  SUPPORT_EIGEN_FIELDS;
 };
 
 /// \brief Contains the result of a (sparse) scene flow estimation (tuples of matches in the
 ///        left/right current/past frames (not 3D vectors yet).
 class SparseSceneFlow {
  public:
-  std::vector<RawFlow> matches;
+  std::vector<RawFlow, Eigen::aligned_allocator<RawFlow>> matches;
 };
 
 /// \brief Interface for components which can compute sparse scene flow from a scene view.
@@ -58,7 +61,7 @@ class SparseSFProvider {
 
   // Hacky proxy for using viso's sf utilities for motion estimation in the inst. rec.
   virtual std::vector<double> ExtractMotion(
-      const std::vector<RawFlow> &flow,
+      const std::vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &flow,
       const std::vector<double> &initial_estimate
   ) const = 0;
 };

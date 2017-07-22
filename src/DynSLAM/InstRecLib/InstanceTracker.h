@@ -6,7 +6,7 @@
 #include <cassert>
 #include <list>
 #include <map>
-#include <vector>
+#include <Eigen/StdVector>
 
 #include "InstanceSegmentationResult.h"
 #include "InstanceView.h"
@@ -56,7 +56,7 @@ class InstanceTracker {
   /// \brief Assign the detections to the best matching tracks.
   /// \note Mutates the `new_detections` input list, removing the matched
   /// detections.
-  void AssignToTracks(std::list<TrackFrame>& new_detections);
+  void AssignToTracks(std::list<TrackFrame, Eigen::aligned_allocator<TrackFrame>>& new_detections);
 
   /// \brief Removes tracks which have not been active in the past k frames.
   void PruneTracks(int current_frame_idx);
@@ -71,7 +71,7 @@ class InstanceTracker {
   /// \param new_detections The instances detected in the current frame.
   void ProcessInstanceViews(
       int frame_idx,
-      const std::vector<InstanceView>& new_detections,
+      const std::vector<InstanceView, Eigen::aligned_allocator<InstanceView>>& new_detections,
       const Eigen::Matrix4f current_camera_pose
   );
 

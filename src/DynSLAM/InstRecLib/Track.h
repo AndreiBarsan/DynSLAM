@@ -1,9 +1,7 @@
-
-
 #ifndef INSTRECLIB_TRACK_H
 #define INSTRECLIB_TRACK_H
 
-#include <vector>
+#include <Eigen/StdVector>
 #include "InstanceSegmentationResult.h"
 #include "InstanceView.h"
 #include "../InfiniTamDriver.h"
@@ -12,6 +10,32 @@
 
 namespace instreclib {
 namespace reconstruction {
+
+// Very naive holder of a SE3 transform + its matrix form.
+// TODO(andrei): If you end up using this in the long run, make it nicer, like ITMPose.
+struct Pose {
+//  Eigen::Matrix<double, 6, 1> se3_form;
+  std::vector<double> se3_form;
+  Eigen::Matrix4d matrix_form;
+
+  Pose() : se3_form({0.0, 0.0, 0.0, 0.0, 0.0, 0.0}), matrix_form(Eigen::Matrix4d::Identity()) {}
+
+  Pose(const vector<double> &se3_form, const Eigen::Matrix4d &matrix_form)
+      : se3_form(se3_form), matrix_form(matrix_form) {}
+
+  Pose(const Pose& other) {
+    this->operator=(other);
+  }
+
+  Pose& operator=(const Pose& other) {
+    se3_form = other.se3_form;
+    matrix_form = other.matrix_form;
+    return *this;
+  }
+
+  SUPPORT_EIGEN_FIELDS;
+};
+
 
 /// \brief One frame of an instance track (InstRecLib::Reconstruction::Track).
 struct TrackFrame {
@@ -22,18 +46,10 @@ struct TrackFrame {
   Eigen::Matrix4f camera_pose;
 
   /// \brief The relative pose to the previous frame in the track, if it could be computed.
-  dynslam::utils::Option<Eigen::Matrix4d> *relative_pose;
+  dynslam::utils::Option<Pose> *relative_pose;
 
-  TrackFrame(int frame_idx, const InstanceView& instance_view, const Eigen::Matrix4f camera_pose)
+  TrackFrame(int frame_idx, const InstanceView& instance_view, const Eigen::Matrix4f &camera_pose)
       : frame_idx(frame_idx), instance_view(instance_view), camera_pose(camera_pose) {}
-
-  SUPPORT_EIGEN_FIELDS;
-};
-
-// Very naive holder of a SE3 transform + its matrix form.
-struct Pose {
-  Eigen::Matrix<double, 6, 1> se3_form;
-  Eigen::Matrix4d matrix_form;
 
   SUPPORT_EIGEN_FIELDS;
 };
@@ -99,7 +115,7 @@ class Track {
 
   int GetEndTime() const { return frames_.back().frame_idx; }
 
-  const std::vector<TrackFrame>& GetFrames() const { return frames_; }
+  const std::vector<TrackFrame, Eigen::aligned_allocator<TrackFrame>>& GetFrames() const { return frames_; }
 
   const TrackFrame& GetFrame(int i) const { return frames_[i]; }
   TrackFrame& GetFrame(int i) { return frames_[i]; }
@@ -191,7 +207,7 @@ class Track {
  private:
   /// \brief A unique identifier for this particular track.
   int id_;
-  std::vector<TrackFrame> frames_;
+  std::vector<TrackFrame, Eigen::aligned_allocator<TrackFrame>> frames_;
 
   /// \brief A pointer to a 3D reconstruction of the object in this track.
   /// Is set to `nullptr` if no reconstruction is available.
@@ -204,7 +220,7 @@ class Track {
 
   // Used for the constant velocity assumption in tracking.
   int last_known_motion_time_ = -1;
-  Eigen::Matrix4d last_known_motion_;
+  Pose last_known_motion_;
 
   /// \brief The number of frames fused in the reconstruction.
   int fused_frames_ = 0;
