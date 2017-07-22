@@ -117,8 +117,10 @@ Option<Eigen::Matrix4d>* EstimateInstanceMotion(
   // This is a good conservative value, but we can definitely do better.
   // TODO(andrei): Try setting the minimum to 6-10, but threshold based on the final RMSE, flagging
   // pose estimates whose residual is above some value as invalid.
+  // Note: 25 => OK results in most cases, but where cars are advancing from opposite direction
+  //             in the hill sequence, this no longer works.
   uint32_t kMinFlowVectorsForPoseEst = 25;
-//  uint32_t kMinFlowVectorsForPoseEst = 12;
+//  uint32_t kMinFlowVectorsForPoseEst = 20;
   // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
   // we're being a little paranoid).
   size_t flow_count = instance_raw_flow.size();
@@ -165,10 +167,12 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
       if (latest_motion->IsPresent()) {
         Eigen::Matrix4f error = egomotion * latest_motion->Get().cast<float>();
         float trans_error = TranslationError(error);
+        float rot_error = RotationError(error);
 
         if (verbose) {
           cout << "Object " << id_ << " has " << setw(8) << setprecision(4) << trans_error
                << " translational error w.r.t. the egomotion." << endl;
+          cout << "Rotation error: " << rot_error << "(currently unused)" << endl;
           cout << endl << "ME: " << endl << egomotion << endl;
           cout << endl << "Object: " << endl << latest_motion->Get() << endl;
         }
