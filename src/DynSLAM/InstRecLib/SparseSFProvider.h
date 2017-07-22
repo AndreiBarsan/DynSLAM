@@ -39,7 +39,7 @@ struct RawFlow {
 };
 
 /// \brief Contains the result of a (sparse) scene flow estimation (tuples of matches in the
-/// left/right current/past frames (not 3D vectors yet).
+///        left/right current/past frames (not 3D vectors yet).
 class SparseSceneFlow {
  public:
   std::vector<RawFlow> matches;
@@ -57,7 +57,10 @@ class SparseSFProvider {
   virtual SparseSceneFlow& GetFlow() = 0;
 
   // Hacky proxy for using viso's sf utilities for motion estimation in the inst. rec.
-  virtual std::vector<double> ExtractMotion(const std::vector<RawFlow> &flow) const = 0;
+  virtual std::vector<double> ExtractMotion(
+      const std::vector<RawFlow> &flow,
+      const std::vector<double> &initial_estimate
+  ) const = 0;
 };
 
 }  // namespace instreclib
