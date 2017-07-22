@@ -125,11 +125,10 @@ Option<Eigen::Matrix4d>* EstimateInstanceMotion(
   // we're being a little paranoid).
   size_t flow_count = instance_raw_flow.size();
 
-  // TODO(andrei): Since we're not doing egomotion computation, the nr of inputs is much lower
-  // than in the full viso case => fewer RANSAC iterations than the default should be OK,
-  // especially if we then use a direct method for refinement.
   if (instance_raw_flow.size() >= kMinFlowVectorsForPoseEst) {
-    vector<double> instance_motion_delta = ssf_provider.ExtractMotion(instance_raw_flow);
+    // TODO(andrei): Store previous estimate and plug in here if available.
+    vector<double> initial_estimate = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    vector<double> instance_motion_delta = ssf_provider.ExtractMotion(instance_raw_flow, initial_estimate);
     if (instance_motion_delta.size() != 6) {
       // track information not available yet; idea: we could move this computation into the
       // track object, and use data from many more frames (if available).

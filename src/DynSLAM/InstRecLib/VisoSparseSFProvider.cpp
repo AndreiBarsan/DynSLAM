@@ -62,7 +62,9 @@ void VisoSparseSFProvider::ComputeSparseSF(const ViewPair &, const ViewPair &cur
   }
 }
 
-std::vector<double> VisoSparseSFProvider::ExtractMotion(const std::vector<RawFlow> &flow) const {
+std::vector<double> VisoSparseSFProvider::ExtractMotion(const std::vector<RawFlow> &flow,
+                                                        const std::vector<double> &initial_estimate
+) const {
   // TODO-LOW(andrei): Extract helper method for this.
   std::vector<Matcher::p_match> flow_viso;
   for(const RawFlow &f : flow) {
@@ -71,7 +73,7 @@ std::vector<double> VisoSparseSFProvider::ExtractMotion(const std::vector<RawFlo
                                          f.curr_left(0), f.curr_left(1), f.curr_left_idx,
                                          f.curr_right(0), f.curr_right(1), f.curr_right_idx));
   }
-  return stereo_vo_->estimateMotion(flow_viso);
+  return stereo_vo_->estimateMotion(flow_viso, initial_estimate);
 }
 
 } // namespace instreclib
