@@ -306,7 +306,7 @@ public:
   }
 
   /// \brief Renders a simple preview of the scene flow information onto the currently active pane.
-  void PreviewSparseSF(const vector<RawFlow> &flow, const pangolin::View &view) {
+  void PreviewSparseSF(const vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &flow, const pangolin::View &view) {
     pangolin::GlFont &font = pangolin::GlFont::I();
     Eigen::Vector2f frame_size(width_, height_);
     font.Text("libviso2 scene flow preview").Draw(-0.98f, 0.89f);

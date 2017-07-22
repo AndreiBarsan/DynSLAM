@@ -12,9 +12,11 @@ namespace reconstruction {
 /// \brief Like ITMView, but associated with a particular object instance.
 class InstanceView {
  public:
+  using FlowVector = std::vector<RawFlow, Eigen::aligned_allocator<RawFlow>>;
+
   InstanceView(const segmentation::InstanceDetection &instance_detection,
                const std::shared_ptr<ITMLib::Objects::ITMView> &view,
-               const std::vector<RawFlow> &sparse_sf)
+               const FlowVector &sparse_sf)
       : instance_detection_(instance_detection),
         view_(view),
         sparse_sf_(sparse_sf) {}
@@ -32,7 +34,7 @@ class InstanceView {
     return instance_detection_;
   }
 
-  const std::vector<RawFlow> GetFlow() const {
+  const FlowVector GetFlow() const {
     return sparse_sf_;
   }
 
@@ -49,7 +51,7 @@ class InstanceView {
   std::shared_ptr<ITMLib::Objects::ITMView> view_;
 
   /// \brief The scene scene flow data associated with this instance at this time.
-  std::vector<RawFlow> sparse_sf_;
+  FlowVector sparse_sf_;
 };
 
 }  // namespace reconstruction
