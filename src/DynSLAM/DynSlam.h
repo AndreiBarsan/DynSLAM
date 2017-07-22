@@ -128,6 +128,10 @@ class DynSlam {
     static_scene_->SaveSceneToMesh(map_fpath.c_str());
   }
 
+  void ForceDynamicObjectCleanup(int object_id) {
+    instance_reconstructor_->ForceObjectCleanup(object_id);
+  }
+
   void SaveDynamicObject(const std::string &dataset_name, const std::string &depth_name, int object_id) const {
     cout << "Saving mesh for object #" << object_id << "'s reconstruction..." << endl;
     string target_folder = EnsureDumpFolderExists(dataset_name);
