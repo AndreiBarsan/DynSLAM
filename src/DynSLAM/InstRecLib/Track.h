@@ -166,8 +166,15 @@ class Track {
     return -1;
   }
 
-  /// \brief The number of frames fused in the reconstruction.
-  int fused_frames_ = 0;
+  void CountFusedFrame() {
+    fused_frames_++;
+  }
+
+  void ReapReconstruction() {
+    int reap_weight = max(1, min(5, static_cast<int>(0.33 * fused_frames_)));
+    cout << "Reaping track with max weight [" << reap_weight << "]." << endl;
+    reconstruction_->Reap(reap_weight);
+  }
 
  private:
   /// \brief A unique identifier for this particular track.
@@ -186,6 +193,9 @@ class Track {
   // Used for the constant velocity assumption in tracking.
   int last_known_motion_time_ = -1;
   Eigen::Matrix4d last_known_motion_;
+
+  /// \brief The number of frames fused in the reconstruction.
+  int fused_frames_ = 0;
 
   SUPPORT_EIGEN_FIELDS;
 };

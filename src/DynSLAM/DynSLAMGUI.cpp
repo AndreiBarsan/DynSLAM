@@ -423,6 +423,10 @@ protected:
 
     pangolin::Var<function<void(void)>> save_map_button("ui.[S]ave Static Map", save_map);
     pangolin::RegisterKeyPressCallback('s', save_map);
+    pangolin::Var<function<void(void)>> reap_button(
+        "ui.Force cleanup of current instance",
+        [this]() { dyn_slam_->ForceDynamicObjectCleanup(visualized_object_idx_); }
+    );
 
     reconstructions = new pangolin::Var<string>("ui.Rec", "");
 

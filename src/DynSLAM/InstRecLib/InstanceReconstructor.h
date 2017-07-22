@@ -92,6 +92,8 @@ class InstanceReconstructor {
       dynslam::PreviewType preview_type = dynslam::PreviewType::kNormal
   );
 
+  void ForceObjectCleanup(int object_id);
+
   void SaveObjectToMesh(int object_id, const string &fpath);
 
  private:

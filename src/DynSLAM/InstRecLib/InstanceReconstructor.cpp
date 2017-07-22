@@ -223,7 +223,7 @@ void InstanceReconstructor::UpdateTracks(const dynslam::DynSlam *dyn_slam,
 {
   for (const auto &pair : instance_tracker_->GetActiveTracks()) {
     Track &track = instance_tracker_->GetTrack(pair.first);
-    bool verbose = false;
+    bool verbose = true;
     track.Update(dyn_slam->GetLastEgomotion(), ssf_provider, verbose);
     if (track.GetLastFrame().frame_idx == dyn_slam->GetCurrentFrameNo() - 1) {
       ProcessSilhouette(track, main_view, frame_size, scene_flow, always_separate);
@@ -338,9 +338,7 @@ void InstanceReconstructor::ProcessReconstructions(bool always_separate) {
                    track.GetLastFrame().frame_idx,
                    gap_size));
 
-        int reap_weight = max(1, min(5, static_cast<int>(0.33 * track.fused_frames_)));
-        cout << "Reaping track with max weight [" << reap_weight << "]." << endl;
-        track.GetReconstruction()->Reap(reap_weight);
+        track.ReapReconstruction();
         TocMicro();
 
         track.SetNeedsCleanup(false);
@@ -450,10 +448,9 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     }
 
     track.SetNeedsCleanup(true);
+    track.CountFusedFrame();
     // Free up memory now that we've fused the frame!
     frame.instance_view.DiscardView();
-
-    track.fused_frames_ += 1;
 
     // TODO remove if unnecessary cleanup
 //    track.SetNeedsCleanup(true);
@@ -489,6 +486,19 @@ void InstanceReconstructor::GetInstanceRaycastPreview(ITMUChar4Image *out,
   // If we're not tracking the object, or if it has no reconstruction available, then there's
   // nothing to display.
   out->Clear();
+}
+
+void InstanceReconstructor::ForceObjectCleanup(int object_id) {
+  if(! instance_tracker_->HasTrack(object_id)) {
+    throw std::runtime_error(dynslam::utils::Format("Unknown track ID: %d", object_id));
+  }
+
+  Track& track = instance_tracker_->GetTrack(object_id);
+  if(! track.HasReconstruction()) {
+    throw std::runtime_error("Track exists but has no reconstruction.");
+  }
+
+  track.ReapReconstruction();
 }
 
 void InstanceReconstructor::SaveObjectToMesh(int object_id, const string &fpath) {
