@@ -5,8 +5,8 @@
 #include "device/cpu/frame_cpu.h"
 #include "device/cuda/frame_cuda.h"
 #include "multiFrames.h"
-#include "common/commDefs.h"
-#include "common/feature/feature_depthMap.h"
+#include "../commDefs.h"
+#include "../feature/feature_depthMap.h"
 
 namespace VGUGV
 {

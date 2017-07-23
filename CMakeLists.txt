@@ -72,6 +72,7 @@ add_subdirectory(src/gflags)
 add_subdirectory(src/libviso2)
 # Work with Lie Groups using Eigen3
 add_subdirectory(src/Sophus)
+find_package(Sophus REQUIRED)
 
 IF(WITH_CUDA)
   include_directories(${CUDA_INCLUDE_DIRS})
@@ -102,10 +103,16 @@ set(DYNSLAM_SOURCES
 
     # Experimental
     src/DynSLAM/Direct/pinholeCameraModel.cpp
+    src/DynSLAM/Direct/helperFunctions.cpp
     src/DynSLAM/Direct/feature/feature_depthMap.cpp
     src/DynSLAM/Direct/frame/frame.cpp
+    src/DynSLAM/Direct/robustLoss/pseudoHuberLoss.cpp
+    src/DynSLAM/Direct/robustLoss/tDistributionLoss.cpp
+    src/DynSLAM/Direct/transformation/transformation.cpp
     # TODO(andrei): Support CUDA directly in DynSLAM project, and build the CUDA frame as well.
     src/DynSLAM/Direct/frame/device/cpu/frame_cpu.cpp
+    src/DynSLAM/Direct/image_alignment/dirImgAlignBase.cpp
+    src/DynSLAM/Direct/image_alignment/device/cpu/dirImgAlignCPU.cpp
     # End experimental parts
 
     src/DynSLAM/DSHandler3D.cpp

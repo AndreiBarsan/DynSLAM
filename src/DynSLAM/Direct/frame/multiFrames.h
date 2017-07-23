@@ -3,8 +3,8 @@
 
 #include <memory>
 #include <vector>
-#include "common/frame/frame.h"
-#include "common/transformation/transformation.h"
+#include "../frame/frame.h"
+#include "../transformation/transformation.h"
 
 namespace VGUGV
 {
