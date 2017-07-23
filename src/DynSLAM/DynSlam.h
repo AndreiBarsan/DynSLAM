@@ -98,6 +98,26 @@ class DynSlam {
   /// \brief Returns an **RGBA** preview of the latest segmented object instance.
   const unsigned char* GetObjectPreview(int object_idx);
 
+  const float* GetObjectDepthPreview(int object_idx) {
+    ITMFloatImage *preview = instance_reconstructor_->GetInstancePreviewDepth(static_cast<size_t>(object_idx));
+
+    if (nullptr == preview) {
+      // This happens when there's no instances to preview.
+      out_image_float_->Clear();
+    } else {
+      if (object_idx == 3 && current_frame_no_ > 20) {
+//        cv::Mat1s out(this->out_image_->noDims.y, this->out_image_->noDims.x);
+//        dynslam::drivers::ItmToCv(*preview, &out);
+//        cv::imshow("foo", out);
+//        cv::waitKey();
+      }
+
+      out_image_float_->SetFrom(preview, ORUtils::MemoryBlock<float>::CPU_TO_CPU);
+    }
+
+    return out_image_float_->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+  }
+
   InstanceReconstructor* GetInstanceReconstructor() {
     return instance_reconstructor_;
   }
@@ -168,6 +188,7 @@ private:
   dynslam::eval::Evaluation *evaluation_;
 
   ITMUChar4Image *out_image_;
+  ITMFloatImage *out_image_float_;
   cv::Mat3b *input_rgb_image_;
   cv::Mat1s *input_raw_depth_image_;
 
