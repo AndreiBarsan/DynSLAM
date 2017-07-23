@@ -216,13 +216,15 @@ public:
 
       object_view_.Activate();
       glColor4f(1.0, 1.0, 1.0, 1.0f);
-      pane_texture_->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
-                             GL_RGBA, GL_UNSIGNED_BYTE);
+//      pane_texture_->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
+//                             GL_RGBA, GL_UNSIGNED_BYTE);
+      pane_texture_->Upload(dyn_slam_->GetObjectDepthPreview(visualized_object_idx_),
+                            GL_RED, GL_FLOAT);
       pane_texture_->RenderToViewport(true);
 
       auto &tracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
       if (dyn_slam_->GetCurrentFrameNo() > 0 && preview_sf_->Get()) {
-        // TODO-LOW(andrei): This is bonkers. Add some helpers!
+        // TODO-LOW(andrei): This is bonkers. Add some helper methods!
         if (tracker.HasTrack(visualized_object_idx_)) {
           const auto &track = tracker.GetTrack(visualized_object_idx_);
           const auto &instance_flow = track.GetLastFrame().instance_view.GetFlow();
@@ -795,9 +797,9 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   sf_params.match.half_resolution = 0;
   sf_params.match.multi_stage = 1;    // Default = 1 (= 0 => much slower)
   sf_params.match.refinement = 1;   // Default = 1 (per-pixel); 2 = sub-pixel, slower
-  sf_params.ransac_iters = 200;    // Default = 200; added more to see if it helps instance reconstruction
+  sf_params.ransac_iters = 500;    // Default = 200; added more to see if it helps instance reconstruction
   // TODO(andrei): Now that we're using warm starts, could we get away with much fewer iterations?
-  sf_params.inlier_threshold = 5.0;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
+  sf_params.inlier_threshold = 3.0;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
                                       // object instances
   sf_params.bucket.max_features = 10;    // Default = 2
   sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;

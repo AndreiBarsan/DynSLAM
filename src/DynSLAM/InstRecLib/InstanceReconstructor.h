@@ -114,6 +114,10 @@ class InstanceReconstructor {
   /// \brief Whether to use voxel decay for regularizing the reconstructed objects.
   bool use_decay_;
 
+  /// \brief Experimental relative pose refinement using ITM's built-in trackers.
+  /// Doesn't really work as of July 23, 2017.
+  bool enable_itm_refinement_ = false;
+
   /// \brief Updates the reconstruction associated with the object tracks, where applicable.
   void ProcessReconstructions(bool always_separate);
 
