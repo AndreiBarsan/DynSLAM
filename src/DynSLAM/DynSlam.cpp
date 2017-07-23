@@ -32,10 +32,7 @@ void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine,
   input_width_ = input_shape.x;
   input_height_ = input_shape.y;
 
-  // TODO(andrei): Own CUDA safety wrapper. With blackjack. And hookers.
-
   this->instance_reconstructor_ = new InstanceReconstructor(itm_static_scene_engine);
-
   cout << "DynSLAM initialization complete." << endl;
 }
 
@@ -55,16 +52,17 @@ void DynSlam::ProcessFrame(Input *input) {
   utils::Toc();
 
   future<shared_ptr<InstanceSegmentationResult>> seg_result_future = async(launch::async, [this] {
-    utils::Tic("Semantic segmentation");
+    utils::Timer timer("Semantic segmentation"); timer.Start();
     auto segmentation_result = segmentation_provider_->SegmentFrame(*input_rgb_image_);
-    utils::Toc();
+    timer.Stop();
+    cout << timer.GetName() << " took " << timer.GetDuration() / 1000 << "ms" << endl;
     return segmentation_result;
   });
 
   future<void> tracking_and_ssf = async(launch::async, [this, &input, &first_frame] {
     utils::Tic("Visual Odometry");
     static_scene_->Track();
-    utils::Toc();
+    utils::Toc("Visual Odometry", false);
 
     utils::Tic("Sparse Scene Flow");
     cv::Mat1b *left_gray, *right_gray;
@@ -81,7 +79,7 @@ void DynSlam::ProcessFrame(Input *input) {
     if (!sparse_sf_provider_->FlowAvailable() && !first_frame) {
       cerr << "Warning: could not compute scene flow." << endl;
     }
-    utils::Toc();
+    utils::Toc("Sparse Scene Flow", false);
   });
 
   seg_result_future.wait();
@@ -102,6 +100,7 @@ void DynSlam::ProcessFrame(Input *input) {
         this,
         static_scene_->GetView(),
         *seg_result_future.get(),
+//        *segmentation_result,
         sparse_sf_provider_->GetFlow(),
         *sparse_sf_provider_,
         always_reconstruct_objects_);
