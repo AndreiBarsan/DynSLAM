@@ -53,30 +53,38 @@ void DynSlam::ProcessFrame(Input *input) {
   }
   utils::Toc();
 
-  cv::Mat1b *left_gray, *right_gray;
-  input->GetCvStereoGray(&left_gray, &right_gray);
+  future<shared_ptr<InstanceSegmentationResult>> seg_result_future = async([this] {
+    utils::Tic("Semantic segmentation");
+    auto segmentation_result = segmentation_provider_->SegmentFrame(*input_rgb_image_);
+    utils::Toc();
+    return segmentation_result;
+  });
 
-  utils::Tic("Semantic segmentation");
-  auto segmentationResult = segmentation_provider_->SegmentFrame(*input_rgb_image_);
-  utils::Toc();
+  future<void> tracking_and_ssf = async([this, &input, &first_frame] {
+    utils::Tic("Visual Odometry");
+    static_scene_->Track();
+    utils::Toc();
 
-  utils::Tic("Visual Odometry");
-  static_scene_->Track();
-  utils::Toc();
+    utils::Tic("Sparse Scene Flow");
+    cv::Mat1b *left_gray, *right_gray;
+    input->GetCvStereoGray(&left_gray, &right_gray);
 
-  utils::Tic("Sparse Scene Flow");
-  // TODO(andrei): Pass egomotion here, so that SF computation is relative to egomotion (so most
-  // SF values, such as those associated with the road or buildings would become close to zero).
-  // Look at libviso2 source code for inspiration on the relation between egomotion and SF. How do
-  // they extract egomotion from the SF?
-  sparse_sf_provider_->ComputeSparseSF(
-      make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
-      make_pair(left_gray, right_gray)
-  );
-  if (!sparse_sf_provider_->FlowAvailable() && !first_frame) {
-    cerr << "Warning: could not compute scene flow." << endl;
-  }
-  utils::Toc();
+    // TODO(andrei): Pass egomotion here, so that SF computation is relative to egomotion (so most
+    // SF values, such as those associated with the road or buildings would become close to zero).
+    // Look at libviso2 source code for inspiration on the relation between egomotion and SF. How do
+    // they extract egomotion from the SF?
+    sparse_sf_provider_->ComputeSparseSF(
+        make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
+        make_pair(left_gray, right_gray)
+    );
+    if (!sparse_sf_provider_->FlowAvailable() && !first_frame) {
+      cerr << "Warning: could not compute scene flow." << endl;
+    }
+    utils::Toc();
+  });
+
+  seg_result_future.wait();
+  tracking_and_ssf.wait();
 
   utils::Tic("Input preprocessing");
   input->GetCvImages(&input_rgb_image_, &input_raw_depth_image_);
@@ -92,7 +100,7 @@ void DynSlam::ProcessFrame(Input *input) {
     instance_reconstructor_->ProcessFrame(
         this,
         static_scene_->GetView(),
-        *segmentationResult,
+        *seg_result_future.get(),
         sparse_sf_provider_->GetFlow(),
         *sparse_sf_provider_,
         always_reconstruct_objects_);
