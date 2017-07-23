@@ -16,3 +16,6 @@
 [submodule "src/eigen"]
 	path = src/eigen
 	url = https://github.com/RLovelett/eigen
+[submodule "src/Sophus"]
+	path = src/Sophus
+	url = https://github.com/strasdat/Sophus
