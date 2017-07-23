@@ -6,6 +6,10 @@
 #include "InstanceView.h"
 #include "../DynSlam.h"
 #include "../../libviso2/src/viso.h"
+#include "../Direct/frame/device/cpu/frame_cpu.h"
+#include "../Direct/frame/frame.hpp"
+#include "../Direct/pinholeCameraModel.h"
+#include "../Direct/image_alignment/device/cpu/dirImgAlignCPU.h"
 
 namespace instreclib {
 namespace reconstruction {
@@ -371,6 +375,48 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
   }
 }
 
+
+uchar* DepthToUchar(float *depth_f) {
+  // TODO convert depth map to uchar expected by Peidong's code; the float depth map encodes metric
+  //      distance
+}
+
+void ExperimentalDirectRefine(Track &track,
+                              int first_idx,
+                              int second_idx,
+                              Eigen::Matrix4d &relative_pose
+) {
+  cout << "Will run experimental direct alignment pose refinement. " << endl;
+  cout << "Initial estimate (from sparse RANSAC): " << endl << relative_pose << endl;
+  auto first_depth = track.GetFrame(first_idx).instance_view.GetView()->depth;
+  auto second_depth = track.GetFrame(second_idx).instance_view.GetView()->depth;
+  first_depth->UpdateHostFromDevice();
+  second_depth->UpdateHostFromDevice();
+  float *ff = first_depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+  float *sf = second_depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+
+  using namespace VGUGV::Common;
+  using namespace VGUGV::SLAM;
+
+  int rows = first_depth->noDims.y;
+  int cols = first_depth->noDims.x;
+  int channels = 1;
+  Eigen::Vector2i frame_size(cols, rows);
+  Eigen::Matrix3f K;
+  PinholeCameraModel cam(frame_size, K);
+
+  FrameCPU_denseDepthMap first_ddm(first_idx, cam, uchar_data, uchar_mask, rows, cols, channels);
+//  Frame_CPU(int frameId, const CameraBase::Ptr& camera, const unsigned char* imageData, const unsigned char* maskImage, int nRows, int nCols, int nChannels)
+
+  float huber_delta = 5.0f;   // TODO(andrei): Ask Peidong about this.
+  float robust_loss_param = huber_delta;
+  DirImgAlignCPU dir_img_align(nMaxPyramidLevels, nMaxIterations, eps, ROBUST_LOSS_TYPE::PSEUDO_HUBER,
+  robust_loss_param)
+
+  // TODO convert to uchar depth and run direct method
+}
+
+
 // TODO-LOW(andrei): IDEA: in poor man KF mode, of if using proper KF, can use the inverse
 // (magnitude of?) the variance as an update weight. That is, if we, say, are unable to estimate
 // relative motion for a particular vehicle over 1-2 frames, we can reduce the weight of subsequent
@@ -401,6 +447,10 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
 
 //    cout << "The inverse: " << rel_dyn_pose_f.inverse() << endl;
     instance_driver.SetPose(rel_dyn_pose_f.inverse());
+
+    if (frame_idx > 0) {
+      // Ensure we have a previous frame to align to. ExperimentalDirectRefine(track, frame_idx, frame_idx - 1, rel_dyn_pose.Get());
+    }
 
     if (enable_itm_refinement_) {
       // This should, in theory, try to refine the pose even further...
