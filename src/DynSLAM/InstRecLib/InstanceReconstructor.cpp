@@ -279,8 +279,7 @@ ITMUChar4Image *InstanceReconstructor::GetInstancePreviewRGB(size_t track_idx) {
 }
 
 ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) {
-  const auto &tracks = instance_tracker_->GetActiveTracks();
-  if (tracks.empty()) {
+  if (! instance_tracker_->HasTrack(track_idx)) {
     return nullptr;
   }
 
@@ -350,6 +349,10 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
   settings->sdfLocalBlockNum = 20000;
   // We don't want to create an (expensive) meshing engine for every instance.
   settings->createMeshingEngine = false;
+  // To be used in conjunction with coarse feature-based alignment.
+  settings->trackerType = ITMLibSettings::TrackerType::TRACKER_ICP;
+//  settings->noICPRunTillLevel
+//  settings->trackerType = ITMLibSettings::TrackerType::TRACKER_COLOR;
 
   track.GetReconstruction() = make_shared<InfiniTamDriver>(
           settings,
@@ -381,7 +384,7 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     return;
   }
 
-  //  cout << "Continuing to reconstruct instance with ID: " << track.GetId() << endl;
+  cout << "Processing reconstruction of instance with ID: " << track.GetId() << endl;
   InfiniTamDriver &instance_driver = *track.GetReconstruction();
 
   TrackFrame &frame = track.GetFrame(frame_idx);
@@ -394,11 +397,47 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
   // still try to estimate it from k to k+2.
   if (rel_dyn_pose.IsPresent()) {
     Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
-//    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
+    cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
 
-    // Note: We have the ITM instance up and running, so we can even perform ICP or some dense
-    // alignment method here if we wish.
+    cout << "The inverse: " << rel_dyn_pose_f.inverse() << endl;
     instance_driver.SetPose(rel_dyn_pose_f.inverse());
+
+    if (enable_itm_refinement_) {
+      // This should, in theory, try to refine the pose even further...
+      instance_driver.Track();
+
+      if (frame.relative_pose->IsPresent()) {
+        Eigen::Matrix4d old_rel_pose = frame.relative_pose->Get().matrix_form;
+
+        Eigen::Matrix4d new_pose = instance_driver.GetPose().cast<double>().inverse();
+        Eigen::Matrix4d delta = new_pose * rel_dyn_pose.Get();
+        Eigen::Matrix4d refined_matrix = old_rel_pose * delta;
+
+        cout << "Refined matrix inv: " << refined_matrix.inverse();
+
+        // TODO(andrei): The improvement may not be significant, but we should also update the se3 form
+        vector<double> old_unrefined_se3 = frame.relative_pose->Get().se3_form;
+        delete frame.relative_pose;
+        frame.relative_pose = new Option<Pose>(new Pose(
+            old_unrefined_se3,
+            refined_matrix
+//          old_rel_pose
+        ));
+
+        cout << "Frame " << frame_idx << ": Refined relative pose only. " << endl
+             << "Old relative: " << endl
+             << old_rel_pose << endl << "New relative, refined by ICP: " << endl
+             << refined_matrix << endl;
+        cout << "Sanity checks:" << endl << frame.relative_pose->Get().matrix_form << endl;
+        for (int i = 0; i < 6; ++i) {
+          cout << frame.relative_pose->Get().se3_form[i] << ", ";
+        }
+        cout << endl;
+      } else {
+        cout << "Frame " << frame_idx << " had no relative pose, so it could not be refined."
+             << endl;
+      }
+    }
 
     try {
       instance_driver.Integrate();
@@ -423,7 +462,8 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     // Free up memory now that we've fused the frame!
     frame.instance_view.DiscardView();
 
-    // TODO remove if unnecessary cleanup
+    // TODO remove if unnecessary (cleanup); NOTE: may be useful since we may prefer to keep the
+    // most recent view even after the fusion, for visualization purposes.
 //    track.SetNeedsCleanup(true);
 //    // Free up memory from the previous frame.
 //    int prev_idx = static_cast<int>(frame_idx) - 1;
