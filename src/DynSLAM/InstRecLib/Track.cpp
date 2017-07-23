@@ -120,8 +120,8 @@ Option<Pose>* EstimateInstanceMotion(
   // pose estimates whose residual is above some value as invalid.
   // Note: 25 => OK results in most cases, but where cars are advancing from opposite direction
   //             in the hill sequence, this no longer works.
-  uint32_t kMinFlowVectorsForPoseEst = 25;
-//  uint32_t kMinFlowVectorsForPoseEst = 20;
+//  uint32_t kMinFlowVectorsForPoseEst = 25;
+  uint32_t kMinFlowVectorsForPoseEst = 23;
   // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
   // we're being a little paranoid).
   size_t flow_count = instance_raw_flow.size();
