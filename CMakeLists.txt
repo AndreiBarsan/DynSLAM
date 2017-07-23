@@ -70,6 +70,8 @@ find_package(Pangolin REQUIRED)
 add_subdirectory(src/gflags)
 # Library for stereo visual odometry and sparse scene flow estimation.
 add_subdirectory(src/libviso2)
+# Work with Lie Groups using Eigen3
+add_subdirectory(src/Sophus)
 
 IF(WITH_CUDA)
   include_directories(${CUDA_INCLUDE_DIRS})
@@ -88,6 +90,7 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 include_directories(${Viso2_INCLUDE_DIRS})
 include_directories(${Pangolin_INCLUDE_DIRS})
 include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(${Sophus_INCLUDE_DIRS})
 
 # TODO(andrei): You may want to have these dependencies in src/DynSLAM/CMakeLists.txt.
 add_subdirectory(src/InfiniTAM/InfiniTAM)
@@ -96,6 +99,14 @@ add_subdirectory(src/DynSLAM/InstRecLib)
 set(DYNSLAM_SOURCES
     # A tiny library for working with portable float map (PFM) files.
     src/pfmLib/ImageIOpfm.cpp
+
+    # Experimental
+    src/DynSLAM/Direct/pinholeCameraModel.cpp
+    src/DynSLAM/Direct/feature/feature_depthMap.cpp
+    src/DynSLAM/Direct/frame/frame.cpp
+    # TODO(andrei): Support CUDA directly in DynSLAM project, and build the CUDA frame as well.
+    src/DynSLAM/Direct/frame/device/cpu/frame_cpu.cpp
+    # End experimental parts
 
     src/DynSLAM/DSHandler3D.cpp
     src/DynSLAM/DynSlam.cpp
