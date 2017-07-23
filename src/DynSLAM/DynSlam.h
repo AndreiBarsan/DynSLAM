@@ -118,32 +118,13 @@ class DynSlam {
     return current_frame_no_;
   }
 
-  void SaveStaticMap(const std::string &dataset_name, const std::string &depth_name) const {
-    string target_folder = EnsureDumpFolderExists(dataset_name);
-    string map_fpath = utils::Format("%s/static-%s-mesh-%06d-frames.obj",
-                                     target_folder.c_str(),
-                                     depth_name.c_str(),
-                                     current_frame_no_);
-    cout << "Saving full static map to: " << map_fpath << endl;
-    static_scene_->SaveSceneToMesh(map_fpath.c_str());
-  }
+  void SaveStaticMap(const std::string &dataset_name, const std::string &depth_name) const;
 
   void ForceDynamicObjectCleanup(int object_id) {
     instance_reconstructor_->ForceObjectCleanup(object_id);
   }
 
-  void SaveDynamicObject(const std::string &dataset_name, const std::string &depth_name, int object_id) const {
-    cout << "Saving mesh for object #" << object_id << "'s reconstruction..." << endl;
-    string target_folder = EnsureDumpFolderExists(dataset_name);
-    string instance_fpath = utils::Format("%s/instance-%s-%06d-mesh.obj",
-                                          target_folder.c_str(),
-                                          depth_name.c_str(),
-                                          object_id);
-    instance_reconstructor_->SaveObjectToMesh(object_id, instance_fpath);
-
-    cout << "Done saving mesh for object #" << object_id << "'s reconstruction in file ["
-         << instance_fpath << "]." << endl;
-  }
+  void SaveDynamicObject(const std::string &dataset_name, const std::string &depth_name, int object_id) const;
 
   // Variants would solve this nicely, but they are C++17-only... TODO(andrei): Use Option<>.
   // Will error out if no flow information is available.
@@ -201,16 +182,7 @@ private:
 
   /// \brief Returns a path to the folder where the dataset's meshes should be dumped, creating it
   ///        using a naive system call if it does not exist.
-  std::string EnsureDumpFolderExists(const string& dataset_name) const {
-    // TODO-LOW(andrei): Make this more cross-platform and more secure.
-    string today_folder = utils::GetDate();
-    string target_folder = "mesh_out/" + dataset_name + "/" + today_folder;
-    if(system(utils::Format("mkdir -p '%s'", target_folder.c_str()).c_str())) {
-      throw runtime_error(utils::Format("Could not create directory: %s", target_folder.c_str()));
-    }
-
-    return target_folder;
-  }
+  std::string EnsureDumpFolderExists(const string& dataset_name) const;
 
 };
 
