@@ -54,14 +54,14 @@ void DynSlam::ProcessFrame(Input *input) {
   }
   utils::Toc();
 
-  future<shared_ptr<InstanceSegmentationResult>> seg_result_future = async([this] {
+  future<shared_ptr<InstanceSegmentationResult>> seg_result_future = async(launch::async, [this] {
     utils::Tic("Semantic segmentation");
     auto segmentation_result = segmentation_provider_->SegmentFrame(*input_rgb_image_);
     utils::Toc();
     return segmentation_result;
   });
 
-  future<void> tracking_and_ssf = async([this, &input, &first_frame] {
+  future<void> tracking_and_ssf = async(launch::async, [this, &input, &first_frame] {
     utils::Tic("Visual Odometry");
     static_scene_->Track();
     utils::Toc();
