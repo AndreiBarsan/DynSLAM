@@ -111,13 +111,17 @@ class Timer {
   }
 
   void Lap() {
-    assert(IsRunning());
+    if (! IsRunning()) {
+      throw std::runtime_error(Format("Timer [%s] not running; cannot stop!", name_.c_str()));
+    }
 
     laps_.push_back(GetTimeMicro());
   }
 
   void Stop() {
-    assert(IsRunning());
+    if (! IsRunning()) {
+      throw std::runtime_error(Format("Timer [%s] not running; cannot stop!", name_.c_str()));
+    }
 
     Lap();
     is_running_ = false;

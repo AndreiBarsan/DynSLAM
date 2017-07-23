@@ -399,7 +399,7 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
     cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
 
-    cout << "The inverse: " << rel_dyn_pose_f.inverse() << endl;
+//    cout << "The inverse: " << rel_dyn_pose_f.inverse() << endl;
     instance_driver.SetPose(rel_dyn_pose_f.inverse());
 
     if (enable_itm_refinement_) {

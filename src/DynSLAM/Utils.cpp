@@ -9,6 +9,7 @@
 #include <sys/time.h>
 
 #include <opencv/cv.h>
+#include <mutex>
 
 namespace dynslam {
 namespace utils {
@@ -105,6 +106,7 @@ void Tic(const std::string &name) {
 }
 
 int64_t Toc(const std::string &name, bool quiet) {
+  assert(Timers::Get().ContainsTimer(name) && "Toc: Unknown timer. Are you timing things on multiple threads? That's not supported.");
   Timers::Get().Stop(name);
   int64_t duration_ms = MicroToMilli(Timers::Get().GetDuration(name));
   if (! quiet) {
@@ -114,6 +116,7 @@ int64_t Toc(const std::string &name, bool quiet) {
 }
 
 int64_t TocMicro(const std::string &name, bool quiet) {
+  assert(Timers::Get().ContainsTimer(name) && "TocMicro: Unknown timer. Are you timing things on multiple threads? That's not supported.");
   Timers::Get().Stop(name);
   int64_t duration_micro = Timers::Get().GetDuration(name);
   if (! quiet) {
