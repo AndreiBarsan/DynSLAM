@@ -3,8 +3,8 @@
 
 #include "../../frame.h"
 #include <memory>
-#include "common/commDefs.h"
-#include "common/cudaDefs.h"
+#include "../../../commDefs.h"
+#include "../../../cudaDefs.h"
 
 namespace VGUGV
 {
