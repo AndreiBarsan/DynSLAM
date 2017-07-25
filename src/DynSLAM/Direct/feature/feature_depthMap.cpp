@@ -102,7 +102,7 @@ namespace VGUGV
     {
       if(input_pyramidLevel + 1 > mnPyramidLevels)
       {
-	printf("[Feature_depthMap] fails to retrieve depth map due to uninitialized depth map data...\n");
+	printf("[Feature_depthMap] fails to retrieve depth map due to uninitialized depth map data... (requested pyramid level %d)\n", input_pyramidLevel);
 	return NULL;
       }
       return mpDepthMap[input_pyramidLevel];

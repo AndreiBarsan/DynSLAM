@@ -10,11 +10,17 @@
 	exit(0);                                                                      \
       }                                                                               \
   }
-  
+
+// TODO(andrei): If integrating direct alignment in codebase permanently, resolve duplication
+// between this and ITM.
+#ifndef _CPU_AND_GPU_CODE_
   #define _CPU_AND_GPU_CODE_ __device__ __host__ // for CUDA device code
-
-#else
-  
-  #define _CPU_AND_GPU_CODE_
-
 #endif
+
+#else   // ndef COMPILE_WITH_CUDA
+
+#ifndef _CPU_AND_GPU_CODE_
+  #define _CPU_AND_GPU_CODE_
+#endif
+
+#endif  // ndef COMPILE_WITH_CUDA
