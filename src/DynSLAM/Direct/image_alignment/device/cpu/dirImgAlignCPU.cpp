@@ -52,11 +52,13 @@ void DirImgAlignCPU::doAlignment(const T_FramePtr &refFrame,
 
 void DirImgAlignCPU::preComputeJacobianHessian(const T_FramePtr &refFrame, int level) {
   int scale = 1 << level;
-  int nRows = refFrame->getFrameSize()(0) / scale;
+//  int nRows = refFrame->getFrameSize()(0) / scale;
   int nCols = refFrame->getFrameSize()(1) / scale;
 
   Common::CameraBase::Ptr pCamera = refFrame->getCameraModel();
   Eigen::Vector2f *pImgGradientVec = refFrame->getPyramidImageGradientVec(level);
+
+  // XXX: This is NOT a depth map in the traditional sense!!! It's a list of hypotheses.
   Common::DepthHypothesisBase *pDepthMap = refFrame->getFeatureDescriptors(level);
   int nDepthMapSize = refFrame->getFeatureSize(level);
   if (pDepthMap == NULL) {
@@ -144,14 +146,14 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
   int nRows = refFrame->getFrameSize()(0) / scale;
   int nCols = refFrame->getFrameSize()(1) / scale;
 
-  Eigen::Vector2f *pGradient = refFrame->getPyramidImageGradientVec(level);
+//  Eigen::Vector2f *pGradient = refFrame->getPyramidImageGradientVec(level);
   Common::DepthHypothesisBase *pDepthMap = refFrame->getFeatureDescriptors(level);
   Common::CameraBase::Ptr pCurCamera = refFrame->getCameraModel();
   int nDepthMapSize = refFrame->getFeatureSize(level);
 
   // Only uses depth, not color.
   // IDEA: would it be better if we had higher-precision depth maps?
-  unsigned char *pRefImageData = refFrame->getPyramidImage(level);
+//  unsigned char *pRefImageData = refFrame->getPyramidImage(level);
   unsigned char *pCurImageData = curFrame->getPyramidImage(level);
 
   Eigen::Matrix<float, 6, 1> Jsum = Eigen::Matrix<float, 6, 1>::Zero();
@@ -174,9 +176,9 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
       continue;
     }
 
-    int r = pixelDepth.pixel(0);
-    int c = pixelDepth.pixel(1);
-    int index = r * nCols + c;
+//    int r = pixelDepth.pixel(0);
+//    int c = pixelDepth.pixel(1);
+//    int index = r * nCols + c;
 
     // get point 3D position
     Eigen::Vector3f ray = pixelDepth.unitRay;
@@ -201,8 +203,6 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
         Common::bilinearInterpolation(pCurImageData, nRows, nCols, pixel_cur(1), pixel_cur(0));
     residual0 = mAffineBrightness_a * intensity_ref + mAffineBrightness_b - intensity_cur;
 
-    // Can parallelize trivially everything up to here
-
     // get robust weighting
     float weight = mRobustLossFunction->getWeight(residual0);
     totalCost += weight * residual0 * residual0;
@@ -218,6 +218,8 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
     // accumulate hessian and jacobian
     JiT = weight * residual0 * JiT;
     Hi = mAffineBrightness_a * weight * Hi;
+
+    // Can parallelize trivially everything up to here, then reduce the rest of the stuff.
 
     float weightByVariance = 1.0f; //std::min(0.0001f / invDepth.variance, 100.0f);
     Jsum += (JiT * weightByVariance);
@@ -244,6 +246,7 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
 }
 
 // Faster version of the above method; looks like it's still under construction.
+// Is this faster than Eigen's built-in vectorization?
 /*
 float DirImgAlignCPU::gaussNewtonUpdateStepSSE(const T_FramePtr &refFrame,
                                                const T_FramePtr &curFrame,
