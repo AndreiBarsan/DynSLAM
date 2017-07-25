@@ -1,6 +1,7 @@
 #ifndef _VGUGV_SLAM_IMG_ALIGNMENT_DIRECT_CPU_
 #define _VGUGV_SLAM_IMG_ALIGNMENT_DIRECT_CPU_
 
+// TODO(andrei): Do we need this? Ask Peidong.
 //#include <Eigen/src/Core/util/Memory.h>
 #include "../../dirImgAlignBase.h"
 #include "../../../commDefs.h"

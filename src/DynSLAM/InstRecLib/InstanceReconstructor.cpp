@@ -375,25 +375,71 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
   }
 }
 
+/// \brief Converts an 8-bit RGB color to an 8-bit grayscale intensity.
+uchar RgbToGrayscale(uchar r, uchar g, uchar b) {
+  return static_cast<uchar>(r * 0.299 + g * 0.587 + b * 0.114);
+}
 
-uchar* DepthToUchar(float *depth_f) {
-  // TODO convert depth map to uchar expected by Peidong's code; the float depth map encodes metric
-  //      distance
+DepthHypothesis_GMM* GenHyps(const uchar *intensity, const float *depth, CameraBase &camera,
+                             int rows, int cols) {
+  // Note: variance not used in depth alignment code, so there's no point in trying to estimate it
+  // from, e.g., the depth.
+
+  // TODO(andrei): For performance, ONLY allocate hypotheses for USED pixels. So when tracking a
+  // car that's 1/5 the screen you don't waste time.
+
+  DepthHypothesis_GMM *hypotheses = new DepthHypothesis_GMM[rows * cols];
+
+  for(int row = 0; row < rows; ++row) {
+    for(int col = 0; col < cols; ++col) {
+      int idx = row * cols + col;
+      hypotheses[idx].pixel[0] = row;
+      hypotheses[idx].pixel[1] = col;
+      camera.backProject(row, col, hypotheses[idx].unitRay);
+
+      hypotheses[idx].rayDepth = depth[idx];
+      hypotheses[idx].bValidated = true;
+    }
+  }
+
+  return hypotheses;
+}
+
+shared_ptr<uchar> RgbToGrayscaleImage(const Vector4u *rgb_image, int rows, int cols) {
+  uchar *grayscale_image = new uchar[rows * cols];
+
+  for(int row = 0; row < rows; ++row) {
+    for(int col = 0; col < cols; ++col) {
+      int idx = row * cols + col;
+      grayscale_image[idx] = RgbToGrayscale(rgb_image[idx].r, rgb_image[idx].g, rgb_image[idx].b);
+    }
+  }
+
+  return shared_ptr<uchar>(grayscale_image);
 }
 
 void ExperimentalDirectRefine(Track &track,
                               int first_idx,
                               int second_idx,
-                              Eigen::Matrix4d &relative_pose
-) {
+                              Eigen::Matrix4d &relative_pose,
+                              const ITMRGBDCalib &calib) {
   cout << "Will run experimental direct alignment pose refinement. " << endl;
   cout << "Initial estimate (from sparse RANSAC): " << endl << relative_pose << endl;
-  auto first_depth = track.GetFrame(first_idx).instance_view.GetView()->depth;
-  auto second_depth = track.GetFrame(second_idx).instance_view.GetView()->depth;
+  auto first_view = track.GetFrame(first_idx).instance_view.GetView();
+  auto second_view = track.GetFrame(second_idx).instance_view.GetView();
+  auto first_depth = first_view->depth;
+  auto second_depth = second_view->depth;
+  auto first_rgb = first_view->rgb;
+  auto second_rgb = second_view->rgb;
   first_depth->UpdateHostFromDevice();
   second_depth->UpdateHostFromDevice();
+  first_rgb->UpdateHostFromDevice();
+  second_rgb->UpdateHostFromDevice();
+
   float *ff = first_depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
   float *sf = second_depth->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+  Vector4u *f_rgb = first_rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+  Vector4u *s_rgb = second_rgb->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
 
   using namespace VGUGV::Common;
   using namespace VGUGV::SLAM;
@@ -403,17 +449,54 @@ void ExperimentalDirectRefine(Track &track,
   int channels = 1;
   Eigen::Vector2i frame_size(cols, rows);
   Eigen::Matrix3f K;
-  PinholeCameraModel cam(frame_size, K);
+  auto &params = calib.intrinsics_rgb.projectionParamsSimple;
+  K << params.fx, 0,          params.px,
+       0,         params.fy,  params.py,
+       0,                 0,          1;
+  CameraBase::Ptr cam = make_shared<PinholeCameraModel>(frame_size, K);
+  cout << "Performing direct alignment for frames " << first_idx << " and " << second_idx
+       << " from track #" << track.GetId() << ". Frame size: " << cols << " x " << rows
+       << ". K: " << endl << K << endl;
 
-  FrameCPU_denseDepthMap first_ddm(first_idx, cam, uchar_data, uchar_mask, rows, cols, channels);
+  shared_ptr<uchar> uchar_data_first = RgbToGrayscaleImage(f_rgb, rows, cols);
+  uchar *uchar_mask_first = nullptr;
+  shared_ptr<uchar> uchar_data_second = RgbToGrayscaleImage(s_rgb, rows, cols);
+  uchar *uchar_mask_second = nullptr;
+
+  // TODO(andrei): It would be easier to modify the direct alignment code to not need the hypothesis
+  // list, rather than do this expensive thing here. Or use PSL? Anyway, modifying the dense
+  // alignment code if it works should lead to faster results either way.
+  DepthHypothesis_GMM *hyps_first = GenHyps(uchar_data_first.get(), ff, *cam, rows, cols);
+  DepthHypothesis_GMM *hyps_second = GenHyps(uchar_data_second.get(), sf, *cam, rows, cols);
+
+  auto first_ddm = make_shared<FrameCPU_denseDepthMap>(
+      first_idx, cam, uchar_data_first.get(), uchar_mask_first, rows, cols, channels);
+  auto second_ddm = make_shared<FrameCPU_denseDepthMap>(
+      second_idx, cam, uchar_data_second.get(), uchar_mask_second, rows, cols, channels);
+  first_ddm->copyFeatureDescriptors(hyps_first, rows * cols);
+  second_ddm->copyFeatureDescriptors(hyps_second, rows * cols);
 //  Frame_CPU(int frameId, const CameraBase::Ptr& camera, const unsigned char* imageData, const unsigned char* maskImage, int nRows, int nCols, int nChannels)
 
-  float huber_delta = 5.0f;   // TODO(andrei): Ask Peidong about this.
+  float huber_delta = 5.0f;   // TODO(andrei): Tune the params based on Peidong's input.
+  int nMaxPyramidLevels = 5;
+  int nMaxIterations = 10;
+  float epsilon = 1e-5;
   float robust_loss_param = huber_delta;
-  DirImgAlignCPU dir_img_align(nMaxPyramidLevels, nMaxIterations, eps, ROBUST_LOSS_TYPE::PSEUDO_HUBER,
-  robust_loss_param)
+//  first_ddm->computeImagePyramids(nMaxPyramidLevels);
+//  second_ddm->computeImagePyramids(nMaxPyramidLevels);
+//  first_ddm->computeImagePyramidsGradients(nMaxPyramidLevels);
+//  second_ddm->computeImagePyramidsGradients(nMaxPyramidLevels);
 
-  // TODO convert to uchar depth and run direct method
+  DirImgAlignCPU dir_img_align(nMaxPyramidLevels, nMaxIterations, epsilon,
+                               ROBUST_LOSS_TYPE::PSEUDO_HUBER, robust_loss_param);
+
+  Transformation transformation;
+  dir_img_align.doAlignment(first_ddm, second_ddm, transformation);
+
+  cout << "Transformation after direct alignment:" << endl << transformation.getTMatrix() << endl;
+
+  delete hyps_first;
+  delete hyps_second;
 }
 
 
@@ -449,7 +532,14 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     instance_driver.SetPose(rel_dyn_pose_f.inverse());
 
     if (frame_idx > 0) {
-      // Ensure we have a previous frame to align to. ExperimentalDirectRefine(track, frame_idx, frame_idx - 1, rel_dyn_pose.Get());
+//      frame.instance_view.GetView()->calib->intrinsics_rgb.projectionParamsSimple;
+      // Ensure we have a previous frame to align to, and do the direct alignment.
+      ExperimentalDirectRefine(track,
+                               static_cast<int>(frame_idx - 1),
+                               static_cast<int>(frame_idx),
+                               rel_dyn_pose.Get(),
+                               *(frame.instance_view.GetView()->calib));
+      // TODO If that doesn't work, try to align against a raycast of the model...
     }
 
     if (enable_itm_refinement_) {
@@ -509,18 +599,19 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
 
     track.SetNeedsCleanup(true);
     track.CountFusedFrame();
+
+    // Note: need to discard older ones, since we need cur+prev for direct alignment.
     // Free up memory now that we've fused the frame!
-    frame.instance_view.DiscardView();
+//    frame.instance_view.DiscardView();
 
     // TODO remove if unnecessary (cleanup); NOTE: may be useful since we may prefer to keep the
     // most recent view even after the fusion, for visualization purposes.
-//    track.SetNeedsCleanup(true);
 //    // Free up memory from the previous frame.
-//    int prev_idx = static_cast<int>(frame_idx) - 1;
-//    if (prev_idx >= 0) {
-//      auto prev_frame = track.GetFrame(prev_idx);
-//      prev_frame.instance_view.DiscardView();
-//    }
+    int prev_idx = static_cast<int>(frame_idx) - 1;
+    if (prev_idx >= 0) {
+      auto prev_frame = track.GetFrame(prev_idx);
+      prev_frame.instance_view.DiscardView();
+    }
   }
   else {
     cout << "Could not fuse instance data for track #" << track.GetId() << " due to missing pose "

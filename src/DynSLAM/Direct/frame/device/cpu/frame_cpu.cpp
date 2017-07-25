@@ -48,6 +48,7 @@ namespace VGUGV
       
       for (int i = 1; i < nTotalLevels; i++)
       {
+        printf("Computing pyramid level %d/%d (1 pre-copied)...\n", (i + 1), nTotalLevels);
 	int scale = 1 << i;
 	int nRows = mnRows / scale;
 	int nCols = mnCols / scale;

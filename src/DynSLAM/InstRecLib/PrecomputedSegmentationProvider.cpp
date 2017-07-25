@@ -19,7 +19,7 @@ using namespace dynslam::utils;
 
 /// Rescale factors used for RGB and depth masking of object instances.
 float kCopyMaskRescaleFactor = 1.05f;
-float kDeleteMaskRescaleFactor = 1.0f;
+float kDeleteMaskRescaleFactor = 1.10f;
 
 /// \brief Rescale factor used for scene flow masking of instances.
 /// Smaller => fewer sparse scene flow vectors from, e.g., the background behind the object.
