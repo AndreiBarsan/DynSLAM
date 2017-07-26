@@ -20,7 +20,8 @@ namespace VGUGV
       using DirImgAlignBase::T_FramePtr;
       
     public:
-      DirImgAlignCPU(int nMaxPyramidLevels, int nMaxIterations, float eps, Common::ROBUST_LOSS_TYPE type, float param);
+      DirImgAlignCPU(int nMaxPyramidLevels, int nMaxIterations, float eps,
+					 Common::ROBUST_LOSS_TYPE type, float param, float minGradMagnitude);
       ~DirImgAlignCPU();
       
     public:
@@ -47,6 +48,10 @@ namespace VGUGV
 //				     Eigen::Matrix<float, 6, 1>& outEpsilon);
       
     private:
+      /// \brief Used for thresholding pixels based on their gradient magnitude when performing the
+      ///        alignment.
+      float mMinGradMagnitude;
+
       float* mPreCompJacobian;
       float* mPreCompHessian;
       float mAffineBrightness_a;

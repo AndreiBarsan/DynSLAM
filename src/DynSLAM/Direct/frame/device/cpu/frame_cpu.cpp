@@ -127,10 +127,8 @@ namespace VGUGV
 	float*           pGradientMag = mpPyramidImageGradientMag[i];
 	Eigen::Vector2f* pGradientVec = mpPyramidImageGradientVec[i];
 	
-	for (int r = 0; r < nRows; r++)
-	{
-	  for (int c = 0; c < nCols; c++)
-	  {				
+	for (int r = 0; r < nRows; r++) {
+	  for (int c = 0; c < nCols; c++) {
 	    int index = r * nCols + c;
 	    
 	    if (r == 0 || r == nRows - 1 || c == 0 || c == nCols - 1)

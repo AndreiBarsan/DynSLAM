@@ -45,6 +45,9 @@ float Track::ScoreMatch(const TrackFrame& new_frame) const {
   int max_area = std::max(new_bbox.GetArea(), last_bbox.GetArea());
   int overlap_area = last_bbox.IntersectWith(new_bbox).GetArea();
 
+  // TODO(andrei): Compute union of areas, so you can score based on IoU, i.e., Jaccard similarity,
+  // which would make this sound much less arbitrary.
+
   // If the overlap completely covers one of the frames, then it's considered perfect.
   // Otherwise, frames which only partially intersect get smaller scores, and frames which don't
   // intersect at all get a score of 0.0.

@@ -3,6 +3,8 @@
 
 #include <sophus/se3.hpp>
 #include <pmmintrin.h>
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
 #include "../../../commDefs.h"
 #include "../../../cameraBase.h"
 #include "../../../frame/frame.hpp"
@@ -13,10 +15,13 @@ DirImgAlignCPU::DirImgAlignCPU(int nMaxPyramidLevels,
                                int nMaxIterations,
                                float eps,
                                Common::ROBUST_LOSS_TYPE type,
-                               float param)
+                               float param,
+                               float minGradMagnitude)
     : DirImgAlignBase(nMaxPyramidLevels, nMaxIterations, eps, type, param),
       mPreCompJacobian(NULL),
-      mPreCompHessian(NULL) {}
+      mPreCompHessian(NULL),
+      mMinGradMagnitude(minGradMagnitude)
+{}
 
 DirImgAlignCPU::~DirImgAlignCPU() {}
 
@@ -31,7 +36,7 @@ void DirImgAlignCPU::doAlignment(const T_FramePtr &refFrame,
 
   Eigen::Matrix4f T_ref2cur = inout_Tref2cur.getTMatrix();
   for (int i = mnMaxPyramidLevels - 1; i >= 0; i--) {
-    std::cout << "Aligning @ level " << (i+1) << "." << std::endl;
+    std::cout << std::endl << "Aligning @ level " << (i+1) << "." << std::endl;
     int nNumValidatedPixels = refFrame->getFeatureSize(i);
     mPreCompJacobian = new float[nNumValidatedPixels * 6];
     mPreCompHessian = new float[nNumValidatedPixels * 36];
@@ -179,16 +184,25 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
   int scale = 1 << level;
   int nRows = refFrame->getFrameSize()(0) / scale;
   int nCols = refFrame->getFrameSize()(1) / scale;
+  int weakGradientCount = 0;
 
-//  Eigen::Vector2f *pGradient = refFrame->getPyramidImageGradientVec(level);
+  /// XXX: does this help? Seems like it doesn't.
+  float learningRate = 1.0f;
+
+  Eigen::Vector2f *pGradient = refFrame->getPyramidImageGradientVec(level);
+  float *pGradientMag = refFrame->getPyramidImageGradientMag(level);
   Common::DepthHypothesisBase *pDepthMap = refFrame->getFeatureDescriptors(level);
   Common::CameraBase::Ptr pCurCamera = refFrame->getCameraModel();
   int nDepthMapSize = refFrame->getFeatureSize(level);
 
-  // Only uses depth, not color.
-  // IDEA: would it be better if we had higher-precision depth maps?
-//  unsigned char *pRefImageData = refFrame->getPyramidImage(level);
+  unsigned char *pRefImageData = refFrame->getPyramidImage(level);
   unsigned char *pCurImageData = curFrame->getPyramidImage(level);
+
+//  cv::Mat1b preview(nRows, nCols, pCurImageData);
+//  cv::Mat1b prev2(nRows, nCols, pRefImageData);
+//  cv::imshow("Current image", preview);
+//  cv::imshow("Reference image", prev2);
+//  cv::waitKey();
 
   Eigen::Matrix<float, 6, 1> Jsum = Eigen::Matrix<float, 6, 1>::Zero();
   Eigen::Matrix<float, 6, 6, Eigen::RowMajor>
@@ -204,15 +218,23 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
 
   int nCount = 0;
   nDepthMapSize = nDepthMapSize / 4 * 4;
+
   for (int i = 0; i < nDepthMapSize; i++) {
     Common::DepthHypothesisBase pixelDepth = pDepthMap[i];
     if (pixelDepth.bNoGoodMatching || pixelDepth.bDiverged) {
       continue;
     }
 
-//    int r = pixelDepth.pixel(0);
-//    int c = pixelDepth.pixel(1);
-//    int index = r * nCols + c;
+    int r = pixelDepth.pixel(0);
+    int c = pixelDepth.pixel(1);
+    int index = r * nCols + c;
+
+//    Eigen::Vector2f &gradient = pGradient[index];
+    float gradientMag = pGradientMag[index];
+    if (gradientMag < mMinGradMagnitude) {
+      weakGradientCount++;
+      continue;
+    }
 
     // get point 3D position
     Eigen::Vector3f ray = pixelDepth.unitRay;
@@ -221,13 +243,13 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
 
     // project it to current image
     Eigen::Vector2f pixel_cur;
-    // XXX: see if this is an actual problem
-//    if (!pCurCamera->project(P3D_curF, pixel_cur)) {
+    if (!pCurCamera->project(P3D_curF, pixel_cur)) {
+      // XXX: see if this is an actual problem
 //      cout << "pCurCamera->project failed to project point." << endl;
 //      cout << "Ray: " << ray << " | Ref. frame 3D point: " << P3D_refF << " | Curr. frame 3D point: " << P3D_curF << endl;
 //      cout << "Ray depth was: " << pixelDepth.rayDepth << endl;
-//      continue;
-//    }
+      continue;
+    }
 
     // Not using masking in dynslam at the moment.
 //    if(!curFrame->pixelLieOutsideImageMask(pixel_cur(1), pixel_cur(0))) {
@@ -255,7 +277,15 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
     float weight = mRobustLossFunction->getWeight(residual0);
 
     if (i % 555 == 0) {
-      cout << "Residual sample: " << residual0 << " | Weight: " << weight << endl;
+//      cout << "Residual sample: " << residual0 << " | Weight: " << weight << endl;
+//      cout << "Whereby the reference intensity is: " << intensity_ref << ", and the current one is:"
+//           << intensity_cur << ". Affine brightness params (a,b) = " << mAffineBrightness_a
+//           << " and " << mAffineBrightness_b << "."<< endl;
+//      cout << "Current intensity sampled  and interp'd bilinearly from coords: x = " << pixel_cur(0)
+//           << ", y = " << pixel_cur(1) << endl;
+//      cout << "Coordinates in reference frame: row = " << pixelDepth.pixel(0) << ", col = "
+//           << pixelDepth.pixel(1) << "." << endl;
+////      cout << "Ray: " << ray << " | 3D reference: " << P3D_refF << " | 3D current: " << P3D_curF << endl;
     }
 
     if (std::isnan(weight)) {
@@ -304,8 +334,10 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
     std::cerr << "WARNING: few points used for actual optimization: " << nCount << std::endl;
   }
 
+  std::cout << "Dropped " << weakGradientCount << " terms due to weak gradient." << std::endl;
+
   // update epsilon
-  outEpsilon = (-1.0f) * Hsum.ldlt().solve(Jsum);
+  outEpsilon = learningRate * (-1.0f) * Hsum.ldlt().solve(Jsum);
   return sqrt(totalCost / (nCount * 1.0f));
 }
 

@@ -234,7 +234,7 @@ public:
 //  int max_decay_weight_ = 3;
 //  int min_decay_age_ = 10;
 
-    int max_decay_weight_= 1;
+    int max_decay_weight_= 2;
     int aggressive_max_decay_weight_= 2;
     int min_decay_age_ = 50;
   /// \brief Voxels older than this are eligible for decay.
