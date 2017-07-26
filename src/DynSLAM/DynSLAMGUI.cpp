@@ -157,6 +157,7 @@ public:
           pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
         }
       }
+
       pangolin::GlFont &font = pangolin::GlFont::I();
       pane_texture_->RenderToViewport(true);
       font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.95, 0.9);
@@ -167,6 +168,7 @@ public:
       // Currently visualizing LIDAR data.
 
       auto lidar = dyn_slam_->GetEvaluation()->GetVelodyne()->ReadFrame(dyn_slam_input_->GetCurrentFrame());
+
       // TODO(andrei): Don't hardcode calibration params like this.
       Eigen::MatrixXf P0(3, 4);
       P0 << 7.070912000000e+02, 0.000000000000e+00, 6.018873000000e+02, 0.000000000000e+00,
@@ -178,17 +180,17 @@ public:
              9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,
           0, 0, 0, 1;
 
-//      Tic("LIDAR render (naive)");
-//      PreviewLidar(lidar, P0, Tr, rgb_view_);
-//      Toc(true);
+//      if (display_raw_previews_->Get()) {
+//        UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
+//      }
+//      else {
+//        UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_);
+//      }
+//      pane_texture_->RenderToViewport(true);
 
-      if (display_raw_previews_->Get()) {
-        UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
-      }
-      else {
-        UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_);
-      }
-      pane_texture_->RenderToViewport(true);
+      Tic("LIDAR render (naive)");
+      PreviewLidar(lidar, P0, Tr, rgb_view_);
+      Toc();
 
       if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
         PreviewSparseSF(dyn_slam_->GetLatestFlow().matches, rgb_view_);
@@ -343,15 +345,23 @@ public:
   void PreviewLidar(
       const Eigen::MatrixXf &lidar_points,
       const Eigen::MatrixXf &P,
-      const Eigen::MatrixXf &Tr,
+      const Eigen::Matrix4f &Tr,
       const pangolin::View &view
   ) {
-    // TODO(andrei): This can be VERY slow (~40ms LOL). Be smart about it and vectorize the shit out
-    // of it.
-    //
     // convert every velo point into 2D as: x_i = P * Tr * X_i
+    size_t N = static_cast<size_t>(lidar_points.rows() * 8);
+    if (N == 0) {
+      return;
+    }
+    static GLfloat verts[2000000];
+    static GLfloat colors[2000000];
+
+    cout << lidar_points.rows() * 12 << " elements..." << endl;
+    size_t idx_v = 0;
+    size_t idx_c = 0;
+
+    glDisable(GL_DEPTH_TEST);
     for (int i = 0; i < lidar_points.rows(); ++i) {
-      // check bounds, then check Z positive, greater than some near plane or smth.
       Eigen::Vector4f point;
       float reflectance = lidar_points(i, 3);
       point(0) = lidar_points(i, 0);
@@ -359,7 +369,7 @@ public:
       point(2) = lidar_points(i, 2);
       point(3) = 1.0f;                // Replace reflectance with the homogeneous 1.
 
-      Eigen::VectorXf p3d = Tr * point;
+      Eigen::Vector4f p3d = Tr * point;
       p3d /= p3d(3);
       float Z = p3d(2);
 
@@ -372,17 +382,48 @@ public:
 
       Eigen::Vector2f frame_size(width_, height_);
       cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(p2d(0), p2d(1)), frame_size, view);
+
+//      const GLfloat verts[] = { x-rad,y, x+rad, y, x,y-rad, x, y+rad};
+
       float intensity = min(5.0f / Z, 1.0f);
-      glColor4f(intensity, intensity, reflectance, 1.0f);
-      // LMAO
-      pangolin::glDrawCross(gl_pos[0], gl_pos[1], 0.001f);
+
+      float rad = 0.001f;
+      GLfloat x = gl_pos(0);
+      GLfloat y = gl_pos(1);
+
+//      verts[idx_v++] = x - rad;
+//      verts[idx_v++] = y;
+//      verts[idx_v++] = x + rad;
+//      verts[idx_v++] = y;
+//      verts[idx_v++] = x;
+//      verts[idx_v++] = y - rad;
+//      verts[idx_v++] = x;
+//      verts[idx_v++] = y + rad;
+      verts[idx_v++] = x;
+      verts[idx_v++] = y;
+
+      colors[idx_c++] = intensity;
+      colors[idx_c++] = intensity;
+      colors[idx_c++] = reflectance;
+//      colors[idx_c++] = intensity;
+//      colors[idx_c++] = intensity;
+//      colors[idx_c++] = reflectance;
+//      colors[idx_c++] = intensity;
+//      colors[idx_c++] = intensity;
+//      colors[idx_c++] = reflectance;
+//      colors[idx_c++] = intensity;
+//      colors[idx_c++] = intensity;
+//      colors[idx_c++] = reflectance;
+
+//      glColor4f(intensity, intensity, reflectance, 1.0f);
+//      // LMAO
+//      pangolin::glDrawCross(gl_pos[0], gl_pos[1], 0.001f);
     }
 
-    glColor4f(1, 1, 1, 1);
-    pangolin::glDraw_x0(1.0f, 1);
-    pangolin::glDraw_y0(1.0f, 1);
-    pangolin::glDraw_z0(1.0f, 1);
-
+    // TODO consider just passing ptr to (projected) internal eigen data. Make sure its row-major though.
+    // Should set modelview matrix properly.
+    pangolin::glDrawColoredVertices<float>(idx_v / 2, verts, colors, GL_POINTS, 2, 3);
+    glEnable(GL_DEPTH_TEST);
   }
 
 protected:
