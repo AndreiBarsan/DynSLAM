@@ -38,6 +38,8 @@ namespace VGUGV
       if(nTotalLevels < 1) return;
       if(mpPyramidImages != NULL) return;
       mnPyramidLevels = nTotalLevels;
+
+		std::cout << "Computing image pyramids for " << nTotalLevels << " levels..." << std::endl;
       
       // dynamically allocate memory space for mpPyramidImages
       mpPyramidImages = new unsigned char*[nTotalLevels];
@@ -105,12 +107,15 @@ namespace VGUGV
 	printf("Frame_CPU::computeImagePyramidsGradients failed due to no pyramid image data ...\n");
 	return;
       }
-      
+
+      printf("Pyramid data present. Will compute gradients and their magnitudes...\n");
+
       mpPyramidImageGradientMag = new float*[nTotalLevels];
       mpPyramidImageGradientVec = new Eigen::Vector2f*[nTotalLevels];
       
       for (int i = 0; i < nTotalLevels; i++)
       {
+        printf("Computing gradients for level %d.\n", i+1);
 	int scale = 1 << i;
 	int nRows = mnRows / scale;
 	int nCols = mnCols / scale;
@@ -137,12 +142,14 @@ namespace VGUGV
 	    
 	    int rInTopLevel = scale * r + scale - 1;
 	    int cInTopLevel = scale * c + scale - 1;
-	    if (!pixelLieOutsideImageMask(rInTopLevel, cInTopLevel)) // check whether it is being masked or not...
-	    {
-	      pGradientMag[index] = 0.0f;
-	      pGradientVec[index] = Eigen::Vector2f(0.0f, 0.0f);
-	      continue;
-	    }
+
+        // TODO(andrei): re-enable if we want masking support in DynSLAM.
+//	    if (!pixelLieOutsideImageMask(rInTopLevel, cInTopLevel)) // check whether it is being masked or not...
+//	    {
+//	      pGradientMag[index] = 0.0f;
+//	      pGradientVec[index] = Eigen::Vector2f(0.0f, 0.0f);
+//	      continue;
+//	    }
 	    
 	    int indexRght = index + 1;
 	    int indexLeft = index - 1;

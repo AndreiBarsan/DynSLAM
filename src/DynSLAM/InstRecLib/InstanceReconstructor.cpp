@@ -380,7 +380,7 @@ uchar RgbToGrayscale(uchar r, uchar g, uchar b) {
   return static_cast<uchar>(r * 0.299 + g * 0.587 + b * 0.114);
 }
 
-DepthHypothesis_GMM* GenHyps(const uchar *intensity, const float *depth, CameraBase &camera,
+vector<DepthHypothesis_GMM> GenHyps(const uchar *intensity, const float *depth, CameraBase &camera,
                              int rows, int cols) {
   // Note: variance not used in depth alignment code, so there's no point in trying to estimate it
   // from, e.g., the depth.
@@ -388,17 +388,25 @@ DepthHypothesis_GMM* GenHyps(const uchar *intensity, const float *depth, CameraB
   // TODO(andrei): For performance, ONLY allocate hypotheses for USED pixels. So when tracking a
   // car that's 1/5 the screen you don't waste time.
 
-  DepthHypothesis_GMM *hypotheses = new DepthHypothesis_GMM[rows * cols];
+  vector<DepthHypothesis_GMM> hypotheses; // = new DepthHypothesis_GMM[rows * cols];
 
   for(int row = 0; row < rows; ++row) {
     for(int col = 0; col < cols; ++col) {
       int idx = row * cols + col;
-      hypotheses[idx].pixel[0] = row;
-      hypotheses[idx].pixel[1] = col;
-      camera.backProject(row, col, hypotheses[idx].unitRay);
 
-      hypotheses[idx].rayDepth = depth[idx];
-      hypotheses[idx].bValidated = true;
+      if (depth[idx] < 0.01f) {
+        continue;
+      }
+
+      DepthHypothesis_GMM hypothesis;
+      hypothesis.pixel[0] = row;
+      hypothesis.pixel[1] = col;
+      camera.backProject(row, col, hypothesis.unitRay);
+      hypothesis.intensity = intensity[idx];
+      hypothesis.rayDepth = depth[idx];
+      hypothesis.bValidated = true;
+
+      hypotheses.push_back(hypothesis);
     }
   }
 
@@ -418,11 +426,15 @@ shared_ptr<uchar> RgbToGrayscaleImage(const Vector4u *rgb_image, int rows, int c
   return shared_ptr<uchar>(grayscale_image);
 }
 
-void ExperimentalDirectRefine(Track &track,
+/// \brief Refines an existing pose using a direct method.
+/// The actual pose we're starting from is hidden in the latest frame of the track. TODO make this better.
+/// \return Whether the refinement succeeded.
+bool ExperimentalDirectRefine(Track &track,
                               int first_idx,
                               int second_idx,
-                              Eigen::Matrix4d &relative_pose,
-                              const ITMRGBDCalib &calib) {
+                              Eigen::Matrix4d &relative_pose,   // TODO do we still need this?
+                              const ITMRGBDCalib &calib,
+                              Eigen::Matrix4f &out_refined_pose) {
   cout << "Will run experimental direct alignment pose refinement. " << endl;
   cout << "Initial estimate (from sparse RANSAC): " << endl << relative_pose << endl;
   auto first_view = track.GetFrame(first_idx).instance_view.GetView();
@@ -466,37 +478,63 @@ void ExperimentalDirectRefine(Track &track,
   // TODO(andrei): It would be easier to modify the direct alignment code to not need the hypothesis
   // list, rather than do this expensive thing here. Or use PSL? Anyway, modifying the dense
   // alignment code if it works should lead to faster results either way.
-  DepthHypothesis_GMM *hyps_first = GenHyps(uchar_data_first.get(), ff, *cam, rows, cols);
-  DepthHypothesis_GMM *hyps_second = GenHyps(uchar_data_second.get(), sf, *cam, rows, cols);
+  cout << "Generating hypotheses..." << endl;
+  vector<DepthHypothesis_GMM> hyps_first = GenHyps(uchar_data_first.get(), ff, *cam, rows, cols);
+  vector<DepthHypothesis_GMM> hyps_second = GenHyps(uchar_data_second.get(), sf, *cam, rows, cols);
+
+  if (hyps_first.size() < 10 || hyps_second.size() < 10) {
+    cout << "Hyps too small: first.size() == " << hyps_first.size() << "; second.size() == "
+         << hyps_second.size() << endl;
+    return false;
+  }
+  else {
+    cout << "Enough hyps: first.size() == " << hyps_first.size() << "; second.size() == "
+         << hyps_second.size() << " Will optimize!" << endl;
+  }
 
   auto first_ddm = make_shared<FrameCPU_denseDepthMap>(
       first_idx, cam, uchar_data_first.get(), uchar_mask_first, rows, cols, channels);
   auto second_ddm = make_shared<FrameCPU_denseDepthMap>(
       second_idx, cam, uchar_data_second.get(), uchar_mask_second, rows, cols, channels);
-  first_ddm->copyFeatureDescriptors(hyps_first, rows * cols);
-  second_ddm->copyFeatureDescriptors(hyps_second, rows * cols);
-//  Frame_CPU(int frameId, const CameraBase::Ptr& camera, const unsigned char* imageData, const unsigned char* maskImage, int nRows, int nCols, int nChannels)
 
-  float huber_delta = 5.0f;   // TODO(andrei): Tune the params based on Peidong's input.
-  int nMaxPyramidLevels = 5;
-  int nMaxIterations = 10;
+  int nMaxPyramidLevels = 1;
+  first_ddm->computeImagePyramids(nMaxPyramidLevels);
+  second_ddm->computeImagePyramids(nMaxPyramidLevels);
+  first_ddm->computeImagePyramidsGradients(nMaxPyramidLevels);
+  second_ddm->computeImagePyramidsGradients(nMaxPyramidLevels);
+
+  first_ddm->copyFeatureDescriptors(hyps_first.data(), hyps_first.size(), nMaxPyramidLevels);
+  second_ddm->copyFeatureDescriptors(hyps_second.data(), hyps_second.size(), nMaxPyramidLevels);
+
+  float huber_delta = 0.2f;   // TODO(andrei): Tune the params based on Peidong's input.
+  int nMaxIterations = 20;
   float epsilon = 1e-5;
   float robust_loss_param = huber_delta;
-//  first_ddm->computeImagePyramids(nMaxPyramidLevels);
-//  second_ddm->computeImagePyramids(nMaxPyramidLevels);
-//  first_ddm->computeImagePyramidsGradients(nMaxPyramidLevels);
-//  second_ddm->computeImagePyramidsGradients(nMaxPyramidLevels);
 
+
+  cout << "Starting optimization..." << endl;
   DirImgAlignCPU dir_img_align(nMaxPyramidLevels, nMaxIterations, epsilon,
                                ROBUST_LOSS_TYPE::PSEUDO_HUBER, robust_loss_param);
 
   Transformation transformation;
+  transformation.setT(track.GetFrame(second_idx).relative_pose->Get().matrix_form.cast<float>());
+  cout << "Will pass the following relative pose transformation to the direct part: " << endl
+      << transformation.getTMatrix() << endl << "  set from our relative pose " << endl
+      << track.GetFrame(second_idx).relative_pose->Get().matrix_form.cast<float>() << endl;
+
   dir_img_align.doAlignment(first_ddm, second_ddm, transformation);
 
+  cout << "Direct alignment done. Old was: " << endl
+       << track.GetFrame(second_idx).relative_pose->Get().matrix_form.cast<float>() << endl;
   cout << "Transformation after direct alignment:" << endl << transformation.getTMatrix() << endl;
 
-  delete hyps_first;
-  delete hyps_second;
+  out_refined_pose = transformation.getTMatrix();
+
+  cout << "Inverse of this new rel pose: " << endl << out_refined_pose.inverse() << endl;
+//  delete hyps_first;
+//  delete hyps_second;
+
+  return true;
 }
 
 
@@ -531,18 +569,34 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
 //    cout << "The inverse: " << rel_dyn_pose_f.inverse() << endl;
     instance_driver.SetPose(rel_dyn_pose_f.inverse());
 
-    if (frame_idx > 0) {
-//      frame.instance_view.GetView()->calib->intrinsics_rgb.projectionParamsSimple;
+    bool enable_direct_refinement = false;
+
+    if (enable_direct_refinement && frame_idx > 0 && frame.relative_pose->IsPresent()) {
+      vector<double> unrefined_se3 = frame.relative_pose->Get().se3_form;
+
       // Ensure we have a previous frame to align to, and do the direct alignment.
-      ExperimentalDirectRefine(track,
+      Eigen::Matrix4f new_relative_pose_matrix;
+      // TODO If that doesn't work, try to align against a raycast of the model...
+      bool success = ExperimentalDirectRefine(track,
                                static_cast<int>(frame_idx - 1),
                                static_cast<int>(frame_idx),
                                rel_dyn_pose.Get(),
-                               *(frame.instance_view.GetView()->calib));
-      // TODO If that doesn't work, try to align against a raycast of the model...
+                               *(frame.instance_view.GetView()->calib),
+                               new_relative_pose_matrix);
+      if(success) {
+        delete frame.relative_pose;
+        // TODO same as before... try updating se3 representation.
+        // TODO be more consistent with float/double
+        frame.relative_pose = new Option<Pose>(new Pose(
+            unrefined_se3,
+            new_relative_pose_matrix.cast<double>()
+        ));
+      }
     }
 
     if (enable_itm_refinement_) {
+      vector<double> unrefined_se3 = frame.relative_pose->Get().se3_form;
+
       // This should, in theory, try to refine the pose even further...
       instance_driver.Track();
 
@@ -556,10 +610,9 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
         cout << "Refined matrix inv: " << refined_matrix.inverse();
 
         // TODO(andrei): The improvement may not be significant, but we should also update the se3 form
-        vector<double> old_unrefined_se3 = frame.relative_pose->Get().se3_form;
         delete frame.relative_pose;
         frame.relative_pose = new Option<Pose>(new Pose(
-            old_unrefined_se3,
+            unrefined_se3,
             refined_matrix
 //          old_rel_pose
         ));
