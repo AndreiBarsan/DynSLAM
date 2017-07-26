@@ -797,7 +797,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   sf_params.match.half_resolution = 0;
   sf_params.match.multi_stage = 1;    // Default = 1 (= 0 => much slower)
   sf_params.match.refinement = 1;   // Default = 1 (per-pixel); 2 = sub-pixel, slower
-  sf_params.ransac_iters = 500;    // Default = 200; added more to see if it helps instance reconstruction
+  sf_params.ransac_iters = 200;    // Default = 200; added more to see if it helps instance reconstruction
   // TODO(andrei): Now that we're using warm starts, could we get away with much fewer iterations?
   sf_params.inlier_threshold = 3.0;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
                                       // object instances

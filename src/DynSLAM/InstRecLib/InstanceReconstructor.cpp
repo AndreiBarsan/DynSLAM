@@ -385,10 +385,7 @@ vector<DepthHypothesis_GMM> GenHyps(const uchar *intensity, const float *depth, 
   // Note: variance not used in depth alignment code, so there's no point in trying to estimate it
   // from, e.g., the depth.
 
-  // TODO(andrei): For performance, ONLY allocate hypotheses for USED pixels. So when tracking a
-  // car that's 1/5 the screen you don't waste time.
-
-  vector<DepthHypothesis_GMM> hypotheses; // = new DepthHypothesis_GMM[rows * cols];
+  vector<DepthHypothesis_GMM> hypotheses;
 
   for(int row = 0; row < rows; ++row) {
     for(int col = 0; col < cols; ++col) {
@@ -459,7 +456,7 @@ bool ExperimentalDirectRefine(Track &track,
   int rows = first_depth->noDims.y;
   int cols = first_depth->noDims.x;
   int channels = 1;
-  Eigen::Vector2i frame_size(cols, rows);
+  Eigen::Vector2i frame_size(rows, cols);
   Eigen::Matrix3f K;
   auto &params = calib.intrinsics_rgb.projectionParamsSimple;
   K << params.fx, 0,          params.px,
@@ -497,7 +494,8 @@ bool ExperimentalDirectRefine(Track &track,
   auto second_ddm = make_shared<FrameCPU_denseDepthMap>(
       second_idx, cam, uchar_data_second.get(), uchar_mask_second, rows, cols, channels);
 
-  int nMaxPyramidLevels = 1;
+  // XXX: the top pyramid level is distorted!! when n = 4 or 3. For 2 and 1 it looks OK.
+  int nMaxPyramidLevels = 2;
   first_ddm->computeImagePyramids(nMaxPyramidLevels);
   second_ddm->computeImagePyramids(nMaxPyramidLevels);
   first_ddm->computeImagePyramidsGradients(nMaxPyramidLevels);
@@ -506,21 +504,22 @@ bool ExperimentalDirectRefine(Track &track,
   first_ddm->copyFeatureDescriptors(hyps_first.data(), hyps_first.size(), nMaxPyramidLevels);
   second_ddm->copyFeatureDescriptors(hyps_second.data(), hyps_second.size(), nMaxPyramidLevels);
 
-  float huber_delta = 0.2f;   // TODO(andrei): Tune the params based on Peidong's input.
-  int nMaxIterations = 20;
-  float epsilon = 1e-5;
+  // TODO(andrei): If refinement fails because, e.g., the top of the pyramid is already too tiny,
+  // then simply drop the process, and only use the RANSAC estimate, or disable fusion completely.
+  float huber_delta = 5.0f;
+  int nMaxIterations = 50;
+  float epsilon = 1e-7;
   float robust_loss_param = huber_delta;
+  float min_gradient_magnitude = 5.0f;
 
-
-  cout << "Starting optimization..." << endl;
   DirImgAlignCPU dir_img_align(nMaxPyramidLevels, nMaxIterations, epsilon,
-                               ROBUST_LOSS_TYPE::PSEUDO_HUBER, robust_loss_param);
+                               ROBUST_LOSS_TYPE::PSEUDO_HUBER, robust_loss_param,
+                               min_gradient_magnitude);
 
   Transformation transformation;
   transformation.setT(track.GetFrame(second_idx).relative_pose->Get().matrix_form.cast<float>());
   cout << "Will pass the following relative pose transformation to the direct part: " << endl
-      << transformation.getTMatrix() << endl << "  set from our relative pose " << endl
-      << track.GetFrame(second_idx).relative_pose->Get().matrix_form.cast<float>() << endl;
+      << transformation.getTMatrix() << endl;
 
   dir_img_align.doAlignment(first_ddm, second_ddm, transformation);
 
@@ -565,11 +564,9 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
   if (rel_dyn_pose.IsPresent()) {
     Eigen::Matrix4f rel_dyn_pose_f = (*rel_dyn_pose).cast<float>();
     cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
-
-//    cout << "The inverse: " << rel_dyn_pose_f.inverse() << endl;
     instance_driver.SetPose(rel_dyn_pose_f.inverse());
 
-    bool enable_direct_refinement = false;
+    bool enable_direct_refinement = true;
 
     if (enable_direct_refinement && frame_idx > 0 && frame.relative_pose->IsPresent()) {
       vector<double> unrefined_se3 = frame.relative_pose->Get().se3_form;
@@ -591,6 +588,9 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
             unrefined_se3,
             new_relative_pose_matrix.cast<double>()
         ));
+
+        rel_dyn_pose_f = track.GetFramePose(frame_idx).Get().cast<float>();   // TODO(andrei): Make this less slow.
+        instance_driver.SetPose(rel_dyn_pose_f.inverse());
       }
     }
 
@@ -731,7 +731,6 @@ void InstanceReconstructor::SaveObjectToMesh(int object_id, const string &fpath)
   mesh->WriteOBJ(fpath.c_str());
 //    mesh->WriteSTL(fpath.c_str());
 
-  // TODO(andrei): This is obviously wasteful!
   delete mesh;
   delete meshing_engine;
 }
