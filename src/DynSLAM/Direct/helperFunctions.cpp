@@ -1,5 +1,6 @@
 #include "helperFunctions.hpp"
 #include <smmintrin.h>
+#include <iostream>
 
 namespace VGUGV
 {
@@ -249,10 +250,15 @@ namespace VGUGV
     {
       int rx = static_cast<int>(col + 0.5f);
       int ry = static_cast<int>(row + 0.5f);
+
+      if (rx < 0 || rx >= nCols || ry < 0 || ry >= nRows) {
+//        throw std::runtime_error("Cannot bilinearly interpolate outside the image.");
+        std::cerr <<"Cannot bilinearly interpolate outside the image." << std::endl;
+      }
       
       if (ry == 0 || ry == nRows - 1 || rx == 0 || rx == nCols - 1)
       {
-	return pData[ry*nCols + rx];
+        return pData[ry*nCols + rx];
       }
       
       int y = static_cast<int>(row);
@@ -272,6 +278,11 @@ namespace VGUGV
       const unsigned char p01 = pData[baseIndex + 1];
       const unsigned char p10 = pData[baseIndex + nCols];
       const unsigned char p11 = pData[baseIndex + nCols + 1];
+
+//      std::cout << "Bilinear interpolation at row = " << row << ", col = " << col << " for "
+//                << nRows << " total rows and " << nCols << " total cols. p's: "
+//                << (int)p00 << ", " << (int)p01 << ", " << (int)p10 << ", " << (int)p11 << " with weights "
+//                << w00 << ", " << w01 << ", " << w10 << ", " << w11 << "." << std::endl;
       
       float value = w11 * p11 + w10 * p10 + w01 * p01 + w00 * p00;
       return value;
