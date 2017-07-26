@@ -31,6 +31,7 @@ void DirImgAlignCPU::doAlignment(const T_FramePtr &refFrame,
 
   Eigen::Matrix4f T_ref2cur = inout_Tref2cur.getTMatrix();
   for (int i = mnMaxPyramidLevels - 1; i >= 0; i--) {
+    std::cout << "Aligning @ level " << (i+1) << "." << std::endl;
     int nNumValidatedPixels = refFrame->getFeatureSize(i);
     mPreCompJacobian = new float[nNumValidatedPixels * 6];
     mPreCompHessian = new float[nNumValidatedPixels * 36];
@@ -51,18 +52,25 @@ void DirImgAlignCPU::doAlignment(const T_FramePtr &refFrame,
 }
 
 void DirImgAlignCPU::preComputeJacobianHessian(const T_FramePtr &refFrame, int level) {
+  using namespace std;
+  cout << "Precomputing jac and hess @ level " << (level + 1) << "." << endl;
+
   int scale = 1 << level;
 //  int nRows = refFrame->getFrameSize()(0) / scale;
   int nCols = refFrame->getFrameSize()(1) / scale;
 
   Common::CameraBase::Ptr pCamera = refFrame->getCameraModel();
   Eigen::Vector2f *pImgGradientVec = refFrame->getPyramidImageGradientVec(level);
+  if (nullptr == pImgGradientVec) {
+    throw std::runtime_error("Image gradient not present.");
+  }
 
   // XXX: This is NOT a depth map in the traditional sense!!! It's a list of hypotheses.
   Common::DepthHypothesisBase *pDepthMap = refFrame->getFeatureDescriptors(level);
   int nDepthMapSize = refFrame->getFeatureSize(level);
   if (pDepthMap == NULL) {
     printf("[DirImgAlignCPU]: no depth map available for image alignment...\n");
+    throw std::runtime_error("No depth map.");
   }
 
   Eigen::Matrix<float, 3, 6> SE3Jacobian = Eigen::Matrix<float, 3, 6>::Zero();
@@ -70,9 +78,13 @@ void DirImgAlignCPU::preComputeJacobianHessian(const T_FramePtr &refFrame, int l
   SE3Jacobian(1, 4) = 1;
   SE3Jacobian(2, 5) = 1;
 
+  cout << "Computing over " << nDepthMapSize << " steps..." << endl;
   for (int i = 0; i < nDepthMapSize; i++) {
     Common::DepthHypothesisBase pixelDepth = pDepthMap[i];
-    if (!pixelDepth.bValidated) continue;
+    if (!pixelDepth.bValidated) {
+      cerr << "Skipping invalid pixel; should not hapen in DynSLAM" << endl;
+      continue;
+    }
 
     int r = pixelDepth.pixel(0);
     int c = pixelDepth.pixel(1);
@@ -116,7 +128,17 @@ void DirImgAlignCPU::solverGaussNewton(const T_FramePtr &refFrame,
     float cost = gaussNewtonUpdateStep(refFrame, curFrame, level, T_cur, epsilon);
 // 	  printf("GN time: %lld\n", Common::elapsedTime(tStart, Common::US));
 
+    printf("GN cost: %10.6f | Epsilon: %f, %f, %f, %f, %f, %f\n", cost,
+           epsilon(0), epsilon(1), epsilon(2), epsilon(3), epsilon(4), epsilon(5));
+
     bool stop = std::isnan(epsilon(0));
+    if (stop) {
+      std::cout << "epsilon(0) is NaN | Stopping.." << std::endl;
+    }
+    if(cost > prevCost) {
+      std::cout << "Cost increased from previous iteration. Was " << prevCost << " and it's now "
+                << cost << ". Stopping." << std::endl;
+    }
     if (stop || cost > prevCost) {
       T_cur = T_prev;
       break;
@@ -132,8 +154,19 @@ void DirImgAlignCPU::solverGaussNewton(const T_FramePtr &refFrame,
     T_cur = T_cur * (deltaT.matrix());
 
     prevCost = cost;
-    if (epsilon.cwiseAbs().maxCoeff() < mConvergenceEps) break;
+    if (epsilon.cwiseAbs().maxCoeff() < mConvergenceEps) {
+      std::cout << "Epsilon max coef is too small. Stopping Gauss-Newton after " << i
+                << " iterations." << std::endl;
+      break;
+    }
+
+    if ((i + 1) == mnMaxIterations) {
+      std::cerr << "Warning: direct alignment reached maximum number of iterations and stopped."
+                << std::endl;
+    }
   }
+
+
   Tref2cur = T_cur;
 }
 
@@ -142,6 +175,7 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
                                             int level,
                                             Eigen::Matrix4f T_ref2cur,
                                             Eigen::Matrix<float, 6, 1> &outEpsilon) {
+  using namespace std;
   int scale = 1 << level;
   int nRows = refFrame->getFrameSize()(0) / scale;
   int nCols = refFrame->getFrameSize()(1) / scale;
@@ -187,10 +221,20 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
 
     // project it to current image
     Eigen::Vector2f pixel_cur;
-    if (!pCurCamera->project(P3D_curF, pixel_cur)
-        || !curFrame->pixelLieOutsideImageMask(pixel_cur(1), pixel_cur(0))) {
-      continue;
-    }
+    // XXX: see if this is an actual problem
+//    if (!pCurCamera->project(P3D_curF, pixel_cur)) {
+//      cout << "pCurCamera->project failed to project point." << endl;
+//      cout << "Ray: " << ray << " | Ref. frame 3D point: " << P3D_refF << " | Curr. frame 3D point: " << P3D_curF << endl;
+//      cout << "Ray depth was: " << pixelDepth.rayDepth << endl;
+//      continue;
+//    }
+
+    // Not using masking in dynslam at the moment.
+//    if(!curFrame->pixelLieOutsideImageMask(pixel_cur(1), pixel_cur(0))) {
+//      cout << "Pixel outside image..." << ray << " | " << P3D_refF << " | " << P3D_curF << endl;
+//      cout << "Ray depth was: " << pixelDepth.rayDepth << endl;
+//      continue;
+//    }
     pixel_cur /= (scale * 1.0f);
 
     float residual0 = 0.0f;
@@ -203,8 +247,21 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
         Common::bilinearInterpolation(pCurImageData, nRows, nCols, pixel_cur(1), pixel_cur(0));
     residual0 = mAffineBrightness_a * intensity_ref + mAffineBrightness_b - intensity_cur;
 
+    if (std::isnan(residual0)) {
+      std::cerr << "residual0 NaN! " << std::endl;
+    }
+
     // get robust weighting
     float weight = mRobustLossFunction->getWeight(residual0);
+
+    if (i % 555 == 0) {
+      cout << "Residual sample: " << residual0 << " | Weight: " << weight << endl;
+    }
+
+    if (std::isnan(weight)) {
+      std::cerr << "Weight became NaN!" << std::endl;
+    }
+
     totalCost += weight * residual0 * residual0;
     nCount++;
 
@@ -239,6 +296,13 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
 
   mAffineBrightness_a = (sum_wIrIk - prev_affine_b * sum_wIr) / sum_wIrIr;
   mAffineBrightness_b = (sum_wIk - prev_affine_a * sum_wIr) / sum_w;
+
+  if (nCount <= 0) {
+    std::cerr << "ERROR: nCount <= 0 | nCount == " << nCount << std::endl;
+  }
+  else if (nCount < 500) {
+    std::cerr << "WARNING: few points used for actual optimization: " << nCount << std::endl;
+  }
 
   // update epsilon
   outEpsilon = (-1.0f) * Hsum.ldlt().solve(Jsum);
