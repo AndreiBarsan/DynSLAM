@@ -12,11 +12,12 @@
 namespace dynslam {
 namespace eval {
 
+/// \brief Reads and manages *corrected* Velodyne point clouds.
 class Velodyne {
  public:
   using LidarReadings = Eigen::Matrix<float, Eigen::Dynamic, 4, Eigen::RowMajor>;
 
-  /// \brief Each Velodyne point has 4 entries: X, Y, Z, and reflectance.
+  /// \brief Each Velodyne reading has 4 components: X, Y, Z, and reflectance.
   static const unsigned short kMeasurementsPerPoint = 4;
 
   /// \brief The size of the buffer into which we initially read the data.

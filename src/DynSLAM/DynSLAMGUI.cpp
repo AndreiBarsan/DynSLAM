@@ -134,22 +134,30 @@ public:
             pane_cam_->GetModelViewMatrix(),
             static_cast<PreviewType>(current_preview_type_));
           pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
-          pane_texture_->RenderToViewport(true);
+//          pane_texture_->RenderToViewport(true);
 
-        // XXX: Experimental...
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
-        auto lidar_pointcloud = velodyne->GetLatestFrame();
-//        PreviewLidar(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb, *main_view_);
+        auto lidar_pointcloud = velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1);
+        float max_depth_meters = dyn_slam_input_->GetDepthProvider()->GetMaxDepthMeters();
 
-        const unsigned char *latest_raycast = dyn_slam_->GetStaticMapRaycastPreview(
-            pane_cam_->GetModelViewMatrix(),
-            PreviewType::kLatestRaycast
+        // TODO(andrei): Pose history in dynslam; will be necessary in delayed evaluation, as well
+        // as if you wanna preview cute little frustums!
+        Eigen::Matrix4f epose = dyn_slam_->GetPose().inverse();
+        auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
+
+        const unsigned char *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastPreview(
+            pango_pose,
+            PreviewType::kDepth
         );
+
+        pane_texture_->Upload(synthesized_depthmap, GL_RGBA, GL_UNSIGNED_BYTE);
+        pane_texture_->RenderToViewport(true);
 
         // TODO(andrei): Only call this from the evaluation, and cache this preview, so we don't
         // have to keep recomputing it.
+//        cout << "Using max depth of " << max_depth_meters << " meters when evaluating." << endl;
         PreviewError(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb,
-                     *main_view_, latest_raycast, width_, height_);
+                     *main_view_, synthesized_depthmap, width_, height_, max_depth_meters);
       }
 
       pangolin::GlFont &font = pangolin::GlFont::I();
@@ -167,7 +175,7 @@ public:
 
         Tic("LIDAR render (partially naive)");
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
-        auto lidar_pointcloud = velodyne->GetLatestFrame();
+        auto lidar_pointcloud = velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1);
         PreviewLidar(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb, rgb_view_);
         Toc(true);
       }
@@ -321,13 +329,23 @@ public:
     const pangolin::View &view,
     const uchar * const computed_depth,
     int width,
-    int height
+    int height,
+    float maxDepthMeters
   ) {
     static GLfloat verts[2000000];
     static GLubyte colors[2000000];
 
     size_t idx_v = 0;
     size_t idx_c = 0;
+
+    // TODO(andrei): Loop for delta_max in [0, 8] like Sengupta et al. BUT, instead of showing just
+    // a single plot, consider making a richer one showing maybe even the distribution of the errors
+    // over time.
+    static const int delta_max = 1;
+    int errors = 0;
+    int measurements = 0;
+
+    long delta_sum = 0;
 
     glDisable(GL_DEPTH_TEST);
     // Doing this via a loop is much slower, but clearer and less likely to lead to evaluation
@@ -341,15 +359,20 @@ public:
       p3d /= p3d(3);
       float Z = p3d(2);
 
-      if (Z < 0.5) {
+      // TODO(andrei): Document these limits and explain them in the thesis as well.
+      if (Z < 0.5 || Z >= maxDepthMeters) {
         continue;
       }
 
-      // TODO convert both to uchar, compute delta, and count pixels over threshold.
-      // Note that Sengupta et al. operate on pixels, so it should be OK if we do a 2d rendering
-      // of the lidar and compare all nonblack pixels.
-      // NOTE: the raycast does NOT encode depth, you dongus! It is already shaded. You instead
-      //       want a map containing the depth of each pixel.
+      float Z_scaled = (Z / maxDepthMeters) * 255;
+      if (Z_scaled <= 0 || Z_scaled > 255) {
+        throw runtime_error("Unexpected Z value");
+      }
+
+      uchar depth_lidar_uc = static_cast<uchar>(Z_scaled);
+
+      // Note that Sengupta et al. operate on pixels, not individually projected LIDAR points, so it
+      // should be OK if we do a 2d rendering of the lidar and compare all nonblack pixels.
 
       Eigen::VectorXf p2d = P * p3d;
       p2d /= p2d(2);
@@ -358,20 +381,92 @@ public:
         continue;
       }
 
+      Eigen::Matrix<uchar, 3, 1> color;
+
+      // We should probably do bilinear interpolation here
+      int row = static_cast<int>(round(p2d(1)));
+      int col = static_cast<int>(round(p2d(0)));
+      uchar depth_computed_uc = computed_depth[(row * width_ + col) * 4];
+
+      // again, for testing
+      if(depth_computed_uc == 0) {
+        continue;
+      }
+
+      color(0) = color(1) = color(2) = 0;
+
+      throw runtime_error("It may be that your way of computing the internal depth is incorrect. "
+          "Please double check.")
+
+      if (depth_lidar_uc > 128) {
+        color(1) = 255;
+      }
+      else {
+        color(2) = 255;
+      }
+
+      if (depth_computed_uc > 128) {
+        color(0) = 255;
+      }
+      else {
+        color(0) = 64;
+      }
+
+
+
+//      color(0) = color(1) = color(2) = min(255, depth_computed_uc + 32);
+
+      // LIDAR depth seems to have a tendency to be bigger?
+      int delta_signed = static_cast<int>(depth_computed_uc) - static_cast<int>(depth_lidar_uc);
+
+      int delta = abs(delta_signed);
+      measurements++;
+      delta_sum += delta_signed;
+
+      // for testing
+      if (depth_computed_uc != 0) {
+//
+        // If the delta is larger than the max value OR if we don't have a measurement for the depth
+        if (delta > delta_max || depth_computed_uc == 0) {
+          errors++;
+
+//          color(0) = min(255, delta * 10);
+//          color(1) = 160;
+//          color(2) = 160;
+        } else {
+//          color(0) = 10;
+//          color(1) = 255 - delta * 10;
+//          color(2) = 255 - delta * 10;
+//          float intensity = min(8.0f / Z, 1.0f);
+//          color(0) = static_cast<uchar>(intensity * 255);
+//          color(1) = static_cast<uchar>(intensity * 255);
+//          color(2) = static_cast<uchar>(reflectance * 255);
+        }
+      }
+      else {
+        continue;
+      }
+
       Eigen::Vector2f frame_size(width_, height_);
       cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(p2d(0), p2d(1)), frame_size, view);
-//
+
       GLfloat x = gl_pos(0);
       GLfloat y = gl_pos(1);
 
       verts[idx_v++] = x;
       verts[idx_v++] = y;
 
-      float intensity = min(8.0f / Z, 1.0f);
-      colors[idx_c++] = static_cast<uchar>(intensity * 255);
-      colors[idx_c++] = static_cast<uchar>(intensity * 255);
-      colors[idx_c++] = static_cast<uchar>(reflectance * 255);
+      colors[idx_c++] = color(0);
+      colors[idx_c++] = color(1);
+      colors[idx_c++] = color(2);
     }
+
+
+    double delta_mean = delta_sum * 1.0 / measurements;
+    cout << "Mean delta: "<< delta_mean << endl;
+
+    double correct_pixels_ratio = (1.0 - (errors * 1.0) / measurements);
+    cout << "Correct pixels ratio: " << correct_pixels_ratio << " @ delta max = " << delta_max << endl;
 
     pangolin::glDrawColoredVertices<float>(idx_v / 2, verts, colors, GL_POINTS, 2, 3);
     glEnable(GL_DEPTH_TEST);

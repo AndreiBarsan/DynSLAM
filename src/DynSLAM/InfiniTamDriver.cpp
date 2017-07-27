@@ -12,6 +12,8 @@ using namespace dynslam::utils;
 /// \brief Converts between the DynSlam preview type enums and the InfiniTAM ones.
 ITMMainEngine::GetImageType GetItmVisualization(PreviewType preview_type) {
   switch(preview_type) {
+    case PreviewType::kDepth:
+      return ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_DEPTH;
     case PreviewType::kGray:
       return ITMMainEngine::GetImageType::InfiniTAM_IMAGE_FREECAMERA_SHADED;
     case PreviewType::kColor:

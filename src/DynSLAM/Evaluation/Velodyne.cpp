@@ -9,7 +9,7 @@ Velodyne::LidarReadings Velodyne::ReadFrame(int frame_idx) {
   using namespace std;
   string fpath_format = dynslam::utils::Format("%s/%s", folder_.c_str(), fname_format_.c_str());
   string fpath = dynslam::utils::Format(fpath_format, frame_idx);
-  cout << "Reading LIDAR for frame " << frame_idx << endl;
+//  cout << "Reading LIDAR for frame " << frame_idx << endl;
 
 //    utils::Tic("Velodyne dump read");
   FILE *velo_in = fopen(fpath.c_str(), "rb");
