@@ -77,7 +77,6 @@ class DynSlam {
 
   /// \brief Returns a preview of the reconstructed static map.
   const unsigned char* GetStaticMapRaycastPreview(
-      int object_idx,
       const pangolin::OpenGlMatrix &model_view,
       PreviewType preview
   ) {

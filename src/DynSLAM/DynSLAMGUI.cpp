@@ -108,66 +108,56 @@ public:
       main_view_->Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
 
-      if(live_raycast_->Get()) {
-        const unsigned char *slam_frame_data = dyn_slam_->GetRaycastPreview();
-        pane_texture_->Upload(slam_frame_data, GL_RGBA, GL_UNSIGNED_BYTE);
-      }
-      else {
-        // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance,
-        // so you get dark, uncolored images.
+      // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance,
+      // so you get dark, uncolored images.
 
-        // Some experimental code for getting the camera to move on its own.
-        if (wiggle_mode_->Get()) {
-          struct timeval tp;
-          gettimeofday(&tp, NULL);
-          double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-          double time_scale = 1500.0;
-          double r = 0.2;
+      // Some experimental code for getting the camera to move on its own.
+      if (wiggle_mode_->Get()) {
+        struct timeval tp;
+        gettimeofday(&tp, NULL);
+        double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+        double time_scale = 1500.0;
+        double r = 0.2;
 //          double cx = cos(time_ms / time_scale) * r;
-          double cy = sin(time_ms / time_scale) * r - r * 2;
+        double cy = sin(time_ms / time_scale) * r - r * 2;
 //          double cz = sin(time_ms / time_scale) * r;
-          pane_cam_->SetModelViewMatrix(
-              pangolin::ModelViewLookAt(
-                  0, 0.0, 0.2,
-                  0, 0.5 + cy, -1.0,
-                  pangolin::AxisY)
-          );
-        }
+        pane_cam_->SetModelViewMatrix(
+            pangolin::ModelViewLookAt(
+                0, 0.0, 0.2,
+                0, 0.5 + cy, -1.0,
+                pangolin::AxisY)
+        );
+      }
 
-        if (dyn_slam_->GetCurrentFrameNo() > 1) {
-          const unsigned char *preview = dyn_slam_->GetStaticMapRaycastPreview(
-              visualized_object_idx_,
-              pane_cam_->GetModelViewMatrix(),
-              static_cast<PreviewType>(current_preview_type_));
+      if (dyn_slam_->GetCurrentFrameNo() > 1) {
+        const unsigned char *preview = dyn_slam_->GetStaticMapRaycastPreview(
+            pane_cam_->GetModelViewMatrix(),
+            static_cast<PreviewType>(current_preview_type_));
           pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
-        }
+          pane_texture_->RenderToViewport(true);
+
+        // XXX: Experimental...
+        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
+        auto lidar_pointcloud = velodyne->GetLatestFrame();
+//        PreviewLidar(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb, *main_view_);
+
+        const unsigned char *latest_raycast = dyn_slam_->GetStaticMapRaycastPreview(
+            pane_cam_->GetModelViewMatrix(),
+            PreviewType::kLatestRaycast
+        );
+
+        // TODO(andrei): Only call this from the evaluation, and cache this preview, so we don't
+        // have to keep recomputing it.
+        PreviewError(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb,
+                     *main_view_, latest_raycast, width_, height_);
       }
 
       pangolin::GlFont &font = pangolin::GlFont::I();
-      pane_texture_->RenderToViewport(true);
       font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.95, 0.9);
 
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
-      // TODO(andrei): Toggle this or something.
-      // Currently visualizing LIDAR data.
-
       if(dyn_slam_->GetCurrentFrameNo() >= 1) {
-        auto lidar = dyn_slam_->GetEvaluation()->GetVelodyne()->GetLatestFrame();
-
-        // TODO(andrei): Don't hardcode calibration params like this.
-        Eigen::MatrixXf P0(3, 4);
-        // Left camera projection matrix; may be redundant!
-        P0 << 7.070912000000e+02, 0.000000000000e+00, 6.018873000000e+02, 0.000000000000e+00,
-            0.000000000000e+00, 7.070912000000e+02, 1.831104000000e+02, 0.000000000000e+00,
-            0.000000000000e+00, 0.000000000000e+00, 1.000000000000e+00, 0.000000000000e+00;
-        Eigen::Matrix4f velo_to_cam;
-        velo_to_cam
-            << -1.857739385241e-03, -9.999659513510e-01, -8.039975204516e-03, -4.784029760483e-03,
-            -6.481465826011e-03, 8.051860151134e-03, -9.999466081774e-01, -7.337429464231e-02,
-            9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,
-            0, 0, 0, 1;
-
         if (display_raw_previews_->Get()) {
           UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
         } else {
@@ -176,8 +166,10 @@ public:
         pane_texture_->RenderToViewport(true);
 
         Tic("LIDAR render (partially naive)");
-        PreviewLidar(lidar, P0, velo_to_cam, rgb_view_);
-        Toc(false);
+        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
+        auto lidar_pointcloud = velodyne->GetLatestFrame();
+        PreviewLidar(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb, rgb_view_);
+        Toc(true);
       }
 
       if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
@@ -206,10 +198,11 @@ public:
 
       object_view_.Activate();
       glColor4f(1.0, 1.0, 1.0, 1.0f);
-//      pane_texture_->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
-//                             GL_RGBA, GL_UNSIGNED_BYTE);
-      pane_texture_->Upload(dyn_slam_->GetObjectDepthPreview(visualized_object_idx_),
-                            GL_RED, GL_FLOAT);
+      pane_texture_->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
+                             GL_RGBA, GL_UNSIGNED_BYTE);
+      // TODO(andrei): Make this gradual; currently it's shown as a single-colored blob
+//      pane_texture_->Upload(dyn_slam_->GetObjectDepthPreview(visualized_object_idx_),
+//                            GL_RED, GL_FLOAT);
       pane_texture_->RenderToViewport(true);
 
       auto &tracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
@@ -321,6 +314,69 @@ public:
     glEnable(GL_DEPTH_TEST);
   }
 
+  void PreviewError(
+    const Eigen::MatrixX4f &lidar_points,
+    const Eigen::MatrixXf &P,
+    const Eigen::Matrix4f &Tr,
+    const pangolin::View &view,
+    const uchar * const computed_depth,
+    int width,
+    int height
+  ) {
+    static GLfloat verts[2000000];
+    static GLubyte colors[2000000];
+
+    size_t idx_v = 0;
+    size_t idx_c = 0;
+
+    glDisable(GL_DEPTH_TEST);
+    // Doing this via a loop is much slower, but clearer and less likely to lead to evaluation
+    // mistakes than simply rendering the lidar in 2D and comparing it with the map.
+    for (int i = 0; i < lidar_points.rows(); ++i) {
+      Eigen::Vector4f point = lidar_points.row(i);
+      float reflectance = lidar_points(i, 3);
+      point(3) = 1.0f;                // Replace reflectance with the homogeneous 1.
+
+      Eigen::Vector4f p3d = Tr * point;
+      p3d /= p3d(3);
+      float Z = p3d(2);
+
+      if (Z < 0.5) {
+        continue;
+      }
+
+      // TODO convert both to uchar, compute delta, and count pixels over threshold.
+      // Note that Sengupta et al. operate on pixels, so it should be OK if we do a 2d rendering
+      // of the lidar and compare all nonblack pixels.
+      // NOTE: the raycast does NOT encode depth, you dongus! It is already shaded. You instead
+      //       want a map containing the depth of each pixel.
+
+      Eigen::VectorXf p2d = P * p3d;
+      p2d /= p2d(2);
+
+      if (p2d(0) < 0 || p2d(0) >= width_ || p2d(1) < 0 || p2d(1) >= height_) {
+        continue;
+      }
+
+      Eigen::Vector2f frame_size(width_, height_);
+      cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(p2d(0), p2d(1)), frame_size, view);
+//
+      GLfloat x = gl_pos(0);
+      GLfloat y = gl_pos(1);
+
+      verts[idx_v++] = x;
+      verts[idx_v++] = y;
+
+      float intensity = min(8.0f / Z, 1.0f);
+      colors[idx_c++] = static_cast<uchar>(intensity * 255);
+      colors[idx_c++] = static_cast<uchar>(intensity * 255);
+      colors[idx_c++] = static_cast<uchar>(reflectance * 255);
+    }
+
+    pangolin::glDrawColoredVertices<float>(idx_v / 2, verts, colors, GL_POINTS, 2, 3);
+    glEnable(GL_DEPTH_TEST);
+  }
+
   /// \brief Renders the velodyne points for visual inspection.
   /// \param lidar_points
   /// \param P Left camera matrix.
@@ -400,7 +456,7 @@ public:
     // TODO-LOW(andrei): For increased performance (unnecessary), consider just passing ptr to
     // internal eigen data. Make sure its row-major though, and the modelview matrix is set properly
     // based on the velo-to-camera matrix.
-    pangolin::glDrawColoredVertices<float>(idx_v / 2, verts, colors, GL_POINTS, 3, 3);
+    pangolin::glDrawColoredVertices<float>(idx_v / 3, verts, colors, GL_POINTS, 3, 3);
     glEnable(GL_DEPTH_TEST);
   }
 
@@ -456,7 +512,6 @@ protected:
     pangolin::RegisterKeyPressCallback('a', [this]() {
       *(this->autoplay_) = ! *(this->autoplay_);
     });
-    live_raycast_ = new pangolin::Var<bool>("ui.Raycast Mode", false, true);
     display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", true, true);
     preview_sf_ = new pangolin::Var<bool>("ui.Show Scene Flow", false, true);
 
@@ -699,9 +754,6 @@ private:
   /// \brief When this is on, the input gets processed as fast as possible, without requiring any
   /// user input.
   pangolin::Var<bool> *autoplay_;
-  /// \brief If enabled, the latest frame's raycast is displayed in the main pane. Otherwise, a
-  /// free-roam view of the scene is provided.
-  pangolin::Var<bool> *live_raycast_;
   /// \brief Whether to display the RGB and depth previews directly from the input, or from the
   /// static scene, i.e., with the dynamic objects removed.
   pangolin::Var<bool> *display_raw_previews_;
@@ -825,7 +877,22 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   sf_params.calib.f  = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx; // TODO should we average fx and fy?
 
   auto sparse_sf_provider = new instreclib::VisoSparseSFProvider(sf_params);
-  auto evaluation = new dynslam::eval::Evaluation(dataset_root, input_config);
+
+  // Set up the evaluation component
+
+  // TODO(andrei): Don't hardcode calibration params like this.
+  Eigen::MatrixXf P0(3, 4);
+  // Left camera projection matrix; may be redundant!
+  P0 << 7.070912000000e+02, 0.000000000000e+00, 6.018873000000e+02, 0.000000000000e+00,
+      0.000000000000e+00, 7.070912000000e+02, 1.831104000000e+02, 0.000000000000e+00,
+      0.000000000000e+00, 0.000000000000e+00, 1.000000000000e+00, 0.000000000000e+00;
+  Eigen::Matrix4f velo_to_cam;
+  velo_to_cam
+      << -1.857739385241e-03, -9.999659513510e-01, -8.039975204516e-03, -4.784029760483e-03,
+      -6.481465826011e-03, 8.051860151134e-03, -9.999466081774e-01, -7.337429464231e-02,
+      9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,
+      0, 0, 0, 1;
+  auto evaluation = new dynslam::eval::Evaluation(dataset_root, input_config, velo_to_cam, P0);
 
   *dyn_slam_out = new gui::DynSlam();
   (*dyn_slam_out)->Initialize(driver, segmentation_provider, sparse_sf_provider, evaluation);
