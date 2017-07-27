@@ -80,14 +80,10 @@ class DepthProvider {
   /// \param disparity The disparity map.
   /// \param calibration The stereo calibration parameters used to compute depth from disparity.
   /// \param out_depth The output depth map, which gets populated by this method.
-  /// \param min_depth_m The minimum depth, in meters, which is not considered too noisy.
-  /// \param max_depth_m The maximum depth, in meters, which is not considered too noisy.
   template<typename T>
   void DepthFromDisparityMap(const cv::Mat_<T> &disparity,
                              const StereoCalibration &calibration,
-                             cv::Mat1s &out_depth,
-                             float min_depth_m =  0.50f,
-                             float max_depth_m = 20.0f
+                             cv::Mat1s &out_depth
   ) {
     assert(disparity.size() == out_depth.size());
 
@@ -101,9 +97,10 @@ class DepthProvider {
         // The max depth is an important factor for the quality of the resulting maps. Too big, and
         // our map will be very noisy; too small, and we only map the road and a couple of meters of
         // the sidewalks.
-        int32_t min_depth_mm = static_cast<int32_t>(min_depth_m * kMetersToMillimeters);
+        int32_t min_depth_mm = static_cast<int32_t>(min_depth_m_ * kMetersToMillimeters);
+        int32_t max_depth_mm = static_cast<int32_t>(max_depth_m_ * kMetersToMillimeters);
 
-        if (depth_mm > max_depth_m * kMetersToMillimeters || depth_mm < min_depth_mm) {
+        if (depth_mm > max_depth_mm || depth_mm < min_depth_mm) {
           depth_mm = std::numeric_limits<int16_t>::max();
         }
 
@@ -116,14 +113,39 @@ class DepthProvider {
   /// \brief The name of the technique being used for depth estimation.
   virtual const std::string& GetName() const = 0;
 
+  float GetMinDepthMeters() const {
+    return min_depth_m_;
+  }
+
+  void SetMinDepthMeters(float min_depth_m) {
+    this->min_depth_m_ = min_depth_m;
+  }
+
+  float GetMaxDepthMeters() const {
+    return max_depth_m_;
+  }
+
+  void SetMaxDepthMeters(float max_depth_m) {
+    this->max_depth_m_ = max_depth_m;
+  }
+
  protected:
-  DepthProvider(bool input_is_depth) : input_is_depth_(input_is_depth) {}
+  /// \param min_depth_m The minimum depth, in meters, which is not considered too noisy.
+  /// \param max_depth_m The maximum depth, in meters, which is not considered too noisy.
+  DepthProvider(bool input_is_depth, float min_depth_m =  0.50f, float max_depth_m = 20.0f) :
+      input_is_depth_(input_is_depth),
+      min_depth_m_(min_depth_m),
+      max_depth_m_(max_depth_m) {}
 
   /// \brief If true, then assume the read maps are depth maps, instead of disparity maps.
   /// In this case, the depth from disparity computation is no longer performed.
   bool input_is_depth_;
   /// \brief Buffer in which the disparity map gets saved at every frame.
   cv::Mat out_disparity_;
+
+ private:
+  float min_depth_m_;
+  float max_depth_m_;
 };
 
 } // namespace dynslam

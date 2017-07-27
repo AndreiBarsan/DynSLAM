@@ -5,7 +5,7 @@
 namespace dynslam {
 
 enum PreviewType {
-  kGray, kColor, kNormal, kWeight, kLatestRaycast, kEnd
+  kDepth, kGray, kColor, kNormal, kWeight, kLatestRaycast, kEnd
 };
 
 } // namespace dynslam
