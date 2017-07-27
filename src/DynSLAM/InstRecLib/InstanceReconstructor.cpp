@@ -348,15 +348,12 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
 
   // Set a much smaller voxel block number for the reconstruction, since individual objects
   // occupy a limited amount of space in the scene.
-  // TODO(andrei): Set this limit based on some physical specification, such as 10m x 10m x
-  // 10m.
-  settings->sdfLocalBlockNum = 20000;
+  // TODO(andrei): Set this limit based on some physical specification, such as 10m x 10m x 10m.
+  settings->sdfLocalBlockNum = 9000;
   // We don't want to create an (expensive) meshing engine for every instance.
   settings->createMeshingEngine = false;
   // To be used in conjunction with coarse feature-based alignment.
   settings->trackerType = ITMLibSettings::TrackerType::TRACKER_ICP;
-//  settings->noICPRunTillLevel
-//  settings->trackerType = ITMLibSettings::TrackerType::TRACKER_COLOR;
 
   track.GetReconstruction() = make_shared<InfiniTamDriver>(
           settings,
@@ -569,7 +566,11 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
     instance_driver.SetPose(rel_dyn_pose_f.inverse());
 
-    bool enable_direct_refinement = true;
+    bool enable_direct_refinement = false;
+
+    if (enable_direct_refinement && enable_itm_refinement_) {
+      throw std::runtime_error("Cannot use both direct image alignment AND the ITM-specific tracker(s)!");
+    }
 
     if (enable_direct_refinement && frame_idx > 0 && frame.relative_pose->IsPresent()) {
       vector<double> unrefined_se3 = frame.relative_pose->Get().se3_form;
