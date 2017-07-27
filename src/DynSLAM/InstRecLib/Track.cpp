@@ -165,12 +165,8 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
   if (prev_frame_idx >= 0) {
     auto prev_pose = frames_[prev_frame_idx].relative_pose;
     if (prev_pose->IsPresent()) {
-      cout << "I will do a warm start!" << endl;
+      // Perform warm start is previous relative pose is known.
       initial_estimate = prev_pose->Get().se3_form;
-
-      cout << "Initial estimate will now be: ";
-      for(int i = 0; i < 6; ++i) cout << initial_estimate[i] << ", ";
-      cout << endl;
     }
   }
 
