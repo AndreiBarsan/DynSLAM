@@ -37,9 +37,7 @@ void VisoSparseSFProvider::ComputeSparseSF(const ViewPair &, const ViewPair &cur
       current_view.first->rows,
       current_view.first->cols
   };
-//    Tic("Viso2 frame processing");
   bool viso2_success = stereo_vo_->process(left_bytes, right_bytes, dims);
-//    Toc();
 
   if (! viso2_success) {
     matches_available_ = false;

@@ -134,21 +134,6 @@ public:
           );
         }
 
-//        struct timeval tp;
-//        gettimeofday(&tp, NULL);
-//        double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-//        double time_scale = 500.0;
-//        double r = 1;
-//        double a = sin(time_ms / time_scale) * r;
-//        double cc = cos(time_ms / time_scale) * r;
-//        cout << (sin(time_ms/time_scale) * 10) << endl;
-//        instance_cam_->SetModelViewMatrix(
-//        pangolin::ModelViewLookAt(
-//            -3.0 + a, -1.00,  12.75,
-//            -3.0, -1.10,  10.00,
-//            pangolin::AxisY)
-//        );
-
         if (dyn_slam_->GetCurrentFrameNo() > 1) {
           const unsigned char *preview = dyn_slam_->GetStaticMapRaycastPreview(
               visualized_object_idx_,
@@ -168,8 +153,7 @@ public:
       // Currently visualizing LIDAR data.
 
       if(dyn_slam_->GetCurrentFrameNo() >= 1) {
-        auto lidar = dyn_slam_->GetEvaluation()->GetVelodyne()->ReadFrame(
-            dyn_slam_input_->GetCurrentFrame() - 1);
+        auto lidar = dyn_slam_->GetEvaluation()->GetVelodyne()->GetLatestFrame();
 
         // TODO(andrei): Don't hardcode calibration params like this.
         Eigen::MatrixXf P0(3, 4);
@@ -191,9 +175,9 @@ public:
         }
         pane_texture_->RenderToViewport(true);
 
-        Tic("LIDAR render (naive)");
+        Tic("LIDAR render (partially naive)");
         PreviewLidar(lidar, P0, velo_to_cam, rgb_view_);
-        Toc();
+        Toc(false);
       }
 
       if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
@@ -347,13 +331,12 @@ public:
   /// the LIDAR results for sanity, and then for every point in the cam frame look up the model
   /// depth and compare the two.
   void PreviewLidar(
-      const Eigen::MatrixXf &lidar_points,
+      const Eigen::MatrixX4f &lidar_points,
       const Eigen::MatrixXf &P,
       const Eigen::Matrix4f &Tr,
       const pangolin::View &view
   ) {
     // convert every velo point into 2D as: x_i = P * Tr * X_i
-    size_t N = static_cast<size_t>(lidar_points.rows() * 8);
     if (lidar_points.rows() == 0) {
       return;
     }
@@ -365,11 +348,8 @@ public:
 
     glDisable(GL_DEPTH_TEST);
     for (int i = 0; i < lidar_points.rows(); ++i) {
-      Eigen::Vector4f point;
+      Eigen::Vector4f point = lidar_points.row(i);
       float reflectance = lidar_points(i, 3);
-      point(0) = lidar_points(i, 0);
-      point(1) = lidar_points(i, 1);
-      point(2) = lidar_points(i, 2);
       point(3) = 1.0f;                // Replace reflectance with the homogeneous 1.
 
       Eigen::Vector4f p3d = Tr * point;
@@ -832,12 +812,11 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   // "VO" we use to align object instance frames have VASTLY different requirements, so we should
   // use separate parameter sets for them.
   sf_params.base = baseline_m;
-  sf_params.match.nms_n = 3;    // Optimal from KITTI leaderboard: 3 (also the default)
+  sf_params.match.nms_n = 3;          // Optimal from KITTI leaderboard: 3 (also the default)
   sf_params.match.half_resolution = 0;
   sf_params.match.multi_stage = 1;    // Default = 1 (= 0 => much slower)
-  sf_params.match.refinement = 1;   // Default = 1 (per-pixel); 2 = sub-pixel, slower
-  sf_params.ransac_iters = 200;    // Default = 200; added more to see if it helps instance reconstruction
-  // TODO(andrei): Now that we're using warm starts, could we get away with much fewer iterations?
+  sf_params.match.refinement = 1;     // Default = 1 (per-pixel); 2 = sub-pixel, slower
+  sf_params.ransac_iters = 500;       // Default = 200; added more to see if it helps instance reconstruction
   sf_params.inlier_threshold = 3.0;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
                                       // object instances
   sf_params.bucket.max_features = 10;    // Default = 2
