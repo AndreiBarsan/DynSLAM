@@ -17,10 +17,14 @@ namespace eval {
 class Evaluation {
 
  public:
-  Evaluation(const std::string &dataset_root, const Input::Config &input_config)
+  Evaluation(const std::string &dataset_root, const Input::Config &input_config,
+             const Eigen::Matrix4f &velodyne_to_rgb, const Eigen::MatrixXf &left_cam_projection)
     : velodyne(new Velodyne(
         utils::Format("%s/%s", dataset_root.c_str(), input_config.velodyne_folder.c_str()),
-        input_config.velodyne_fname_format)) { }
+        input_config.velodyne_fname_format,
+        velodyne_to_rgb,
+        left_cam_projection))
+  { }
 
   /// \brief Supermethod in charge of all per-frame evaluation metrics.
   void EvaluateFrame(Input *input, DynSlam *dyn_slam);
