@@ -380,11 +380,14 @@ uchar RgbToGrayscale(uchar r, uchar g, uchar b) {
   return static_cast<uchar>(r * 0.299 + g * 0.587 + b * 0.114);
 }
 
+/// \brief Converts a given (intensity, depth) frame into a list of "depth hypotheses" to be used
+///        in the direct alignment code. This function basically just massages data from the DynSLAM
+///        side into the format required in the direct alignment code, which is based on Liu,
+///        Peidong, et al., 2017 "Direct Visual Odometry for a Fisheye-Stereo Camera."
 vector<DepthHypothesis_GMM> GenHyps(const uchar *intensity, const float *depth, CameraBase &camera,
                              int rows, int cols) {
   // Note: variance not used in depth alignment code, so there's no point in trying to estimate it
   // from, e.g., the depth.
-
   vector<DepthHypothesis_GMM> hypotheses;
 
   for(int row = 0; row < rows; ++row) {

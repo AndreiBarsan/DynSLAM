@@ -167,30 +167,34 @@ public:
       // TODO(andrei): Toggle this or something.
       // Currently visualizing LIDAR data.
 
-      auto lidar = dyn_slam_->GetEvaluation()->GetVelodyne()->ReadFrame(dyn_slam_input_->GetCurrentFrame());
+      if(dyn_slam_->GetCurrentFrameNo() >= 1) {
+        auto lidar = dyn_slam_->GetEvaluation()->GetVelodyne()->ReadFrame(
+            dyn_slam_input_->GetCurrentFrame() - 1);
 
-      // TODO(andrei): Don't hardcode calibration params like this.
-      Eigen::MatrixXf P0(3, 4);
-      P0 << 7.070912000000e+02, 0.000000000000e+00, 6.018873000000e+02, 0.000000000000e+00,
+        // TODO(andrei): Don't hardcode calibration params like this.
+        Eigen::MatrixXf P0(3, 4);
+        // Left camera projection matrix; may be redundant!
+        P0 << 7.070912000000e+02, 0.000000000000e+00, 6.018873000000e+02, 0.000000000000e+00,
             0.000000000000e+00, 7.070912000000e+02, 1.831104000000e+02, 0.000000000000e+00,
             0.000000000000e+00, 0.000000000000e+00, 1.000000000000e+00, 0.000000000000e+00;
-      Eigen::Matrix4f Tr;
-      Tr << -1.857739385241e-03, -9.999659513510e-01, -8.039975204516e-03, -4.784029760483e-03,
+        Eigen::Matrix4f velo_to_cam;
+        velo_to_cam
+            << -1.857739385241e-03, -9.999659513510e-01, -8.039975204516e-03, -4.784029760483e-03,
             -6.481465826011e-03, 8.051860151134e-03, -9.999466081774e-01, -7.337429464231e-02,
-             9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,
-          0, 0, 0, 1;
+            9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,
+            0, 0, 0, 1;
 
-//      if (display_raw_previews_->Get()) {
-//        UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
-//      }
-//      else {
-//        UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_);
-//      }
-//      pane_texture_->RenderToViewport(true);
+        if (display_raw_previews_->Get()) {
+          UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
+        } else {
+          UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_);
+        }
+        pane_texture_->RenderToViewport(true);
 
-      Tic("LIDAR render (naive)");
-      PreviewLidar(lidar, P0, Tr, rgb_view_);
-      Toc();
+        Tic("LIDAR render (naive)");
+        PreviewLidar(lidar, P0, velo_to_cam, rgb_view_);
+        Toc();
+      }
 
       if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
         PreviewSparseSF(dyn_slam_->GetLatestFlow().matches, rgb_view_);
@@ -350,13 +354,12 @@ public:
   ) {
     // convert every velo point into 2D as: x_i = P * Tr * X_i
     size_t N = static_cast<size_t>(lidar_points.rows() * 8);
-    if (N == 0) {
+    if (lidar_points.rows() == 0) {
       return;
     }
     static GLfloat verts[2000000];
-    static GLfloat colors[2000000];
+    static GLubyte colors[2000000];
 
-    cout << lidar_points.rows() * 12 << " elements..." << endl;
     size_t idx_v = 0;
     size_t idx_c = 0;
 
@@ -373,56 +376,51 @@ public:
       p3d /= p3d(3);
       float Z = p3d(2);
 
-      if (Z < 0.5f) {
-        continue;
-      }
+      // This part is VERY slow and should be performed in hardware...
+//      Eigen::VectorXf p2d = P * p3d;
+//      p2d /= p2d(2);
 
-      Eigen::VectorXf p2d = P * p3d;
-      p2d /= p2d(2);
+//      if (p2d(0) < 0 || p2d(0) >= width_ || p2d(1) < 0 || p2d(1) >= height_) {
+//        continue;
+//      }
 
-      Eigen::Vector2f frame_size(width_, height_);
-      cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(p2d(0), p2d(1)), frame_size, view);
+//      Eigen::Vector2f frame_size(width_, height_);
+//      cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(p2d(0), p2d(1)), frame_size, view);
+//
+//      GLfloat x = gl_pos(0);
+//      GLfloat y = gl_pos(1);
+//      GLfloat x = p2d(0);
+//      GLfloat y = p2d(1);
 
-//      const GLfloat verts[] = { x-rad,y, x+rad, y, x,y-rad, x, y+rad};
-
-      float intensity = min(5.0f / Z, 1.0f);
-
-      float rad = 0.001f;
-      GLfloat x = gl_pos(0);
-      GLfloat y = gl_pos(1);
-
-//      verts[idx_v++] = x - rad;
-//      verts[idx_v++] = y;
-//      verts[idx_v++] = x + rad;
-//      verts[idx_v++] = y;
 //      verts[idx_v++] = x;
-//      verts[idx_v++] = y - rad;
-//      verts[idx_v++] = x;
-//      verts[idx_v++] = y + rad;
-      verts[idx_v++] = x;
-      verts[idx_v++] = y;
+//      verts[idx_v++] = y;
+      verts[idx_v++] = p3d(0);
+      verts[idx_v++] = p3d(1);
+      verts[idx_v++] = p3d(2);
 
-      colors[idx_c++] = intensity;
-      colors[idx_c++] = intensity;
-      colors[idx_c++] = reflectance;
-//      colors[idx_c++] = intensity;
-//      colors[idx_c++] = intensity;
-//      colors[idx_c++] = reflectance;
-//      colors[idx_c++] = intensity;
-//      colors[idx_c++] = intensity;
-//      colors[idx_c++] = reflectance;
-//      colors[idx_c++] = intensity;
-//      colors[idx_c++] = intensity;
-//      colors[idx_c++] = reflectance;
-
-//      glColor4f(intensity, intensity, reflectance, 1.0f);
-//      // LMAO
-//      pangolin::glDrawCross(gl_pos[0], gl_pos[1], 0.001f);
+      float intensity = min(8.0f / Z, 1.0f);
+      colors[idx_c++] = static_cast<uchar>(intensity * 255);
+      colors[idx_c++] = static_cast<uchar>(intensity * 255);
+      colors[idx_c++] = static_cast<uchar>(reflectance * 255);
     }
 
-    // TODO consider just passing ptr to (projected) internal eigen data. Make sure its row-major though.
-    // Should set modelview matrix properly.
-    pangolin::glDrawColoredVertices<float>(idx_v / 2, verts, colors, GL_POINTS, 2, 3);
+    float fx = P(0, 0);
+    float fy = P(1, 1);
+    float cx = P(0, 2);
+    float cy = P(1, 2);
+    auto proj = pangolin::ProjectionMatrix(width_, height_, fx, fy, cx, cy, 0.01, 1000);
+
+//    auto milliseconds_since_epoch = (
+//        std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1) - 1501147873988);
+    pangolin::OpenGlRenderState state(
+        proj, pangolin::IdentityMatrix().RotateX(M_PI)
+    );
+    state.Apply();
+
+    // TODO-LOW(andrei): For increased performance (unnecessary), consider just passing ptr to
+    // internal eigen data. Make sure its row-major though, and the modelview matrix is set properly
+    // based on the velo-to-camera matrix.
+    pangolin::glDrawColoredVertices<float>(idx_v / 2, verts, colors, GL_POINTS, 3, 3);
     glEnable(GL_DEPTH_TEST);
   }
 
