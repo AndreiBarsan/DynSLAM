@@ -1,9 +1,33 @@
 
 #include "Input.h"
+#include "PrecomputedDepthProvider.h"
 
 namespace dynslam {
 
 using namespace std;
+
+void Input::GetFrameCvImages(
+    int frame_idx,
+    std::shared_ptr<cv::Mat3b> &rgb,
+    std::shared_ptr<cv::Mat1s> &raw_depth
+) {
+  cv::Mat3b rgb_right_temp(GetRgbSize());
+
+  rgb.reset(new cv::Mat3b(GetRgbSize()));
+  raw_depth.reset(new cv::Mat1s(GetDepthSize()));
+
+  ReadLeftColor(frame_idx, *rgb);
+  ReadRightColor(frame_idx, rgb_right_temp);
+
+  PrecomputedDepthProvider *pdp = dynamic_cast<PrecomputedDepthProvider*>(GetDepthProvider());
+  if (nullptr == pdp) {
+    GetDepthProvider()->DepthFromStereo(*rgb, rgb_right_temp, stereo_calibration_, *raw_depth);
+  }
+  else {
+    // If we're using precomputed depth, make sure you tell it exactly which frame we are evaluating.
+    pdp->GetDepth(frame_idx, this->stereo_calibration_, *raw_depth);
+  }
+}
 
 bool Input::HasMoreImages() {
   string next_fpath =
@@ -12,24 +36,10 @@ bool Input::HasMoreImages() {
 }
 
 bool Input::ReadNextFrame() {
-  left_frame_gray_buf_ = cv::imread(GetFrameName(dataset_folder_,
-                                                 config_.left_gray_folder,
-                                                 config_.fname_format,
-                                                 frame_idx_),
-                                    CV_LOAD_IMAGE_UNCHANGED);
-  right_frame_gray_buf_ = cv::imread(GetFrameName(dataset_folder_,
-                                                  config_.right_gray_folder,
-                                                  config_.fname_format,
-                                                  frame_idx_),
-                                     CV_LOAD_IMAGE_UNCHANGED);
-  left_frame_color_buf_ = cv::imread(GetFrameName(dataset_folder_,
-                                                  config_.left_color_folder,
-                                                  config_.fname_format,
-                                                  frame_idx_));
-  right_frame_color_buf_ = cv::imread(GetFrameName(dataset_folder_,
-                                                   config_.right_color_folder,
-                                                   config_.fname_format,
-                                                   frame_idx_));
+  ReadLeftGray(frame_idx_, left_frame_gray_buf_);
+  ReadRightGray(frame_idx_, right_frame_gray_buf_);
+  ReadLeftColor(frame_idx_, left_frame_color_buf_);
+  ReadRightColor(frame_idx_, right_frame_color_buf_);
 
   // Sanity checks to ensure the dimensions from the calibration file and the actual image
   // dimensions correspond.
@@ -81,5 +91,37 @@ void Input::GetCvStereoGray(cv::Mat1b **left, cv::Mat1b **right) {
   *left = &left_frame_gray_buf_;
   *right = &right_frame_gray_buf_;
 }
+
+void Input::ReadLeftGray(int frame_idx, cv::Mat1b &out) const {
+  out = cv::imread(GetFrameName(dataset_folder_,
+                                config_.left_gray_folder,
+                                config_.fname_format,
+                                frame_idx),
+                   CV_LOAD_IMAGE_UNCHANGED);
+}
+
+void Input::ReadRightGray(int frame_idx, cv::Mat1b &out) const {
+  out = cv::imread(GetFrameName(dataset_folder_,
+                                config_.right_gray_folder,
+                                config_.fname_format,
+                                frame_idx),
+                   CV_LOAD_IMAGE_UNCHANGED);
+
+}
+
+void Input::ReadLeftColor(int frame_idx, cv::Mat3b &out) const {
+  out = cv::imread(GetFrameName(dataset_folder_,
+                                config_.left_color_folder,
+                                config_.fname_format,
+                                frame_idx));
+}
+
+void Input::ReadRightColor(int frame_idx, cv::Mat3b &out) const {
+  out = cv::imread(GetFrameName(dataset_folder_,
+                                config_.right_color_folder,
+                                config_.fname_format,
+                                frame_idx));
+}
+
 
 } // namespace dynslam
