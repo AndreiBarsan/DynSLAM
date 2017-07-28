@@ -11,19 +11,45 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
   // No-dynamic-mapping == our system but with no semantics, object tracking, etc., so just ITM on
   // stereo.
 
-  // => TODO(andrei): Plot error as fn of delta, the allowed error. (see Sengupta/Torr paper Fig 10).
-
-  if (input->GetCurrentFrame() > 0) {
+  if (dyn_slam->GetCurrentFrameNo() > 0) {
     cout << "Starting evaluation of current frame..." << endl;
-    EvaluateFrame(input->GetCurrentFrame() - 1, input, dyn_slam);
-    cout << "Evaluation complete." << endl;
+    // TODO wrap this vector into its own class (also CSV-serializable)
+    vector<DepthEvaluation> evals = EvaluateFrame(input->GetCurrentFrame() - 1, input, dyn_slam);
+
+    if (! wrote_header_) {
+      *csv_dump_ << "frame,";
+      for(auto &eval : evals) {
+        *csv_dump_ << eval.GetHeader();
+      }
+      *csv_dump_ << endl;
+      wrote_header_ = true;
+    }
+
+    // Append each measurement from this frame into the CSV file
+    *csv_dump_ << evals[0].meta.frame_idx << ", ";
+
+    cout << "Evaluation complete:" << endl;
+    bool missing_depths_are_errors = true;
+    for (auto &eval : evals) {
+      cout << "Evaluation on frame #" << eval.meta.frame_idx << ", delta max = "
+           << setw(2) << eval.delta_max
+           << "   Fusion accuracy = " << setw(7) << setprecision(3)
+           << eval.fused_result.GetCorrectPixelRatio(missing_depths_are_errors)
+           << " | Input accuracy  = " <<  setw(7) << setprecision(3)
+           << eval.input_result.GetCorrectPixelRatio(missing_depths_are_errors)
+           << endl;
+
+      *csv_dump_ << eval.GetData() << ", ";
+    }
+
+    *csv_dump_ << endl;
   }
 }
 
 std::vector<DepthEvaluation> Evaluation::EvaluateFrame(int frame_idx,
                                                        Input *input,
                                                        DynSlam *dyn_slam) {
-  auto lidar_pointcloud = velodyne->ReadFrame(frame_idx);
+  auto lidar_pointcloud = velodyne_->ReadFrame(frame_idx);
 
   // TODO(andrei): Pose history in dynslam; will be necessary in delayed evaluation, as well
   // as if you wanna preview cute little frustums!
@@ -63,7 +89,7 @@ std::vector<DepthEvaluation> Evaluation::EvaluateFrame(int frame_idx,
         byte_depth = 0;
       }
       else {
-        byte_depth = static_cast<uchar>(in_depth / 1000.0 / max_depth_meters * 255);
+        byte_depth = static_cast<uchar>(round(in_depth / 1000.0 / max_depth_meters * 255));
       }
 
 //            input_depthmap_uc.at<uchar>(row, col) = byte_depth;
@@ -77,28 +103,31 @@ std::vector<DepthEvaluation> Evaluation::EvaluateFrame(int frame_idx,
   }
 
   DepthEvaluationMeta meta(frame_idx, input->GetDatasetIdentifier());
+  std::vector<DepthEvaluation> evals;
 
   // TODO(andrei): Nicer loop, use produced results, etc.
-  for(int delta_max = 1; delta_max <= 5; ++delta_max) {
-    EvaluateDepth(
+  for(uint delta_max = 0; delta_max <= 10; ++delta_max) {
+    evals.push_back(EvaluateDepth(
         meta,
         lidar_pointcloud,
         rendered_depthmap,
         input_depthmap_uc,
-        velodyne->velodyne_to_rgb,
-        velodyne->rgb_project,
+        velodyne_->velodyne_to_rgb,
+        velodyne_->rgb_project,
         width,
         height,
         min_depth_meters,
         max_depth_meters,
         delta_max
-    );
+    ));
   }
 
-  // TODO populate
-  return std::vector<DepthEvaluation>();
+  return evals;
 }
 
+// TODO(andrei): Support rendering onto texture which then gets saved OR just render for a particular
+// fixed delta_max on the fly from the GUI (simpler, but would require some serious refactoring of
+// this method, which would be nice anyway).
 DepthEvaluation Evaluation::EvaluateDepth(const DepthEvaluationMeta &meta,
                                           const Eigen::MatrixX4f &lidar_points,
                                           const uchar *const rendered_depth,

@@ -39,13 +39,12 @@ struct DepthResult : public ICsvSerializable {
 
   /// \brief Returns the ratio of correct pixels in this depth evaluation result.
   /// \param include_missing Whether to count pixels with no depth data in the evaluated depth map
-  ///                        as incorrect. Formula: ratio = (correct) / (measurements)
+  ///                        as incorrect.
   double GetCorrectPixelRatio(bool include_missing) const {
     if (include_missing) {
       return static_cast<double>(correct_count) / measurement_count;
     } else {
-      return static_cast<double>(measurement_count - error_count)
-          / (measurement_count - missing_count);
+      return static_cast<double>(correct_count) / (measurement_count - missing_count);
     }
   }
 
@@ -71,7 +70,7 @@ struct DepthEvaluationMeta {
 };
 
 /// \brief Stores the result of comparing a computed depth with a LIDAR ground truth.
-struct DepthEvaluation {
+struct DepthEvaluation : public ICsvSerializable {
   // Parameters
   const DepthEvaluationMeta meta;
   const int delta_max;
@@ -93,24 +92,46 @@ struct DepthEvaluation {
         max_depth_meters(max_depth_meters),
         fused_result(fused_result),
         input_result(input_result) {}
+
+  string GetHeader() const override {
+    return utils::Format("fusion-total-%d, fusion-error-%d, fusion-missing-%d, fusion-correct-%d,"
+                         "input-total-%d, input-error-%d, input-missing-%d, input-correct-%d",
+                         delta_max, delta_max, delta_max, delta_max, delta_max, delta_max,
+                         delta_max, delta_max);
+  }
+
+  string GetData() const override {
+//    return utils::Format("%s, %s", fused_result.GetData().c_str(), input_result.GetData().c_str());
+    return fused_result.GetData();
+  }
 };
 
 /// \brief Main class handling the quantitative evaluation of the DynSLAM system.
 class Evaluation {
+ public:
+  static std::string GetCsvName(const std::string &dataset_root, const Input::Config &input_config) {
+    // TODO(andrei): Be more thorough and creative!
+    return "out.csv";
+  }
 
  public:
   Evaluation(const std::string &dataset_root, const Input::Config &input_config,
              const Eigen::Matrix4f &velodyne_to_rgb, const Eigen::MatrixXf &left_cam_projection)
-      : velodyne(new Velodyne(
+      : velodyne_(new Velodyne(
       utils::Format("%s/%s", dataset_root.c_str(), input_config.velodyne_folder.c_str()),
       input_config.velodyne_fname_format,
       velodyne_to_rgb,
-      left_cam_projection)) {}
+      left_cam_projection)),
+        csv_dump_(new std::ofstream(GetCsvName(dataset_root, input_config)))
+  {}
+
+  virtual ~Evaluation() {
+    delete csv_dump_;
+    delete velodyne_;
+  }
 
   /// \brief Supermethod in charge of all per-frame evaluation metrics.
   void EvaluateFrame(Input *input, DynSlam *dyn_slam);
-
-  /// TODO method to eval map depth vs. input depth vs. lidar on arbitrary frame.
 
   std::vector<DepthEvaluation> EvaluateFrame(int frame_idx, Input *input, DynSlam *dyn_slam);
 
@@ -149,21 +170,20 @@ class Evaluation {
       const uint input_stride = 4
   ) const;
 
-  virtual ~Evaluation() {
-    delete velodyne;
-  }
-
   Velodyne *GetVelodyne() {
-    return velodyne;
+    return velodyne_;
   }
 
   const Velodyne *GetVelodyne() const {
-    return velodyne;
+    return velodyne_;
   }
 
  private:
-  Velodyne *velodyne;
+  Velodyne *velodyne_;
+  ostream *csv_dump_;
 
+  // Used in CSV data dumping.
+  bool wrote_header_ = false;
 };
 
 }
