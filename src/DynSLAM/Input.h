@@ -4,6 +4,7 @@
 
 #include <string>
 #include <highgui.h>
+#include <memory>
 
 #include "DepthProvider.h"
 #include "Utils.h"
@@ -18,6 +19,7 @@ namespace dynslam {
 class Input {
  public:
   struct Config {
+    std::string dataset_name;
     std::string left_gray_folder;
     std::string right_gray_folder;
     std::string left_color_folder;
@@ -48,6 +50,7 @@ class Input {
   /// We don't use constants here in order to make the code easier to read.
   static Config KittiOdometryConfig() {
     Config config;
+    config.dataset_name           = "kitti-odometry";
     config.left_gray_folder       = "image_0";
     config.right_gray_folder      = "image_1";
     config.left_color_folder      = "image_2";
@@ -102,6 +105,7 @@ class Input {
   bool ReadNextFrame();
 
   /// \brief Returns pointers to the latest RGB and depth data.
+  /// \note The caller does not take ownership.
   void GetCvImages(cv::Mat3b **rgb, cv::Mat1s **raw_depth);
 
   /// \brief Returns pointers to the latest grayscale input frames.
@@ -109,7 +113,7 @@ class Input {
 
   cv::Size2i GetRgbSize() const {
     return cv::Size2i(static_cast<int>(calibration_.intrinsics_rgb.sizeX),
-                     static_cast<int>(calibration_.intrinsics_rgb.sizeY));
+                      static_cast<int>(calibration_.intrinsics_rgb.sizeY));
   }
 
   cv::Size2i GetDepthSize() const {
@@ -118,12 +122,21 @@ class Input {
   }
 
   /// \brief Gets the name of the dataset folder which we are using.
-  std::string GetName() const {
+  /// TODO(andrei): Make this more robust.
+  std::string GetSequenceName() const {
     return dataset_folder_.substr(dataset_folder_.rfind('/'));
+  }
+
+  std::string GetDatasetIdentifier() const {
+    return config_.dataset_name + "-" + GetSequenceName();
   }
 
   DepthProvider* GetDepthProvider() const {
     return depth_provider_;
+  }
+
+  void SetDepthProvider(DepthProvider *depth_provider) {
+    this->depth_provider_ = depth_provider;
   }
 
   /// \brief Returns the current frame index from the dataset.
@@ -131,6 +144,9 @@ class Input {
   int GetCurrentFrame() const {
     return frame_idx_;
   }
+
+  /// \brief Sets the out parameters to the RGB and depth images from the specified frame.
+  void GetFrameCvImages(int frame_idx, std::shared_ptr<cv::Mat3b> &rgb, std::shared_ptr<cv::Mat1s> &raw_depth);
 
  private:
   std::string dataset_folder_;
@@ -156,6 +172,11 @@ class Input {
                                   int frame_idx) {
     return root + "/" + folder + "/" + utils::Format(fname_format, frame_idx);
   }
+
+  void ReadLeftGray(int frame_idx, cv::Mat1b &out) const;
+  void ReadRightGray(int frame_idx, cv::Mat1b &out) const;
+  void ReadLeftColor(int frame_idx, cv::Mat3b &out) const;
+  void ReadRightColor(int frame_idx, cv::Mat3b &out) const;
 };
 
 } // namespace dynslam

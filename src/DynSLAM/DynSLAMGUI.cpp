@@ -92,6 +92,7 @@ public:
     // No need to delete any view pointers; Pangolin deletes those itself on shutdown.
     delete dummy_image_texture_;
     delete pane_texture_;
+    delete pane_texture_mono_uchar_;
   }
 
   /// \brief Executes the main Pangolin input and rendering loop.
@@ -134,8 +135,9 @@ public:
             pane_cam_->GetModelViewMatrix(),
             static_cast<PreviewType>(current_preview_type_));
           pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
-//          pane_texture_->RenderToViewport(true);
+          pane_texture_->RenderToViewport(true);
 
+        /*
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
         auto lidar_pointcloud = velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1);
         float max_depth_meters = dyn_slam_input_->GetDepthProvider()->GetMaxDepthMeters();
@@ -145,20 +147,58 @@ public:
         Eigen::Matrix4f epose = dyn_slam_->GetPose().inverse();
         auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
-        const unsigned char *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastPreview(
+        const uchar *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastPreview(
             pango_pose,
 //            pane_cam_->GetModelViewMatrix(),
             PreviewType::kDepth
         );
+        const cv::Mat1s *input_depthmap = dyn_slam_->GetDepthPreview();
+//        cv::Mat1b input_depthmap_uc(height_, width_);
+
+        // TODO(andrei): Don't waste memory...
+        uchar input_depthmap_uc[width_ * height_ * 4];
+
+        for(int row = 0; row < height_; ++row) {
+          for(int col = 0; col < width_; ++col) {
+            // The (signed) short-valued depth map encodes the depth expressed in millimeters.
+            short in_depth = input_depthmap->at<short>(row, col);
+            // TODO(andrei): Use the affine depth calib params here if needed...
+            uchar byte_depth;
+            if (in_depth == std::numeric_limits<short>::max()) {
+              byte_depth = 0;
+            }
+            else {
+              byte_depth = static_cast<uchar>(in_depth / 1000.0 / max_depth_meters * 255);
+            }
+
+//            input_depthmap_uc.at<uchar>(row, col) = byte_depth;
+
+            int idx = (row * width_ + col) * 4;
+            input_depthmap_uc[idx] =     byte_depth;
+            input_depthmap_uc[idx + 1] = byte_depth;
+            input_depthmap_uc[idx + 2] = byte_depth;
+            input_depthmap_uc[idx + 3] = byte_depth;
+          }
+        }
+
+//        UploadCvTexture(input_depthmap_uc, *pane_texture_mono_uchar_, false);
+//        pane_texture_mono_uchar_->Upload(input_depthmap_uc, GL_RED, GL_UNSIGNED_BYTE);
+//        pane_texture_mono_uchar_->RenderToViewport(true);
 
         pane_texture_->Upload(synthesized_depthmap, GL_RGBA, GL_UNSIGNED_BYTE);
+//        pane_texture_->Upload(input_depthmap_uc, GL_RGBA, GL_UNSIGNED_BYTE);
         pane_texture_->RenderToViewport(true);
 
         // TODO(andrei): Only call this from the evaluation, and cache this preview, so we don't
         // have to keep recomputing it.
-//        cout << "Using max depth of " << max_depth_meters << " meters when evaluating." << endl;
         PreviewError(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb,
-                     *main_view_, synthesized_depthmap, width_, height_, max_depth_meters);
+                     *main_view_,
+                     synthesized_depthmap,
+//                     input_depthmap_uc,
+                     width_,
+                     height_,
+                     max_depth_meters);
+        */
       }
 
       pangolin::GlFont &font = pangolin::GlFont::I();
@@ -323,8 +363,6 @@ public:
     glEnable(GL_DEPTH_TEST);
   }
 
-  /// Based on the method used in [0].
-  /// [0]: Sengupta, S., Greveson, E., Shahrokni, A., & Torr, P. H. S. (2013). Urban 3D semantic modelling using stereo vision. Proceedings - IEEE International Conference on Robotics and Automation, 580–585. https://doi.org/10.1109/ICRA.2013.6630632
   void PreviewError(
     const Eigen::MatrixX4f &lidar_points,
     const Eigen::MatrixXf &P,
@@ -394,36 +432,11 @@ public:
       int col = static_cast<int>(round(p2d(0)));
       uchar depth_computed_uc = computed_depth[(row * width_ + col) * 4];
 
-      // again, for testing
-//      if(depth_computed_uc == 0) {
-//        continue;
-//      }
-
-      color(0) = color(1) = color(2) = 0;
-
-//      if (depth_lidar_uc > 128) {
-//        color(1) = 255;
-//      }
-//      else {
-//        color(2) = 255;
-//      }
-//
-//      if (depth_computed_uc > 128) {
-//        color(0) = 255;
-//      }
-//      else {
-//        color(0) = 64;
-//      }
-
-
-
-//      color(0) = color(1) = color(2) = min(255, depth_computed_uc + 32);
-
       // LIDAR depth seems to have a tendency to be bigger?
       int delta_signed = static_cast<int>(depth_computed_uc) - static_cast<int>(depth_lidar_uc);
 
       // for testing
-      if (depth_computed_uc != 0) {
+//      if (depth_computed_uc != 0) {
 
         int delta = abs(delta_signed);
         measurements++;
@@ -440,15 +453,15 @@ public:
           color(0) = 10;
           color(1) = 255 - delta * 10;
           color(2) = 255 - delta * 10;
-          float intensity = min(8.0f / Z, 1.0f);
-          color(0) = static_cast<uchar>(intensity * 255);
-          color(1) = static_cast<uchar>(intensity * 255);
-          color(2) = static_cast<uchar>(reflectance * 255);
+//          float intensity = min(8.0f / Z, 1.0f);
+//          color(0) = static_cast<uchar>(intensity * 255);
+//          color(1) = static_cast<uchar>(intensity * 255);
+//          color(2) = static_cast<uchar>(reflectance * 255);
         }
-      }
-      else {
-        continue;
-      }
+//      }
+//      else {
+//        continue;
+//      }
 
       Eigen::Vector2f frame_size(width_, height_);
       cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(p2d(0), p2d(1)), frame_size, view);
@@ -590,7 +603,7 @@ protected:
     auto save_map = [this]() {
       Tic("Static map mesh generation");
       cout << "Saving static map..." << endl;
-      dyn_slam_->SaveStaticMap(dyn_slam_input_->GetName(),
+      dyn_slam_->SaveStaticMap(dyn_slam_input_->GetSequenceName(),
                                dyn_slam_input_->GetDepthProvider()->GetName());
       cout << "Mesh generated OK. Writing asynchronously to the disk..." << endl;
       Toc();
@@ -622,7 +635,7 @@ protected:
     });
     pangolin::RegisterKeyPressCallback('x', [this]() { SelectNextVisualizedObject(); });
     auto save_object = [this]() {
-      dyn_slam_->SaveDynamicObject(dyn_slam_input_->GetName(),
+      dyn_slam_->SaveDynamicObject(dyn_slam_input_->GetSequenceName(),
                                      dyn_slam_input_->GetDepthProvider()->GetName(),
                                      visualized_object_idx_);
     };
@@ -738,6 +751,8 @@ protected:
     // textures for visualization (hence the 'GL_RGB' specification).
     this->pane_texture_ = new pangolin::GlTexture(width_, height_, GL_RGB, false, 0, GL_RGB,
                                                   GL_UNSIGNED_BYTE);
+    this->pane_texture_mono_uchar_ = new pangolin::GlTexture(width_, height_, GL_RGB, false, 0,
+                                                             GL_RED, GL_UNSIGNED_BYTE);
     cout << "Pangolin UI setup complete." << endl;
   }
 
@@ -836,6 +851,7 @@ private:
 
   pangolin::GlTexture *dummy_image_texture_;
   pangolin::GlTexture *pane_texture_;
+  pangolin::GlTexture *pane_texture_mono_uchar_;
 
   pangolin::Var<string> *reconstructions;
 
@@ -909,35 +925,30 @@ private:
 /// This is useful when you want to focus on the quality of the reconstruction, instead of that of
 /// the odometry.
 void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
-  // Parameters used in the KITTI-odometry dataset.
-  // TODO(andrei): Read from a file.
-  float baseline_m = 0.537150654273f;
-  float focal_length_px = 707.0912f;
-  StereoCalibration stereo_calibration(baseline_m, focal_length_px);
-
-//  Input::Config input_config = Input::KittiOdometryConfig();
-  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+  Input::Config input_config = Input::KittiOdometryConfig();
+//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
 
   int frame_offset = FLAGS_frame_offset;
 
+  // TODO(andrei): Read baseline from a file.
+  float baseline_m = 0.537150654273f;
+  float focal_length_px = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx;
+  StereoCalibration stereo_calibration(baseline_m, focal_length_px);
+
   *input_out = new Input(
       dataset_root,
       input_config,
-      // TODO(andrei): Why not both elas and dispnet? Maybe it's worth investigating to use the more
-      // conservative, sharper libelas depth maps for the main map, but the smoother ones produced
-      // by dispnet for the objects. This may be a good idea since libelas tends to screw up when
-      // faced with reflective surfaces, but dispnet is more robust to that. Similarly, for certain
-      // areas of the static map such as foliage and fences, dispnet's smoothness is more of a
-      // liability than an asset.
-      // TODO(andrei): Carefully read the dispnet paper.
-      new PrecomputedDepthProvider(dataset_root + "/" + input_config.depth_folder,
-                                   input_config.depth_fname_format,
-                                   input_config.read_depth,
-                                   frame_offset),
+      nullptr,          // set the depth later
       itm_calibration,
       stereo_calibration,
       frame_offset);
+  DepthProvider *depth = new PrecomputedDepthProvider(
+      *input_out,
+      dataset_root + "/" + input_config.depth_folder,
+      input_config.depth_fname_format,
+      input_config.read_depth);
+  (*input_out)->SetDepthProvider(depth);
 
   // [RIP] I lost a couple of hours debugging a bug caused by the fact that InfiniTAM still works
   // even when there is a discrepancy between the size of the depth/rgb inputs, as specified in the
@@ -977,20 +988,20 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   auto sparse_sf_provider = new instreclib::VisoSparseSFProvider(sf_params);
 
   // Set up the evaluation component
+  Eigen::MatrixXf left_cam_proj(3, 4);
+  auto &proj_params = itm_calibration.intrinsics_rgb.projectionParamsSimple;
+  left_cam_proj << proj_params.fx,            0.0, proj_params.px, 0.0,
+                   0.0, proj_params.fy, proj_params.py, 0.0,
+                   0.0,            0.0,            1.0, 0.0;
 
-  // TODO(andrei): Don't hardcode calibration params like this.
-  Eigen::MatrixXf P0(3, 4);
-  // Left camera projection matrix; may be redundant!
-  P0 << 7.070912000000e+02, 0.000000000000e+00, 6.018873000000e+02, 0.000000000000e+00,
-      0.000000000000e+00, 7.070912000000e+02, 1.831104000000e+02, 0.000000000000e+00,
-      0.000000000000e+00, 0.000000000000e+00, 1.000000000000e+00, 0.000000000000e+00;
+  // This is fixed for the entire KITTI family of datasets.
   Eigen::Matrix4f velo_to_cam;
   velo_to_cam
       << -1.857739385241e-03, -9.999659513510e-01, -8.039975204516e-03, -4.784029760483e-03,
       -6.481465826011e-03, 8.051860151134e-03, -9.999466081774e-01, -7.337429464231e-02,
       9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,
       0, 0, 0, 1;
-  auto evaluation = new dynslam::eval::Evaluation(dataset_root, input_config, velo_to_cam, P0);
+  auto evaluation = new dynslam::eval::Evaluation(dataset_root, input_config, velo_to_cam, left_cam_proj);
 
   *dyn_slam_out = new gui::DynSlam();
   (*dyn_slam_out)->Initialize(driver, segmentation_provider, sparse_sf_provider, evaluation);
