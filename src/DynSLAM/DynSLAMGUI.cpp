@@ -147,6 +147,7 @@ public:
 
         const unsigned char *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastPreview(
             pango_pose,
+//            pane_cam_->GetModelViewMatrix(),
             PreviewType::kDepth
         );
 
@@ -322,6 +323,8 @@ public:
     glEnable(GL_DEPTH_TEST);
   }
 
+  /// Based on the method used in [0].
+  /// [0]: Sengupta, S., Greveson, E., Shahrokni, A., & Torr, P. H. S. (2013). Urban 3D semantic modelling using stereo vision. Proceedings - IEEE International Conference on Robotics and Automation, 580–585. https://doi.org/10.1109/ICRA.2013.6630632
   void PreviewError(
     const Eigen::MatrixX4f &lidar_points,
     const Eigen::MatrixXf &P,
@@ -330,7 +333,7 @@ public:
     const uchar * const computed_depth,
     int width,
     int height,
-    float maxDepthMeters
+    float max_depth_meters
   ) {
     static GLfloat verts[2000000];
     static GLubyte colors[2000000];
@@ -338,10 +341,13 @@ public:
     size_t idx_v = 0;
     size_t idx_c = 0;
 
+    // TODO(andrei): Image comparison approach, maybe: generate LIDAR "depth map", then compare
+    // with synthesized one as follows: for all pixels which are not both black, compute the delta.
+
     // TODO(andrei): Loop for delta_max in [0, 8] like Sengupta et al. BUT, instead of showing just
     // a single plot, consider making a richer one showing maybe even the distribution of the errors
     // over time.
-    static const int delta_max = 1;
+    static const int delta_max = 10;
     int errors = 0;
     int measurements = 0;
 
@@ -360,11 +366,11 @@ public:
       float Z = p3d(2);
 
       // TODO(andrei): Document these limits and explain them in the thesis as well.
-      if (Z < 0.5 || Z >= maxDepthMeters) {
+      if (Z < 0.5 || Z >= max_depth_meters) {
         continue;
       }
 
-      float Z_scaled = (Z / maxDepthMeters) * 255;
+      float Z_scaled = (Z / max_depth_meters) * 255;
       if (Z_scaled <= 0 || Z_scaled > 255) {
         throw runtime_error("Unexpected Z value");
       }
@@ -389,28 +395,25 @@ public:
       uchar depth_computed_uc = computed_depth[(row * width_ + col) * 4];
 
       // again, for testing
-      if(depth_computed_uc == 0) {
-        continue;
-      }
+//      if(depth_computed_uc == 0) {
+//        continue;
+//      }
 
       color(0) = color(1) = color(2) = 0;
 
-      throw runtime_error("It may be that your way of computing the internal depth is incorrect. "
-          "Please double check.")
-
-      if (depth_lidar_uc > 128) {
-        color(1) = 255;
-      }
-      else {
-        color(2) = 255;
-      }
-
-      if (depth_computed_uc > 128) {
-        color(0) = 255;
-      }
-      else {
-        color(0) = 64;
-      }
+//      if (depth_lidar_uc > 128) {
+//        color(1) = 255;
+//      }
+//      else {
+//        color(2) = 255;
+//      }
+//
+//      if (depth_computed_uc > 128) {
+//        color(0) = 255;
+//      }
+//      else {
+//        color(0) = 64;
+//      }
 
 
 
@@ -419,28 +422,28 @@ public:
       // LIDAR depth seems to have a tendency to be bigger?
       int delta_signed = static_cast<int>(depth_computed_uc) - static_cast<int>(depth_lidar_uc);
 
-      int delta = abs(delta_signed);
-      measurements++;
-      delta_sum += delta_signed;
-
       // for testing
       if (depth_computed_uc != 0) {
-//
+
+        int delta = abs(delta_signed);
+        measurements++;
+        delta_sum += delta_signed;
+
         // If the delta is larger than the max value OR if we don't have a measurement for the depth
         if (delta > delta_max || depth_computed_uc == 0) {
           errors++;
 
-//          color(0) = min(255, delta * 10);
-//          color(1) = 160;
-//          color(2) = 160;
+          color(0) = min(255, delta * 10);
+          color(1) = 160;
+          color(2) = 160;
         } else {
-//          color(0) = 10;
-//          color(1) = 255 - delta * 10;
-//          color(2) = 255 - delta * 10;
-//          float intensity = min(8.0f / Z, 1.0f);
-//          color(0) = static_cast<uchar>(intensity * 255);
-//          color(1) = static_cast<uchar>(intensity * 255);
-//          color(2) = static_cast<uchar>(reflectance * 255);
+          color(0) = 10;
+          color(1) = 255 - delta * 10;
+          color(2) = 255 - delta * 10;
+          float intensity = min(8.0f / Z, 1.0f);
+          color(0) = static_cast<uchar>(intensity * 255);
+          color(1) = static_cast<uchar>(intensity * 255);
+          color(2) = static_cast<uchar>(reflectance * 255);
         }
       }
       else {
