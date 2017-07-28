@@ -19,7 +19,7 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
     if (! wrote_header_) {
       *csv_dump_ << "frame,";
       for(auto &eval : evals) {
-        *csv_dump_ << eval.GetHeader();
+        *csv_dump_ << eval.GetHeader() << ", ";
       }
       *csv_dump_ << endl;
       wrote_header_ = true;
