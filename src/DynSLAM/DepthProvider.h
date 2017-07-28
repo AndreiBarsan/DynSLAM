@@ -8,10 +8,12 @@
 #include "Utils.h"
 
 // Some necessary forward declarations
-namespace dynslam { namespace utils {
-  std::string Type2Str(int type);
-  std::string Format(const std::string& fmt, ...);
-}}
+namespace dynslam {
+namespace utils {
+std::string Type2Str(int type);
+std::string Format(const std::string &fmt, ...);
+}
+}
 
 namespace dynslam {
 
@@ -33,11 +35,11 @@ class DepthProvider {
   virtual ~DepthProvider() {}
 
   /// \brief Computes a depth map from a stereo image pair (stereo -> disparity -> depth).
-  void DepthFromStereo(const cv::Mat &left,
-                       const cv::Mat &right,
-                       const StereoCalibration &calibration,
-                       cv::Mat1s &out_depth) {
-    if(input_is_depth_) {
+  virtual void DepthFromStereo(const cv::Mat &left,
+                               const cv::Mat &right,
+                               const StereoCalibration &calibration,
+                               cv::Mat1s &out_depth) {
+    if (input_is_depth_) {
       // Our input is designated as direct depth, not just disparity.
       DisparityMapFromStereo(left, right, out_depth);
       return;
@@ -49,11 +51,9 @@ class DepthProvider {
     // This should be templated in a nicer fashion...
     if (out_disparity_.type() == CV_32FC1) {
       DepthFromDisparityMap<float>(out_disparity_, calibration, out_depth);
-    }
-    else if (out_disparity_.type() == CV_16SC1) {
+    } else if (out_disparity_.type() == CV_16SC1) {
       DepthFromDisparityMap<uint16_t>(out_disparity_, calibration, out_depth);
-    }
-    else {
+    } else {
       throw std::runtime_error(utils::Format(
           "Unknown data type for disparity matrix [%s]. Supported are CV_32FC1 and CV_16SC1.",
           utils::Type2Str(out_disparity_.type()).c_str()
@@ -86,22 +86,31 @@ class DepthProvider {
                              cv::Mat1s &out_depth
   ) {
     assert(disparity.size() == out_depth.size());
+    float kMetersToMillimeters = 1000.0;
 
-    for(int i = 0; i < disparity.rows; ++i) {
-      for(int j = 0; j < disparity.cols; ++j) {
+    // The max depth is an important factor for the quality of the resulting maps. Too big, and
+    // our map will be very noisy; too small, and we only map the road and a couple of meters of
+    // the sidewalks.
+    int32_t min_depth_mm = static_cast<int32_t>(min_depth_m_ * kMetersToMillimeters);
+    int32_t max_depth_mm = static_cast<int32_t>(max_depth_m_ * kMetersToMillimeters);
+    int32_t max_representable_depth = std::numeric_limits<int16_t>::max();
+
+    // InfiniTAM requires short depth maps, so we need to ensure our depth can actually fit in a
+    // short.
+    if (max_depth_mm >= max_representable_depth) {
+      throw std::runtime_error(utils::Format("Unsupported maximum depth of %f meters (%d mm, "
+                                                 "larger than the %d limit).", max_depth_m_,
+                                             max_depth_mm, max_representable_depth));
+    }
+
+    for (int i = 0; i < disparity.rows; ++i) {
+      for (int j = 0; j < disparity.cols; ++j) {
         T disp = disparity.template at<T>(i, j);
-
-        float kMetersToMillimeters = 1000.0;
-        int32_t depth_mm = static_cast<int32_t>(kMetersToMillimeters * DepthFromDisparity(disp, calibration));
-
-        // The max depth is an important factor for the quality of the resulting maps. Too big, and
-        // our map will be very noisy; too small, and we only map the road and a couple of meters of
-        // the sidewalks.
-        int32_t min_depth_mm = static_cast<int32_t>(min_depth_m_ * kMetersToMillimeters);
-        int32_t max_depth_mm = static_cast<int32_t>(max_depth_m_ * kMetersToMillimeters);
+        int32_t depth_mm =
+            static_cast<int32_t>(kMetersToMillimeters * DepthFromDisparity(disp, calibration));
 
         if (depth_mm > max_depth_mm || depth_mm < min_depth_mm) {
-          depth_mm = std::numeric_limits<int16_t>::max();
+          depth_mm = max_representable_depth;
         }
 
         int16_t depth_mm_short = static_cast<int16_t>(depth_mm);
@@ -111,7 +120,7 @@ class DepthProvider {
   }
 
   /// \brief The name of the technique being used for depth estimation.
-  virtual const std::string& GetName() const = 0;
+  virtual const std::string &GetName() const = 0;
 
   float GetMinDepthMeters() const {
     return min_depth_m_;
@@ -132,7 +141,7 @@ class DepthProvider {
  protected:
   /// \param min_depth_m The minimum depth, in meters, which is not considered too noisy.
   /// \param max_depth_m The maximum depth, in meters, which is not considered too noisy.
-  DepthProvider(bool input_is_depth, float min_depth_m =  0.50f, float max_depth_m = 20.0f) :
+  DepthProvider(bool input_is_depth, float min_depth_m = 0.50f, float max_depth_m = 16.0f) :
       input_is_depth_(input_is_depth),
       min_depth_m_(min_depth_m),
       max_depth_m_(max_depth_m) {}
