@@ -26,7 +26,7 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
 
     // ...and print some quick info in real time as well.
     cout << "Evaluation complete:" << endl;
-    bool missing_depths_are_errors = false;
+    bool missing_depths_are_errors = true;
     if(missing_depths_are_errors) {
       cout << "(Missing = errors)" << endl;
     }
@@ -42,6 +42,9 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
            << eval.input_result.GetCorrectPixelRatio(missing_depths_are_errors)
            << endl;
     }
+
+    cerr << "Something looks fishy when visualizing the DispNet fusion result. Check it out! TODO"
+         << "Maybe it's computed for the right image??" << endl;
   }
 }
 

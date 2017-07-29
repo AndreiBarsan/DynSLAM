@@ -146,7 +146,7 @@ class DepthProvider {
   /// \param Whether the input is a depth map, or just a disparity map.
   /// \param min_depth_m The minimum depth, in meters, which is not considered too noisy.
   /// \param max_depth_m The maximum depth, in meters, which is not considered too noisy.
-  explicit DepthProvider(bool input_is_depth, float min_depth_m = 0.50f, float max_depth_m = 25.0f) :
+  explicit DepthProvider(bool input_is_depth, float min_depth_m, float max_depth_m) :
       input_is_depth_(input_is_depth),
       min_depth_m_(min_depth_m),
       max_depth_m_(max_depth_m) {}

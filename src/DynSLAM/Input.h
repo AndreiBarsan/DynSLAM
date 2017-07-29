@@ -27,6 +27,11 @@ class Input {
     std::string fname_format;
     std::string itm_calibration_fname;
 
+    /// \brief Minimum depth to keep when computing depth maps.
+    float min_depth_m;
+    /// \brief Maximum depth to keep when computing depth maps.
+    float max_depth_m;
+
     // These are optional, and only used for precomputed depth/segmentation.
     std::string depth_folder = "";
     std::string depth_fname_format = "";
@@ -58,6 +63,8 @@ class Input {
     config.fname_format           = "%06d.png";
     config.itm_calibration_fname  = "itm-calib.txt";
 
+    config.min_depth_m            =  0.5f;
+    config.max_depth_m            = 16.0f;
     config.depth_folder           = "precomputed-depth/Frames";
     config.depth_fname_format     = "%04d.pgm";
     config.read_depth             = true;
@@ -69,6 +76,7 @@ class Input {
 
     config.velodyne_folder        = "velodyne";
     config.velodyne_fname_format  = "%06d.bin";
+
 
     return config;
   };

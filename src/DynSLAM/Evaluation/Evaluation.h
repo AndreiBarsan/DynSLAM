@@ -132,23 +132,29 @@ struct DepthFrameEvaluation : public ICsvSerializable {
 /// \brief Main class handling the quantitative evaluation of the DynSLAM system.
 class Evaluation {
  public:
-  static std::string GetCsvName(const std::string &dataset_root, const Input *input) {
-    // XXX: add depth provider name and voxel size!
-    return utils::Format("%s-offset-%d-results.csv",
+  static std::string GetCsvName(const std::string &dataset_root,
+                                const Input *input,
+                                float voxel_size_meters) {
+    return utils::Format("%s-offset-%d-depth-%s-voxelsize-%.4f-results.csv",
                          input->GetDatasetIdentifier().c_str(),
-                         input->GetCurrentFrame());
+                         input->GetCurrentFrame(),
+                         input->GetDepthProvider()->GetName().c_str(),
+                         voxel_size_meters);
   }
 
  public:
-  Evaluation(const std::string &dataset_root, const Input *input,
-             const Eigen::Matrix4f &velodyne_to_rgb, const Eigen::MatrixXf &left_cam_projection)
+  Evaluation(const std::string &dataset_root,
+             const Input *input,
+             const Eigen::Matrix4f &velodyne_to_rgb,
+             const Eigen::MatrixXf &left_cam_projection,
+             float voxel_size_meters)
       : velodyne_(new Velodyne(utils::Format("%s/%s",
                                              dataset_root.c_str(),
                                              input->GetConfig().velodyne_folder.c_str()),
                                 input->GetConfig().velodyne_fname_format,
                                 velodyne_to_rgb,
                                 left_cam_projection)),
-        csv_dump_(new std::ofstream(GetCsvName(dataset_root, input)))
+        csv_dump_(new std::ofstream(GetCsvName(dataset_root, input, voxel_size_meters)))
   {}
 
   Evaluation(const Evaluation&) = delete;
