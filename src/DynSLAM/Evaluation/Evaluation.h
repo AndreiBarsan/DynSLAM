@@ -50,11 +50,11 @@ struct DepthResult : public ICsvSerializable {
   }
 
   string GetHeader() const override {
-    return "measurements_count, error_count, missing_count, correct_count";
+    return "measurements_count,error_count,missing_count,correct_count";
   }
 
   string GetData() const override {
-    return utils::Format("%d, %d, %d, %d",
+    return utils::Format("%d,%d,%d,%d",
                          measurement_count,
                          error_count,
                          missing_count,
@@ -88,14 +88,14 @@ struct DepthEvaluation : public ICsvSerializable {
         input_result(input_result) {}
 
   string GetHeader() const override {
-    return utils::Format("fusion-total-%d, fusion-error-%d, fusion-missing-%d, fusion-correct-%d,"
-                         "input-total-%d, input-error-%d, input-missing-%d, input-correct-%d",
+    return utils::Format("fusion-total-%d,fusion-error-%d,fusion-missing-%d,fusion-correct-%d,"
+                         "input-total-%d,input-error-%d,input-missing-%d,input-correct-%d",
                          delta_max, delta_max, delta_max, delta_max, delta_max, delta_max,
                          delta_max, delta_max);
   }
 
   string GetData() const override {
-    return utils::Format("%s, %s", fused_result.GetData().c_str(), input_result.GetData().c_str());
+    return utils::Format("%s,%s", fused_result.GetData().c_str(), input_result.GetData().c_str());
   }
 };
 
@@ -112,9 +112,9 @@ struct DepthFrameEvaluation : public ICsvSerializable {
 
   string GetHeader() const override {
     std::stringstream ss;
-    ss << "frame, ";
+    ss << "frame";
     for (auto &eval : evaluations) {
-      ss << eval.GetHeader() << ", ";
+      ss << "," << eval.GetHeader();
     }
     return ss.str();
   }
@@ -123,7 +123,7 @@ struct DepthFrameEvaluation : public ICsvSerializable {
     std::stringstream ss;
     ss << meta.frame_idx;
     for (auto &eval :evaluations) {
-      ss << eval.GetData() << ", ";
+      ss << "," << eval.GetData();
     }
     return ss.str();
   }
@@ -133,11 +133,10 @@ struct DepthFrameEvaluation : public ICsvSerializable {
 class Evaluation {
  public:
   static std::string GetCsvName(const std::string &dataset_root, const Input *input) {
-    auto res = utils::Format("%s-offset-%d-results.csv",
+    // XXX: add depth provider name and voxel size!
+    return utils::Format("%s-offset-%d-results.csv",
                          input->GetDatasetIdentifier().c_str(),
                          input->GetCurrentFrame());
-    cout << "CSV name: " << res << endl;
-    return res;
   }
 
  public:
