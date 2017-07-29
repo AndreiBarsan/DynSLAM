@@ -19,9 +19,11 @@ class PrecomputedDepthProvider : public DepthProvider {
       Input *input,
       const std::string &folder,
       const std::string &fname_format,
-      bool input_is_depth = false,
-      int frame_offset = 0)
-      : DepthProvider(input_is_depth),
+      bool input_is_depth,
+      int frame_offset,
+      float min_depth_m,
+      float max_depth_m)
+      : DepthProvider(input_is_depth, min_depth_m, max_depth_m),
         input_(input),
         folder_(folder),
         fname_format_(fname_format) {}

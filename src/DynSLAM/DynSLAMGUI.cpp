@@ -147,7 +147,8 @@ public:
 
         //*
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
-        auto lidar_pointcloud = velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1);
+//        auto lidar_pointcloud = velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1);
+        auto lidar_pointcloud = velodyne->GetLatestFrame();
         float max_depth_meters = dyn_slam_input_->GetDepthProvider()->GetMaxDepthMeters();
 
         // TODO(andrei): Pose history in dynslam; will be necessary in delayed evaluation, as well
@@ -190,19 +191,19 @@ public:
         }
 
 //        UploadCvTexture(input_depthmap_uc, *pane_texture_mono_uchar_, false);
-//        pane_texture_mono_uchar_->Upload(input_depthmap_uc, GL_RED, GL_UNSIGNED_BYTE);
-//        pane_texture_mono_uchar_->RenderToViewport(true);
+        pane_texture_mono_uchar_->Upload(input_depthmap_uc, GL_RGBA, GL_UNSIGNED_BYTE);
+        pane_texture_mono_uchar_->RenderToViewport(true);
 
-        pane_texture_->Upload(synthesized_depthmap, GL_RGBA, GL_UNSIGNED_BYTE);
+//        pane_texture_->Upload(synthesized_depthmap, GL_RGBA, GL_UNSIGNED_BYTE);
 //        pane_texture_->Upload(input_depthmap_uc, GL_RGBA, GL_UNSIGNED_BYTE);
-        pane_texture_->RenderToViewport(true);
+//        pane_texture_->RenderToViewport(true);
 
         // TODO(andrei): Only call this from the evaluation, and cache this preview, so we don't
         // have to keep recomputing it.
         PreviewError(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb,
                      *main_view_,
-                     synthesized_depthmap,
-//                     input_depthmap_uc,
+//                     synthesized_depthmap,
+                     input_depthmap_uc,
                      width_,
                      height_,
                      max_depth_meters);
@@ -224,8 +225,14 @@ public:
 
         Tic("LIDAR render (partially naive)");
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
-        auto lidar_pointcloud = velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1);
-        PreviewLidar(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb, rgb_view_);
+        if (velodyne->HasLatestFrame()) {
+          PreviewLidar(velodyne->GetLatestFrame(),velodyne->rgb_project, velodyne->velodyne_to_rgb, rgb_view_);
+        }
+        else {
+          PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
+                       velodyne->rgb_project, velodyne->velodyne_to_rgb, rgb_view_);
+        }
+
         Toc(true);
       }
 
@@ -933,8 +940,8 @@ private:
 /// This is useful when you want to focus on the quality of the reconstruction, instead of that of
 /// the odometry.
 void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
-//  Input::Config input_config = Input::KittiOdometryConfig();
-  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+  Input::Config input_config = Input::KittiOdometryConfig();
+//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
   VoxelDecayParams voxel_decay_params(
       FLAGS_voxel_decay,
@@ -960,19 +967,23 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       *input_out,
       dataset_root + "/" + input_config.depth_folder,
       input_config.depth_fname_format,
-      input_config.read_depth);
+      input_config.read_depth,
+      frame_offset,
+      input_config.min_depth_m,
+      input_config.max_depth_m
+  );
   (*input_out)->SetDepthProvider(depth);
 
   // [RIP] I lost a couple of hours debugging a bug caused by the fact that InfiniTAM still works
   // even when there is a discrepancy between the size of the depth/rgb inputs, as specified in the
   // calibration file, and the actual size of the input images (but it screws up the previews).
 
-  ITMLibSettings *settings = new ITMLibSettings();
-  settings->groundTruthPoseFpath = dataset_root + "/" + input_config.odometry_fname;
-  settings->groundTruthPoseOffset = frame_offset;
+  ITMLibSettings *driver_settings = new ITMLibSettings();
+  driver_settings->groundTruthPoseFpath = dataset_root + "/" + input_config.odometry_fname;
+  driver_settings->groundTruthPoseOffset = frame_offset;
 
   drivers::InfiniTamDriver *driver = new InfiniTamDriver(
-      settings,
+      driver_settings,
       new ITMRGBDCalib(itm_calibration),
       ToItmVec((*input_out)->GetRgbSize()),
       ToItmVec((*input_out)->GetDepthSize()),
@@ -1015,7 +1026,9 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       -6.481465826011e-03, 8.051860151134e-03, -9.999466081774e-01, -7.337429464231e-02,
       9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,
       0, 0, 0, 1;
-  auto evaluation = new dynslam::eval::Evaluation(dataset_root, *input_out, velo_to_cam, left_cam_proj);
+  auto evaluation = new dynslam::eval::Evaluation(dataset_root, *input_out, velo_to_cam,
+                                                  left_cam_proj,
+                                                  driver_settings->sceneParams.voxelSize);
 
   *dyn_slam_out = new gui::DynSlam();
   (*dyn_slam_out)->Initialize(driver, segmentation_provider, sparse_sf_provider, evaluation);
