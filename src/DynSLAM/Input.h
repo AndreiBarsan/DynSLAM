@@ -124,7 +124,7 @@ class Input {
   /// \brief Gets the name of the dataset folder which we are using.
   /// TODO(andrei): Make this more robust.
   std::string GetSequenceName() const {
-    return dataset_folder_.substr(dataset_folder_.rfind('/'));
+    return dataset_folder_.substr(dataset_folder_.rfind('/') + 1);
   }
 
   std::string GetDatasetIdentifier() const {
@@ -148,6 +148,10 @@ class Input {
   /// \brief Sets the out parameters to the RGB and depth images from the specified frame.
   void GetFrameCvImages(int frame_idx, std::shared_ptr<cv::Mat3b> &rgb, std::shared_ptr<cv::Mat1s> &raw_depth);
 
+  const Config& GetConfig() const {
+    return config_;
+  }
+
  private:
   std::string dataset_folder_;
   Config config_;
@@ -166,9 +170,9 @@ class Input {
   cv::Mat1b left_frame_gray_buf_;
   cv::Mat1b right_frame_gray_buf_;
 
-  static std::string GetFrameName(std::string root,
-                                  std::string folder,
-                                  std::string fname_format,
+  static std::string GetFrameName(const std::string &root,
+                                  const std::string &folder,
+                                  const std::string &fname_format,
                                   int frame_idx) {
     return root + "/" + folder + "/" + utils::Format(fname_format, frame_idx);
   }

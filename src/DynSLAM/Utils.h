@@ -73,6 +73,8 @@ std::ostream& operator<<(std::ostream &out, const Option<T> &option) {
 bool EndsWith(const std::string &value, const std::string &ending);
 
 /// \brief Streamlined 'sprintf' functionality for C++.
+/// \note If you're getting gibberish printing strings, make sure you pass 'c_str()' to the
+/// function, not the actual string object.
 std::string Format(const std::string& fmt, ...);
 
 inline bool FileExists(const std::string &fpath) {

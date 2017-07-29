@@ -34,7 +34,15 @@ DEFINE_string(dataset_root, "", "The root folder of the dataset sequence to use.
 // Useful offsets for dynamic object reconstruction:
 //  int frame_offset = 85; // for odo seq 02
 //  int frame_offset = 4015;         // Clear dynamic object in odometry sequence 08.
-DEFINE_int32 (frame_offset, 0, "The frame index from which to start reading the dataset sequence.");
+DEFINE_int32(frame_offset, 0, "The frame index from which to start reading the dataset sequence.");
+
+DEFINE_bool(voxel_decay, true, "Whether to enable map regularization via voxel decay (a.k.a. voxel "
+                               "garbage collection).");
+DEFINE_int32(min_decay_age, 50, "The minimum voxel *block* age for voxels within it to be eligible "
+                                " for deletion (garbage collection).");
+DEFINE_int32(max_decay_weight, 2, "The maximum voxle weight for decay. Voxels which have "
+                                  "accumulated more than this many measurements will not be "
+                                  "removed.");
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
 // issue.
@@ -131,13 +139,13 @@ public:
       }
 
       if (dyn_slam_->GetCurrentFrameNo() > 1) {
-        const unsigned char *preview = dyn_slam_->GetStaticMapRaycastPreview(
-            pane_cam_->GetModelViewMatrix(),
-            static_cast<PreviewType>(current_preview_type_));
-          pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
-          pane_texture_->RenderToViewport(true);
+//        const unsigned char *preview = dyn_slam_->GetStaticMapRaycastPreview(
+//            pane_cam_->GetModelViewMatrix(),
+//            static_cast<PreviewType>(current_preview_type_));
+//          pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
+//          pane_texture_->RenderToViewport(true);
 
-        /*
+        //*
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
         auto lidar_pointcloud = velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1);
         float max_depth_meters = dyn_slam_input_->GetDepthProvider()->GetMaxDepthMeters();
@@ -198,7 +206,7 @@ public:
                      width_,
                      height_,
                      max_depth_meters);
-        */
+        //*/
       }
 
       pangolin::GlFont &font = pangolin::GlFont::I();
@@ -385,7 +393,7 @@ public:
     // TODO(andrei): Loop for delta_max in [0, 8] like Sengupta et al. BUT, instead of showing just
     // a single plot, consider making a richer one showing maybe even the distribution of the errors
     // over time.
-    static const int delta_max = 10;
+    static const int delta_max = 3;
     int errors = 0;
     int measurements = 0;
 
@@ -477,12 +485,12 @@ public:
       colors[idx_c++] = color(2);
     }
 
-
-    double delta_mean = delta_sum * 1.0 / measurements;
-    cout << "Mean delta: "<< delta_mean << endl;
-
-    double correct_pixels_ratio = (1.0 - (errors * 1.0) / measurements);
-    cout << "Correct pixels ratio: " << correct_pixels_ratio << " @ delta max = " << delta_max << endl;
+//
+//    double delta_mean = delta_sum * 1.0 / measurements;
+//    cout << "Mean delta: "<< delta_mean << endl;
+//
+//    double correct_pixels_ratio = (1.0 - (errors * 1.0) / measurements);
+//    cout << "Correct pixels ratio: " << correct_pixels_ratio << " @ delta max = " << delta_max << endl;
 
     pangolin::glDrawColoredVertices<float>(idx_v / 2, verts, colors, GL_POINTS, 2, 3);
     glEnable(GL_DEPTH_TEST);
@@ -925,9 +933,14 @@ private:
 /// This is useful when you want to focus on the quality of the reconstruction, instead of that of
 /// the odometry.
 void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
-  Input::Config input_config = Input::KittiOdometryConfig();
-//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+//  Input::Config input_config = Input::KittiOdometryConfig();
+  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
+  VoxelDecayParams voxel_decay_params(
+      FLAGS_voxel_decay,
+      FLAGS_min_decay_age,
+      FLAGS_max_decay_weight
+  );
 
   int frame_offset = FLAGS_frame_offset;
 
@@ -962,7 +975,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       settings,
       new ITMRGBDCalib(itm_calibration),
       ToItmVec((*input_out)->GetRgbSize()),
-      ToItmVec((*input_out)->GetDepthSize()));
+      ToItmVec((*input_out)->GetDepthSize()),
+      voxel_decay_params);
 
   const string seg_folder = dataset_root + "/" + input_config.segmentation_folder;
   auto segmentation_provider =
@@ -1001,7 +1015,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       -6.481465826011e-03, 8.051860151134e-03, -9.999466081774e-01, -7.337429464231e-02,
       9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,
       0, 0, 0, 1;
-  auto evaluation = new dynslam::eval::Evaluation(dataset_root, input_config, velo_to_cam, left_cam_proj);
+  auto evaluation = new dynslam::eval::Evaluation(dataset_root, *input_out, velo_to_cam, left_cam_proj);
 
   *dyn_slam_out = new gui::DynSlam();
   (*dyn_slam_out)->Initialize(driver, segmentation_provider, sparse_sf_provider, evaluation);
@@ -1010,7 +1024,15 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 } // namespace dynslam
 
 int main(int argc, char **argv) {
-  using namespace dynslam;
+  gflags::SetUsageMessage("The GUI for the DynSLAM dense simultaneous localization and mapping "
+                          "system for dynamic environments.\nThis project was built as Andrei "
+                          "Barsan's MSc Thesis in Computer Science at the Swiss Federal "
+                          "Institute of Technology, Zurich (ETHZ) in the Spring/Summer of 2017, "
+                          "under the supervision of Liu Peidong and Professor Andreas Geiger.\n\n"
+                          "Project webpage with source code and more information: "
+                          "https://github.com/AndreiBarsan/DynSLAM\n\n"
+                          "Based on the amazing InfiniTAM volumetric fusion framework (https://github.com/victorprad/InfiniTAM).\n"
+                          "Please see the README.md file for further information and credits.");
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   const string dataset_root = FLAGS_dataset_root;
@@ -1027,11 +1049,11 @@ int main(int argc, char **argv) {
     ));
   }
 
-  DynSlam *dyn_slam;
-  Input *input;
+  dynslam::DynSlam *dyn_slam;
+  dynslam::Input *input;
   BuildDynSlamKittiOdometryGT(dataset_root, &dyn_slam, &input);
 
-  gui::PangolinGui pango_gui(dyn_slam, input);
+  dynslam::gui::PangolinGui pango_gui(dyn_slam, input);
   pango_gui.Run();
 
   delete dyn_slam;

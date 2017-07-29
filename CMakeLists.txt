@@ -121,6 +121,8 @@ set(DYNSLAM_SOURCES
     src/DynSLAM/Evaluation/Velodyne.cpp
     src/DynSLAM/InfiniTamDriver.cpp
     src/DynSLAM/Input.cpp
+    src/DynSLAM/DepthProvider.h
+    src/DynSLAM/PrecomputedDepthProvider.h
     src/DynSLAM/PrecomputedDepthProvider.cpp
     src/DynSLAM/Utils.cpp)
 
