@@ -63,6 +63,10 @@ class Velodyne {
   /// \brief Returns an Nx4 **row-major** Eigen matrix containing the Velodyne readings from the
   ///        latest read frame.
   LidarReadings GetLatestFrame();
+
+  bool HasLatestFrame() const {
+    return nullptr != latest_frame_;
+  }
 };
 
 }
