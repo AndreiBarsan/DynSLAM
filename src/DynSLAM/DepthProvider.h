@@ -32,7 +32,11 @@ struct StereoCalibration {
 /// return their results into pre-allocated out parameters.
 class DepthProvider {
  public:
-  virtual ~DepthProvider() {}
+  DepthProvider (const DepthProvider&) = default;
+  DepthProvider (DepthProvider&&) = default;
+  DepthProvider& operator=(const DepthProvider&) = default;
+  DepthProvider& operator=(DepthProvider&&) = default;
+  virtual ~DepthProvider() = default;
 
   /// \brief Computes a depth map from a stereo image pair (stereo -> disparity -> depth).
   virtual void DepthFromStereo(const cv::Mat &left,
@@ -139,9 +143,10 @@ class DepthProvider {
   }
 
  protected:
+  /// \param Whether the input is a depth map, or just a disparity map.
   /// \param min_depth_m The minimum depth, in meters, which is not considered too noisy.
   /// \param max_depth_m The maximum depth, in meters, which is not considered too noisy.
-  DepthProvider(bool input_is_depth, float min_depth_m = 0.50f, float max_depth_m = 16.0f) :
+  explicit DepthProvider(bool input_is_depth, float min_depth_m = 0.50f, float max_depth_m = 25.0f) :
       input_is_depth_(input_is_depth),
       min_depth_m_(min_depth_m),
       max_depth_m_(max_depth_m) {}

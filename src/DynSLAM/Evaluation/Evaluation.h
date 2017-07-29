@@ -13,6 +13,7 @@ class DynSlam;
 namespace dynslam {
 namespace eval {
 
+/// \brief Interface for poor man's serialization.
 class ICsvSerializable {
  public:
   /// \brief Should return the field names in the same order as GetData, without a newline.
@@ -71,10 +72,7 @@ struct DepthEvaluationMeta {
 
 /// \brief Stores the result of comparing a computed depth with a LIDAR ground truth.
 struct DepthEvaluation : public ICsvSerializable {
-  // Parameters
-  const DepthEvaluationMeta meta;
   const int delta_max;
-  const float max_depth_meters;
 
   /// \brief Results for the depth map synthesized from engine.
   const DepthResult fused_result;
@@ -82,14 +80,10 @@ struct DepthEvaluation : public ICsvSerializable {
   /// \brief Results for the depth map received as input.
   const DepthResult input_result;
 
-  DepthEvaluation(const DepthEvaluationMeta &meta,
-                  const int delta_max,
-                  const float max_depth_meters,
-                  const DepthResult &fused_result,
-                  const DepthResult &input_result)
-      : meta(meta),
-        delta_max(delta_max),
-        max_depth_meters(max_depth_meters),
+  DepthEvaluation(const int delta_max,
+                  DepthResult &&fused_result,
+                  DepthResult &&input_result)
+      : delta_max(delta_max),
         fused_result(fused_result),
         input_result(input_result) {}
 
@@ -101,29 +95,67 @@ struct DepthEvaluation : public ICsvSerializable {
   }
 
   string GetData() const override {
-//    return utils::Format("%s, %s", fused_result.GetData().c_str(), input_result.GetData().c_str());
-    return fused_result.GetData();
+    return utils::Format("%s, %s", fused_result.GetData().c_str(), input_result.GetData().c_str());
+  }
+};
+
+/// \brief Contains a frame's depth evaluation results for multiple values of $\delta_max$.
+struct DepthFrameEvaluation : public ICsvSerializable {
+  const DepthEvaluationMeta meta;
+  const float max_depth_meters;
+  const std::vector<DepthEvaluation> evaluations;
+
+  DepthFrameEvaluation(DepthEvaluationMeta &&meta,
+                       float max_depth_meters,
+                       vector<DepthEvaluation> &&evaluations)
+      : meta(meta), max_depth_meters(max_depth_meters), evaluations(evaluations) {}
+
+  string GetHeader() const override {
+    std::stringstream ss;
+    ss << "frame, ";
+    for (auto &eval : evaluations) {
+      ss << eval.GetHeader() << ", ";
+    }
+    return ss.str();
+  }
+
+  string GetData() const override {
+    std::stringstream ss;
+    ss << meta.frame_idx;
+    for (auto &eval :evaluations) {
+      ss << eval.GetData() << ", ";
+    }
+    return ss.str();
   }
 };
 
 /// \brief Main class handling the quantitative evaluation of the DynSLAM system.
 class Evaluation {
  public:
-  static std::string GetCsvName(const std::string &dataset_root, const Input::Config &input_config) {
-    // TODO(andrei): Be more thorough and creative!
-    return "out.csv";
+  static std::string GetCsvName(const std::string &dataset_root, const Input *input) {
+    auto res = utils::Format("%s-offset-%d-results.csv",
+                         input->GetDatasetIdentifier().c_str(),
+                         input->GetCurrentFrame());
+    cout << "CSV name: " << res << endl;
+    return res;
   }
 
  public:
-  Evaluation(const std::string &dataset_root, const Input::Config &input_config,
+  Evaluation(const std::string &dataset_root, const Input *input,
              const Eigen::Matrix4f &velodyne_to_rgb, const Eigen::MatrixXf &left_cam_projection)
-      : velodyne_(new Velodyne(
-      utils::Format("%s/%s", dataset_root.c_str(), input_config.velodyne_folder.c_str()),
-      input_config.velodyne_fname_format,
-      velodyne_to_rgb,
-      left_cam_projection)),
-        csv_dump_(new std::ofstream(GetCsvName(dataset_root, input_config)))
+      : velodyne_(new Velodyne(utils::Format("%s/%s",
+                                             dataset_root.c_str(),
+                                             input->GetConfig().velodyne_folder.c_str()),
+                                input->GetConfig().velodyne_fname_format,
+                                velodyne_to_rgb,
+                                left_cam_projection)),
+        csv_dump_(new std::ofstream(GetCsvName(dataset_root, input)))
   {}
+
+  Evaluation(const Evaluation&) = delete;
+  Evaluation(const Evaluation&&) = delete;
+  Evaluation& operator=(const Evaluation&) = delete;
+  Evaluation& operator=(const Evaluation&&) = delete;
 
   virtual ~Evaluation() {
     delete csv_dump_;
@@ -133,7 +165,7 @@ class Evaluation {
   /// \brief Supermethod in charge of all per-frame evaluation metrics.
   void EvaluateFrame(Input *input, DynSlam *dyn_slam);
 
-  std::vector<DepthEvaluation> EvaluateFrame(int frame_idx, Input *input, DynSlam *dyn_slam);
+  DepthFrameEvaluation EvaluateFrame(int frame_idx, Input *input, DynSlam *dyn_slam);
 
   static uint depth_delta(uchar computed_depth, uchar ground_truth_depth) {
     return static_cast<uint>(abs(
@@ -150,24 +182,23 @@ class Evaluation {
   /// quantized depth and the LIDAR point's is below 'delta_max'. Based on the evaluation method
   /// from [0].
   ///
-  /// TODO-LOW(andrei): Honestly, the [0] approach is not very good. It would make more sense to use
+  /// TODO-LOW(andrei): Honestly, the [0] approach is not perfect. It would make more sense to use
   /// float metric depth, and make the deltas also metric, i.e., more meaningful...
   ///
   /// [0]: Sengupta, S., Greveson, E., Shahrokni, A., & Torr, P. H. S. (2013). Urban 3D semantic modelling using stereo vision. Proceedings - IEEE International Conference on Robotics and Automation, 580–585. https://doi.org/10.1109/ICRA.2013.6630632
   DepthEvaluation EvaluateDepth(
-      const DepthEvaluationMeta &meta,
       const Eigen::MatrixX4f &lidar_points,
-      const uchar *const rendered_depth,
-      const uchar *const input_depth,
+      const uchar *rendered_depth,
+      const uchar *input_depth,
       const Eigen::Matrix4f &velo_to_cam,
       const Eigen::MatrixXf &cam_proj,
-      const int frame_width,
-      const int frame_height,
-      const float min_depth_meters,
-      const float max_depth_meters,
-      const uint delta_max,
-      const uint rendered_stride = 4,
-      const uint input_stride = 4
+      int frame_width,
+      int frame_height,
+      float min_depth_meters,
+      float max_depth_meters,
+      uint delta_max,
+      uint rendered_stride = 4,
+      uint input_stride = 4
   ) const;
 
   Velodyne *GetVelodyne() {

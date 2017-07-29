@@ -8,10 +8,15 @@
 #include <opencv/cv.h>
 #include <pangolin/pangolin.h>
 #include <Eigen/Core>
+#include <gflags/gflags.h>
 
 #include "../InfiniTAM/InfiniTAM/ITMLib/Engine/ITMMainEngine.h"
+#include "Defines.h"
 #include "Input.h"
 #include "PreviewType.h"
+#include "VoxelDecayParams.h"
+
+DECLARE_bool(enable_evaluation);
 
 namespace dynslam {
 namespace drivers {
@@ -76,13 +81,15 @@ public:
       const ITMLibSettings *settings,
       const ITMRGBDCalib *calib,
       const Vector2i &img_size_rgb,
-      const Vector2i &img_size_d)
+      const Vector2i &img_size_d,
+      const VoxelDecayParams &voxel_decay_params)
       : ITMMainEngine(settings, calib, img_size_rgb, img_size_d),
         rgb_itm_(new ITMUChar4Image(img_size_rgb, true, true)),
         raw_depth_itm_(new ITMShortImage(img_size_d, true, true)),
         rgb_cv_(new cv::Mat3b(img_size_rgb.height, img_size_rgb.width)),
         raw_depth_cv_(new cv::Mat1s(img_size_d.height, img_size_d.width)),
-        last_egomotion_(new Eigen::Matrix4f)
+        last_egomotion_(new Eigen::Matrix4f),
+        voxel_decay_params_(voxel_decay_params)
   {
     last_egomotion_->setIdentity();
   }
@@ -101,11 +108,6 @@ public:
 
   // used by the instance reconstruction
   void SetView(ITMView *view) {
-    if (this->view) {
-      // TODO(andrei): These views should be memory managed by the tracker. Make sure this is right.
-//      delete this->view;
-    }
-
     this->view = view;
   }
 
@@ -185,15 +187,19 @@ public:
   /// Very useful for, e.g., reducing artifacts caused by noisy depth maps.
   /// \note This implementation is only supported on the GPU, and for voxel hashing.
   void Decay() {
-    denseMapper->Decay(scene, renderState_live, max_decay_weight_, min_decay_age_, false);
+    if (voxel_decay_params_.enabled) {
+      denseMapper->Decay(scene, renderState_live, voxel_decay_params_.max_decay_weight,
+                         voxel_decay_params_.min_decay_age, false);
+    }
   }
 
   /// \brief Aggressive decay which ignores the minimum age requirement and acts on ALL voxels.
   /// Typically used to clean up finished reconstructions. Can be much slower than `Decay`, even by
   /// a few orders of magnitude if used on the full static map.
   void Reap(int max_decay_weight) {
-    // TODO(andrei): If this works OK, then just get rid of agressive decay param(s).
-    denseMapper->Decay(scene, renderState_live, max_decay_weight, 0, true);
+    if (voxel_decay_params_.enabled) {
+      denseMapper->Decay(scene, renderState_live, max_decay_weight, 0, true);
+    }
   }
 
   size_t GetVoxelSizeBytes() const {
@@ -217,8 +223,15 @@ public:
     }
   }
 
-  // Necessary for having Eigen types as fields.
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+  VoxelDecayParams& GetVoxelDecayParams() {
+    return voxel_decay_params_;
+  }
+
+  const VoxelDecayParams& GetVoxelDecayParams() const {
+    return voxel_decay_params_;
+  }
+
+  SUPPORT_EIGEN_FIELDS;
 
  private:
   ITMUChar4Image *rgb_itm_;
@@ -229,18 +242,8 @@ public:
 
   Eigen::Matrix4f *last_egomotion_;
 
-  // Parameters for voxel decay
-  // ELAS
-//  int max_decay_weight_ = 3;
-//  int min_decay_age_ = 10;
-
-    int max_decay_weight_= 2;
-    int aggressive_max_decay_weight_= 2;
-    int min_decay_age_ = 50;
-  /// \brief Voxels older than this are eligible for decay.
-//  int min_decay_age_ = 10;
-  /// \brief Voxels with a weight smaller than this are decayed, provided that they are old enough.
-//  int max_decay_weight_ = 2;
+  // Parameters for voxel decay (map regularization).
+  VoxelDecayParams voxel_decay_params_;
 };
 
 } // namespace drivers
