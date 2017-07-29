@@ -41,11 +41,7 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
            << " | Input accuracy  = " <<  setw(7) << setprecision(3)
            << eval.input_result.GetCorrectPixelRatio(missing_depths_are_errors)
            << endl;
-
-      *csv_dump_ << eval.GetData() << ", ";
     }
-
-    *csv_dump_ << endl;
   }
 }
 
