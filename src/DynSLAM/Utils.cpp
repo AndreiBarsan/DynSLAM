@@ -25,6 +25,7 @@ bool EndsWith(const string &value, const string &ending){
 }
 
 string Format(const string& fmt, ...) {
+  // TODO-LOW(andrei): Use varadic templates to implement in a typesafe, string-friendly manner.
   // Keeps track of the resulting string size.
   size_t out_size = fmt.size() * 2;
   unique_ptr<char[]> formatted;
@@ -88,15 +89,15 @@ int64_t MicroToMilli(int64_t time_micro) {
 }
 
 int64_t GetTimeMs() {
-  struct timeval time;
-  gettimeofday(&time, NULL);
+  timeval time;
+  gettimeofday(&time, nullptr);
   int64_t time_us = time.tv_sec * 1000L + time.tv_usec / 1000;
   return time_us;
 }
 
 int64_t GetTimeMicro() {
-  struct timeval time;
-  gettimeofday(&time, NULL);
+  timeval time;
+  gettimeofday(&time, nullptr);
   int64_t time_us = time.tv_sec * 1000L * 1000L + time.tv_usec;
   return time_us;
 }

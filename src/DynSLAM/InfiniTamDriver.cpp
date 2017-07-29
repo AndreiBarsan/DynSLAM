@@ -2,7 +2,9 @@
 
 #include "InfiniTamDriver.h"
 
-#include <Eigen/Core>
+DEFINE_bool(enable_evaluation, true, "Whether to enable evaluation mode for DynSLAM. This means "
+    "the system will load in LIDAR ground truth and compare its maps with it, dumping the results "
+    "in CSV format.");
 
 namespace dynslam {
 namespace drivers {

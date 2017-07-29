@@ -24,7 +24,6 @@ using namespace instreclib::segmentation;
 using namespace dynslam::drivers;
 
 // TODO(andrei): Get rid of ITM-specific image objects for visualization.
-
 /// \brief The central class of the DynSLAM system.
 /// It processes input stereo frames and generates separate maps for all encountered object
 /// instances, as well one for the static background.
@@ -104,13 +103,6 @@ class DynSlam {
       // This happens when there's no instances to preview.
       out_image_float_->Clear();
     } else {
-      if (object_idx == 3 && current_frame_no_ > 20) {
-//        cv::Mat1s out(this->out_image_->noDims.y, this->out_image_->noDims.x);
-//        dynslam::drivers::ItmToCv(*preview, &out);
-//        cv::imshow("foo", out);
-//        cv::waitKey();
-      }
-
       out_image_float_->SetFrom(preview, ORUtils::MemoryBlock<float>::CPU_TO_CPU);
     }
 
@@ -197,8 +189,6 @@ private:
 
   /// Whether to force instance reconstruction even for static ones.
   bool always_reconstruct_objects_ = false;
-
-  bool enable_map_decay_ = true;
 
   /// \brief Returns a path to the folder where the dataset's meshes should be dumped, creating it
   ///        using a naive system call if it does not exist.

@@ -342,16 +342,20 @@ void InstanceReconstructor::ProcessReconstructions(bool always_separate) {
 }
 
 void InstanceReconstructor::InitializeReconstruction(Track &track) const {
-  cout << endl << endl;
-  cout << "Starting to reconstruct instance with ID: " << track.GetId() << endl << endl;
+  cout << endl << "Starting to reconstruct instance with ID: " << track.GetId() << endl << endl;
   ITMLibSettings *settings = new ITMLibSettings(*driver_->GetSettings());
 
   // Set a much smaller voxel block number for the reconstruction, since individual objects
   // occupy a limited amount of space in the scene.
-  // TODO(andrei): Set this limit based on some physical specification, such as 10m x 10m x 10m.
-  settings->sdfLocalBlockNum = 9000;
   // We don't want to create an (expensive) meshing engine for every instance.
   settings->createMeshingEngine = false;
+
+//  settings->sceneParams.mu = 0.3f;
+//  settings->sceneParams.voxelSize = 0.035f;
+  // Set the volume to roughly represent 5m x 5m x 10m, which should be more than enough for most
+  // common vehicles.
+  settings->sdfLocalBlockNum = static_cast<long>(5 * 5 * 10 / settings->sceneParams.voxelSize);
+
   // To be used in conjunction with coarse feature-based alignment.
   settings->trackerType = ITMLibSettings::TrackerType::TRACKER_ICP;
 
@@ -359,7 +363,8 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
           settings,
           driver_->GetView()->calib,
           driver_->GetView()->rgb->noDims,
-          driver_->GetView()->rgb->noDims);
+          driver_->GetView()->rgb->noDims,
+          driver_->GetVoxelDecayParams());
 
   // TODO(andrei): This may not work for the (Stat/dyn) -> Unc -> (stat/dyn) situation!
   // If we already have some frames, integrate them into the new volume.
