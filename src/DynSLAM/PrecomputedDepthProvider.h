@@ -28,11 +28,16 @@ class PrecomputedDepthProvider : public DepthProvider {
         folder_(folder),
         fname_format_(fname_format) {}
 
-  virtual ~PrecomputedDepthProvider() {}
+  PrecomputedDepthProvider(const PrecomputedDepthProvider&) = delete;
+  PrecomputedDepthProvider(PrecomputedDepthProvider&&) = delete;
+  PrecomputedDepthProvider& operator=(const PrecomputedDepthProvider&) = delete;
+  PrecomputedDepthProvider& operator=(PrecomputedDepthProvider&&) = delete;
 
-  virtual void DisparityMapFromStereo(const cv::Mat &left,
-                                      const cv::Mat &right,
-                                      cv::Mat &out_disparity) override;
+  ~PrecomputedDepthProvider() override = default;
+
+  void DisparityMapFromStereo(const cv::Mat &left,
+                              const cv::Mat &right,
+                              cv::Mat &out_disparity) override;
 
 
   /// \brief Loads the precomputed depth map for the specified frame into 'out_depth'.
@@ -57,13 +62,11 @@ class PrecomputedDepthProvider : public DepthProvider {
     }
   }
 
-  virtual float DepthFromDisparity(const float disparity_px,
-                                   const StereoCalibration &calibration) override;
+  float DepthFromDisparity(const float disparity_px, const StereoCalibration &calibration) override;
 
   const std::string &GetName() const override;
 
  protected:
-
   /// \brief Reads a disparity or depth (depending on the data).
   void ReadPrecomputed(int frame_idx, cv::Mat &out) const;
 
