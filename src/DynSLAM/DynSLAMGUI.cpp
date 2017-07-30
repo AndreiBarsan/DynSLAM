@@ -604,7 +604,9 @@ protected:
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // GUI components
+    /***************************************************************************
+     * GUI Buttons
+     **************************************************************************/
     pangolin::CreatePanel("ui")
       .SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(kUiWidth));
 
@@ -617,11 +619,16 @@ protected:
 
     auto save_map = [this]() {
       Tic("Static map mesh generation");
-      cout << "Saving static map..." << endl;
-      dyn_slam_->SaveStaticMap(dyn_slam_input_->GetSequenceName(),
-                               dyn_slam_input_->GetDepthProvider()->GetName());
-      cout << "Mesh generated OK. Writing asynchronously to the disk..." << endl;
-      Toc();
+      if (dyn_slam_->GetCurrentFrameNo() < 2) {
+        cerr << "Warning: no map to save!" << endl;
+      }
+      else {
+        cout << "Saving static map..." << endl;
+        dyn_slam_->SaveStaticMap(dyn_slam_input_->GetSequenceName(),
+                                 dyn_slam_input_->GetDepthProvider()->GetName());
+        cout << "Mesh generated OK. Writing asynchronously to the disk..." << endl;
+        Toc();
+      }
     };
 
     pangolin::Var<function<void(void)>> save_map_button("ui.[S]ave Static Map", save_map);
@@ -632,14 +639,6 @@ protected:
     );
 
     reconstructions = new pangolin::Var<string>("ui.Rec", "");
-
-    wiggle_mode_ = new pangolin::Var<bool>("ui.Wiggle mode", false, true);
-    autoplay_ = new pangolin::Var<bool>("ui.[A]utoplay", false, true);
-    pangolin::RegisterKeyPressCallback('a', [this]() {
-      *(this->autoplay_) = ! *(this->autoplay_);
-    });
-    display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", true, true);
-    preview_sf_ = new pangolin::Var<bool>("ui.Show Scene Flow", false, true);
 
     pangolin::Var<function<void(void)>> previous_object("ui.Previous Object [z]", [this]() {
       SelectPreviousVisualizedObject();
@@ -679,6 +678,18 @@ protected:
     pangolin::Var<function<void(void)>> npt("ui.Next Preview Type [k]", next_preview_type);
     pangolin::RegisterKeyPressCallback('k', next_preview_type);
 
+    /***************************************************************************
+     * GUI Checkboxes
+     **************************************************************************/
+    wiggle_mode_ = new pangolin::Var<bool>("ui.Wiggle mode", false, true);
+    autoplay_ = new pangolin::Var<bool>("ui.[A]utoplay", false, true);
+    pangolin::RegisterKeyPressCallback('a', [this]() {
+      *(this->autoplay_) = ! *(this->autoplay_);
+    });
+    display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", true, true);
+    preview_sf_ = new pangolin::Var<bool>("ui.Show Scene Flow", false, true);
+
+
     // This is used for the free view camera. The focal lengths are not used in rendering, BUT they
     // impact the sensitivity of the free view camera. The smaller they are, the faster the camera
     // responds to input (ideally, you should use the translation and zoom scales to control this,
@@ -689,22 +700,17 @@ protected:
                                        width_ / 2, height_ / 2,
                                        0.1, 1000);
 
-    // TODO(andrei): Set based on initial camera pose, to account for starting the reconstruction
-    // from a mid-frame, instead of the first one.
     pane_cam_ = new pangolin::OpenGlRenderState(
         proj_,
         pangolin::ModelViewLookAt(0, 0, 0,
                                   0, 0, -1,
-        // -Y is up.
-//        pangolin::ModelViewLookAt(0, -7.5, 290,
-//                                  0, -7.5, 289,
                                   pangolin::AxisY));
-
     instance_cam_ = new pangolin::OpenGlRenderState(
         proj_,
         pangolin::ModelViewLookAt(
-          -3.0, -1.00,  12.75,
-          -3.0, -1.00,  10.0,
+          // -y is up
+          0.0, 0.50,  6.75,
+          0.0, 0.50,  4.0,
           pangolin::AxisY)
     );
 
