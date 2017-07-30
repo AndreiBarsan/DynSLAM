@@ -21,7 +21,8 @@ namespace reconstruction {
 
 using namespace dynslam::drivers;
 
-// TODO(andrei): Extract an interface from this class once its functionality is defined better.
+// TODO-LOW(andrei): Extract an interface from this class once its functionality is defined better,
+// since the libviso-based implementation is just one possibility.
 /// \brief Pipeline component responsible for reconstructing the individual object instances.
 class InstanceReconstructor {
  public:
@@ -42,7 +43,7 @@ class InstanceReconstructor {
         class_name) != kPossiblyDynamicClassesVoc2012.cend());
   }
 
-  InstanceReconstructor(InfiniTamDriver *driver, bool use_decay = true)
+  explicit InstanceReconstructor(InfiniTamDriver *driver, bool use_decay = true)
       : instance_tracker_(new InstanceTracker()),
         frame_idx_(0),
         driver_(driver),
@@ -51,7 +52,7 @@ class InstanceReconstructor {
   /// \brief Uses the segmentation result to remove dynamic objects from the main view and save
   ///        them to separate buffers, which are then used for individual object reconstruction.
   ///
-  /// This is the core of the reconstruction engine.
+  /// This is the core of the instance reconstruction engine.
   ///
   /// \param dyn_slam The owner of this component.
   /// \param main_view The original InfiniTAM view of the scene. Gets mutated!
