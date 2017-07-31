@@ -16,6 +16,8 @@ namespace eval {
 /// \brief Interface for poor man's serialization.
 class ICsvSerializable {
  public:
+  virtual ~ICsvSerializable() = default;
+
   /// \brief Should return the field names in the same order as GetData, without a newline.
   virtual std::string GetHeader() const = 0;
   virtual std::string GetData() const = 0;
