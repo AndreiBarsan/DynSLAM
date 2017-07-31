@@ -11,3 +11,4 @@ install/
 doxygen-html/
 .idea/
 cmake-build-debug/
+media/
