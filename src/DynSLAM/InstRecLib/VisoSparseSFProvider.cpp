@@ -4,6 +4,11 @@
 
 namespace instreclib {
 
+Eigen::Matrix4d VisoToEigen(const Matrix &viso_matrix) {
+  //  The '~' transposes the matrix...
+  return Eigen::Matrix4d((~viso_matrix).val[0]);
+}
+
 void VisoSparseSFProvider::ComputeSparseSF(const ViewPair &, const ViewPair &current_view) {
   using namespace std;
   using namespace dynslam::utils;

@@ -35,18 +35,9 @@ void DynSlam::ProcessFrame(Input *input) {
   });
 
   future<void> tracking_and_ssf = async(launch::async, [this, &input, &first_frame] {
-    utils::Tic("Visual Odometry");
-    static_scene_->Track();
-    utils::Toc("Visual Odometry", false);
-
     utils::Tic("Sparse Scene Flow");
     cv::Mat1b *left_gray, *right_gray;
     input->GetCvStereoGray(&left_gray, &right_gray);
-
-    // TODO(andrei): Pass egomotion here, so that SF computation is relative to egomotion (so most
-    // SF values, such as those associated with the road or buildings would become close to zero).
-    // Look at libviso2 source code for inspiration on the relation between egomotion and SF. How do
-    // they extract egomotion from the SF?
     sparse_sf_provider_->ComputeSparseSF(
         make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
         make_pair(left_gray, right_gray)
@@ -55,6 +46,19 @@ void DynSlam::ProcessFrame(Input *input) {
       cerr << "Warning: could not compute scene flow." << endl;
     }
     utils::Toc("Sparse Scene Flow", false);
+
+    utils::Tic("Visual Odometry");
+    // TODO(andrei): More proper way of doing this, e.g., by defining a new ITM tracker and giving
+    // it a reference to the viso object.
+    Eigen::Matrix4f delta = sparse_sf_provider_->GetLatestMotion();
+    Eigen::Matrix4f new_pose = delta * poses_[poses_.size() - 1];
+    static_scene_->SetPose(new_pose.inverse());
+    poses_.push_back(new_pose);
+
+//    static_scene_->Track();
+
+    utils::Toc("Visual Odometry", false);
+
   });
 
   seg_result_future.wait();
