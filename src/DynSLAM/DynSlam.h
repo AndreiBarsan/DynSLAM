@@ -8,7 +8,6 @@
 #include "InstRecLib/PrecomputedSegmentationProvider.h"
 #include "InstRecLib/SparseSFProvider.h"
 #include "Input.h"
-#include "Evaluation/Evaluation.h"
 
 namespace dynslam {
 namespace eval {
@@ -29,20 +28,31 @@ using namespace dynslam::drivers;
 /// instances, as well one for the static background.
 class DynSlam {
  public:
-  // TODO(andrei): If possible, get rid of the initialize method.
-  void Initialize(InfiniTamDriver *itm_static_scene_engine,
-                  SegmentationProvider *segmentation_provider,
-                  SparseSFProvider *sparse_sf_provider,
-                  dynslam::eval::Evaluation *evaluation);
+  DynSlam(InfiniTamDriver *itm_static_scene_engine,
+          SegmentationProvider *segmentation_provider,
+          SparseSFProvider *sparse_sf_provider,
+          dynslam::eval::Evaluation *evaluation,
+          const Vector2i &input_shape,
+          float max_depth_meters)
+    : static_scene_(itm_static_scene_engine),
+      sparse_sf_provider_(sparse_sf_provider),
+      segmentation_provider_(segmentation_provider),
+      evaluation_(evaluation),
+      current_frame_no_(0),
+      // Allocate the ITM buffers on the CPU and on the GPU (true, true).
+      out_image_(new ITMUChar4Image(input_shape, true, true)),
+      out_image_float_(new ITMFloatImage(input_shape, true, true)),
+      input_rgb_image_(new cv::Mat3b(input_shape.x, input_shape.y)),
+      input_raw_depth_image_(new cv::Mat1s(input_shape.x, input_shape.y)),
+      input_width_(input_shape.x),
+      input_height_(input_shape.y),
+      instance_reconstructor_(new InstanceReconstructor(itm_static_scene_engine)),
+      max_depth_meters_(max_depth_meters)
+  {}
 
   /// \brief Reads in and processes the next frame from the data source.
   /// This is where most of the interesting stuff happens.
   void ProcessFrame(Input *input);
-
-  const unsigned char* GetRaycastPreview() {
-    static_scene_->GetImage(out_image_, PreviewType::kLatestRaycast);
-    return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
-  }
 
   /// \brief Returns an RGB preview of the latest color frame.
   const cv::Mat3b* GetRgbPreview() {
@@ -74,11 +84,12 @@ class DynSlam {
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
-  /// \brief Returns a preview of the reconstructed static map.
+  /// \brief Returns an RGBA preview of the reconstructed static map.
   const unsigned char* GetStaticMapRaycastPreview(
       const pangolin::OpenGlMatrix &model_view,
       PreviewType preview
   ) {
+    static_scene_->GetVisualizationEngine()->SetMaxDepthMeters(max_depth_meters_);
     static_scene_->GetImage(out_image_, preview, model_view);
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
@@ -189,6 +200,8 @@ private:
 
   /// Whether to force instance reconstruction even for static ones.
   bool always_reconstruct_objects_ = false;
+
+  float max_depth_meters_;
 
   /// \brief Returns a path to the folder where the dataset's meshes should be dumped, creating it
   ///        using a naive system call if it does not exist.

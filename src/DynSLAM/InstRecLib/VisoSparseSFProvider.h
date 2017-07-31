@@ -20,7 +20,9 @@ class VisoSparseSFProvider : public SparseSFProvider {
  public:
   VisoSparseSFProvider(VisualOdometryStereo::parameters &stereo_vo_params)
     : stereo_vo_(new VisualOdometryStereo(stereo_vo_params)),
-      matches_available_(false) { }
+      matches_available_(false),
+      latest_flow_(SparseSceneFlow())
+  { }
 
   virtual ~VisoSparseSFProvider() {
     delete stereo_vo_;
