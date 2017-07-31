@@ -12,7 +12,8 @@
 
 namespace instreclib {
 
-// TODO(andrei): Consider using the joint VO+SF work Peidong sent you (open source from TUM).
+Eigen::Matrix4d VisoToEigen(const Matrix &viso_matrix);
+
 // Note that at this point, we use libviso2, which is primarily a visual odometry library, as a
 // library for scene flow computation, in order to understand the motion of the other vehicles in
 // view.
@@ -39,6 +40,11 @@ class VisoSparseSFProvider : public SparseSFProvider {
   virtual SparseSceneFlow& GetFlow() {
     assert(matches_available_ && "Last frame's matches are not available.");
     return latest_flow_;
+  }
+
+  Eigen::Matrix4f GetLatestMotion() const override {
+    return VisoToEigen(stereo_vo_->getMotion()).cast<float>();
+
   }
 
   std::vector<double> ExtractMotion(const std::vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &flow,

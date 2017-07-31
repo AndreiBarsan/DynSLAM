@@ -1,6 +1,8 @@
 #ifndef DYNSLAM_DYNSLAM_H
 #define DYNSLAM_DYNSLAM_H
 
+#include <Eigen/StdVector>
+
 #include <pangolin/display/opengl_render_state.h>
 
 #include "InfiniTamDriver.h"
@@ -35,19 +37,20 @@ class DynSlam {
           const Vector2i &input_shape,
           float max_depth_meters)
     : static_scene_(itm_static_scene_engine),
-      sparse_sf_provider_(sparse_sf_provider),
       segmentation_provider_(segmentation_provider),
+      instance_reconstructor_(new InstanceReconstructor(itm_static_scene_engine)),
+      sparse_sf_provider_(sparse_sf_provider),
       evaluation_(evaluation),
-      current_frame_no_(0),
       // Allocate the ITM buffers on the CPU and on the GPU (true, true).
       out_image_(new ITMUChar4Image(input_shape, true, true)),
       out_image_float_(new ITMFloatImage(input_shape, true, true)),
       input_rgb_image_(new cv::Mat3b(input_shape.x, input_shape.y)),
       input_raw_depth_image_(new cv::Mat1s(input_shape.x, input_shape.y)),
+      current_frame_no_(0),
       input_width_(input_shape.x),
       input_height_(input_shape.y),
-      instance_reconstructor_(new InstanceReconstructor(itm_static_scene_engine)),
-      max_depth_meters_(max_depth_meters)
+      max_depth_meters_(max_depth_meters),
+      poses_({ Eigen::Matrix4f::Identity() })
   {}
 
   /// \brief Reads in and processes the next frame from the data source.
@@ -182,6 +185,8 @@ class DynSlam {
     static_scene_->WaitForMeshDump();
   }
 
+  SUPPORT_EIGEN_FIELDS;
+
 private:
   InfiniTamDriver *static_scene_;
   SegmentationProvider *segmentation_provider_;
@@ -202,6 +207,8 @@ private:
   bool always_reconstruct_objects_ = false;
 
   float max_depth_meters_;
+
+  std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> poses_;
 
   /// \brief Returns a path to the folder where the dataset's meshes should be dumped, creating it
   ///        using a naive system call if it does not exist.

@@ -74,6 +74,7 @@ using namespace instreclib::reconstruction;
 using namespace instreclib::segmentation;
 
 using namespace dynslam;
+using namespace dynslam::eval;
 using namespace dynslam::utils;
 
 static const int kUiWidth = 300;
@@ -194,12 +195,22 @@ public:
           }
         }
 
+        uchar diff_buffer[width_ * height_ * 4];
+        memset(diff_buffer, '\0', sizeof(uchar) * width_ * height_ * 4);
+
         const uchar * compare_lidar_vs = nullptr;
+        const unsigned char *preview = nullptr;
         int delta_max_visualization = 3;
         string message;
         switch(current_lidar_vis_) {
           case kNone:
             message = "Free cam preview";
+            // Render the normal preview with no lidar overlay
+            preview = dyn_slam_->GetStaticMapRaycastPreview(
+                pane_cam_->GetModelViewMatrix(),
+                static_cast<PreviewType>(current_preview_type_));
+            pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
+            pane_texture_->RenderToViewport(true);
             break;
           case kInputVsLidar:
             message = utils::Format("Input depth vs. LIDAR | delta_max = %d", delta_max_visualization);
@@ -212,7 +223,10 @@ public:
 
           case kInputVsFusion:
             message = "Input depth vs. fusion";
-            // TODO(andrei): Implement.
+            DiffDepthmaps(input_depthmap_uc, synthesized_depthmap, width_, height_,
+                          delta_max_visualization, diff_buffer);
+            pane_texture_->Upload(diff_buffer, GL_RGBA, GL_UNSIGNED_BYTE);
+            pane_texture_->RenderToViewport(true);
             break;
 
           default:
@@ -224,21 +238,16 @@ public:
         if (compare_lidar_vs != nullptr) {
           pane_texture_->Upload(compare_lidar_vs, GL_RGBA, GL_UNSIGNED_BYTE);
           pane_texture_->RenderToViewport(true);
-          PreviewError(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb,
+          DepthResult result = PreviewError(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb,
                        *main_view_,
                        compare_lidar_vs,
                        width_,
                        height_,
                        max_depth_meters,
                        delta_max_visualization);
-        }
-        else {
-          // Render the normal preview with no lidar overlay
-          const unsigned char *preview = dyn_slam_->GetStaticMapRaycastPreview(
-              pane_cam_->GetModelViewMatrix(),
-              static_cast<PreviewType>(current_preview_type_));
-          pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
-          pane_texture_->RenderToViewport(true);
+          message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
+                                   result.GetCorrectPixelRatio(true),
+                                   result.GetCorrectPixelRatio(false));
         }
 
         font.Text(message).Draw(-0.95f, 0.80f);
@@ -411,7 +420,46 @@ public:
     glEnable(GL_DEPTH_TEST);
   }
 
-  void PreviewError(
+  void DiffDepthmaps(
+      const uchar * input_depthmap,
+      const uchar * synthesized_depthmap,
+      int width,
+      int height,
+      int delta_max,
+      uchar * out_image,
+      int stride = 4
+  ) {
+
+    for (int i = 0; i < height; ++i) {
+      for (int j = 0; j < width; ++j) {
+        int idx = (i * width + j) * stride;
+        int input = input_depthmap[idx];
+        int synth = synthesized_depthmap[idx];
+
+        if (input == 0 || synth == 0) {
+          continue;
+        }
+
+        int delta = input - synth;
+        int abs_delta = abs(delta);
+        if (abs_delta > delta_max) {
+          out_image[idx + 0] = min(255, 100 + (abs_delta - delta) * 10);
+          out_image[idx + 1] = 0;
+          out_image[idx + 2] = 0;
+          out_image[idx + 3] = 255;
+        }
+        else {
+          out_image[idx + 0] = 20;
+          out_image[idx + 1] = 180;
+          out_image[idx + 2] = 20;
+          out_image[idx + 3] = 255;
+        }
+      }
+    }
+
+  }
+
+  DepthResult PreviewError(
     const Eigen::MatrixX4f &lidar_points,
     const Eigen::MatrixXf &P,
     const Eigen::Matrix4f &Tr,
@@ -422,6 +470,7 @@ public:
     float max_depth_meters,
     const int delta_max
   ) {
+    // TODO(andrei) XXX reduce code duplication between this and the main eval module
     static GLfloat verts[2000000];
     static GLubyte colors[2000000];
 
@@ -429,9 +478,11 @@ public:
     size_t idx_c = 0;
 
     int errors = 0;
+    int missing = 0;
     int measurements = 0;
+    int correct = 0;
 
-    long delta_sum = 0;
+//    long delta_sum = 0;
 
     glDisable(GL_DEPTH_TEST);
     // Doing this via a loop is much slower, but clearer and less likely to lead to evaluation
@@ -474,19 +525,23 @@ public:
       int col = static_cast<int>(round(p2d(0)));
       uchar depth_computed_uc = computed_depth[(row * width_ + col) * 4];
 
-      // LIDAR depth seems to have a tendency to be bigger?
       int delta_signed = static_cast<int>(depth_computed_uc) - static_cast<int>(depth_lidar_uc);
-
-      // for testing
-//      if (depth_computed_uc != 0) {
 
         int delta = abs(delta_signed);
         measurements++;
-        delta_sum += delta_signed;
+//        delta_sum += delta_signed;
 
         // If the delta is larger than the max value OR if we don't have a measurement for the depth
+      if(depth_computed_uc == 0) {
+        missing++;
+      }
+      else if (delta > delta_max) {
+        errors++;
+      }
+      else {
+        correct++;
+      }
         if (delta > delta_max || depth_computed_uc == 0) {
-          errors++;
 
           color(0) = min(255, delta * 10);
           color(1) = 160;
@@ -519,15 +574,10 @@ public:
       colors[idx_c++] = color(2);
     }
 
-//
-//    double delta_mean = delta_sum * 1.0 / measurements;
-//    cout << "Mean delta: "<< delta_mean << endl;
-//
-//    double correct_pixels_ratio = (1.0 - (errors * 1.0) / measurements);
-//    cout << "Correct pixels ratio: " << correct_pixels_ratio << " @ delta max = " << delta_max << endl;
-
     pangolin::glDrawColoredVertices<float>(idx_v / 2, verts, colors, GL_POINTS, 2, 3);
     glEnable(GL_DEPTH_TEST);
+
+    return DepthResult(measurements, errors, missing, correct);
   }
 
   /// \brief Renders the velodyne points for visual inspection.

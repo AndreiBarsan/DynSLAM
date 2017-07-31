@@ -66,6 +66,11 @@ class SparseSFProvider {
   /// \note This will not be available until at least two frames have been processed.
   virtual SparseSceneFlow& GetFlow() = 0;
 
+  // TODO-LOW(andrei): Get rid of this.
+  // Another hack until we create a dedicated ITM tracker which calls into this...
+  // Returns the latest visual odometry estimate.
+  virtual Eigen::Matrix4f GetLatestMotion() const = 0;
+
   // Hacky proxy for using viso's sf utilities for motion estimation in the inst. rec.
   virtual std::vector<double> ExtractMotion(
       const std::vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &flow,

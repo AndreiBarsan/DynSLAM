@@ -141,7 +141,7 @@ Option<Pose>* EstimateInstanceMotion(
            << " matches." << endl;
       Matrix delta_mx = VisualOdometry::transformationVectorToMatrix(instance_motion_delta);
 
-      // TODO(andrei): Make this a utility. Note: The '~' transposes the matrix...
+      // TODO(andrei): Make this a utility.
       return new Option<Pose>(new Pose(
           instance_motion_delta,
           Eigen::Matrix4d((~delta_mx).val[0])
