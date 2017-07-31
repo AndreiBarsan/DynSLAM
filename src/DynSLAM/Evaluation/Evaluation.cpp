@@ -26,7 +26,7 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
 
     // ...and print some quick info in real time as well.
     cout << "Evaluation complete:" << endl;
-    bool missing_depths_are_errors = true;
+    bool missing_depths_are_errors = false;
     if(missing_depths_are_errors) {
       cout << "(Missing = errors)" << endl;
     }
@@ -38,13 +38,18 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
            << setw(2) << eval.delta_max
            << "   Fusion accuracy = " << setw(7) << setprecision(3)
            << eval.fused_result.GetCorrectPixelRatio(missing_depths_are_errors)
+           << " @ " << eval.fused_result.correct_count << " correct px "
            << " | Input accuracy  = " <<  setw(7) << setprecision(3)
            << eval.input_result.GetCorrectPixelRatio(missing_depths_are_errors)
+          << " @ " << eval.input_result.correct_count << " correct px "
            << endl;
     }
 
-    cerr << "Something looks fishy when visualizing the DispNet fusion result. Check it out! TODO"
+    cerr << "Something looks fishy when visualizing the DispNet fusion result. Check it out! TODO "
          << "Maybe it's computed for the right image??" << endl;
+    cerr << "TODO Try lower res models" << endl;
+    cerr << "TODO Try higher-res depth computation" << endl;
+    cerr << "TODO Try rendering the original and synthesized depth map deltas themselves!" << endl;
   }
 }
 

@@ -51,6 +51,13 @@ class SparseSceneFlow {
 /// \brief Interface for components which can compute sparse scene flow from a scene view.
 class SparseSFProvider {
  public:
+  virtual ~SparseSFProvider() = default;
+  SparseSFProvider() = default;
+  SparseSFProvider(const SparseSFProvider&) = default;
+  SparseSFProvider(SparseSFProvider&&) = default;
+  SparseSFProvider& operator=(const SparseSFProvider&) = default;
+  SparseSFProvider& operator=(SparseSFProvider&&) = default;
+
   virtual void ComputeSparseSF(const ViewPair &last_view, const ViewPair &current_view) = 0;
 
   virtual bool FlowAvailable() const = 0;

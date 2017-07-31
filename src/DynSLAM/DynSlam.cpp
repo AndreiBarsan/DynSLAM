@@ -4,37 +4,12 @@
 #include <thread>
 
 #include "DynSlam.h"
+#include "Evaluation/Evaluation.h"
 
 namespace dynslam {
 
 using namespace instreclib::reconstruction;
 using namespace dynslam::eval;
-
-void DynSlam::Initialize(InfiniTamDriver *itm_static_scene_engine,
-                         SegmentationProvider *segmentation_provider,
-                         SparseSFProvider *sparse_sf_provider,
-                         Evaluation *evaluation) {
-
-  this->static_scene_ = itm_static_scene_engine;
-  this->sparse_sf_provider_ = sparse_sf_provider;
-  this->segmentation_provider_ = segmentation_provider;
-  this->evaluation_ = evaluation;
-  this->current_frame_no_ = 0;
-
-  bool allocate_gpu = true;
-
-  Vector2i input_shape = itm_static_scene_engine->GetImageSize();
-  out_image_ = new ITMUChar4Image(input_shape, true, allocate_gpu);
-  out_image_float_ = new ITMFloatImage(input_shape, true, allocate_gpu);
-  input_rgb_image_ = new cv::Mat3b(input_shape.x, input_shape.y);
-  input_raw_depth_image_ = new cv::Mat1s(input_shape.x, input_shape.y);
-
-  input_width_ = input_shape.x;
-  input_height_ = input_shape.y;
-
-  this->instance_reconstructor_ = new InstanceReconstructor(itm_static_scene_engine);
-  cout << "DynSLAM initialization complete." << endl;
-}
 
 void DynSlam::ProcessFrame(Input *input) {
   // Read the images from the first part of the pipeline
@@ -90,20 +65,24 @@ void DynSlam::ProcessFrame(Input *input) {
   static_scene_->UpdateView(*input_rgb_image_, *input_raw_depth_image_);
   utils::Toc();
 
+  // TODO make field
+  bool enable_dynamic_ = false;
+
   // Split the scene up into instances, and fuse each instance independently.
   utils::Tic("Instance tracking and reconstruction");
   if (sparse_sf_provider_->FlowAvailable()) {
     // We need flow information in order to correctly determine which objects are moving, so we
     // can't do this when no scene flow is available (i.e., in the first frame, unless an error
     // occurs).
-    instance_reconstructor_->ProcessFrame(
-        this,
-        static_scene_->GetView(),
-        *seg_result_future.get(),
-//        *segmentation_result,
-        sparse_sf_provider_->GetFlow(),
-        *sparse_sf_provider_,
-        always_reconstruct_objects_);
+    if (enable_dynamic_) {
+      instance_reconstructor_->ProcessFrame(
+          this,
+          static_scene_->GetView(),
+          *seg_result_future.get(),
+          sparse_sf_provider_->GetFlow(),
+          *sparse_sf_provider_,
+          always_reconstruct_objects_);
+    }
   }
   utils::Toc();
 

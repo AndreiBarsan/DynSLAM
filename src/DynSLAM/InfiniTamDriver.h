@@ -231,6 +231,14 @@ public:
     return voxel_decay_params_;
   }
 
+  IITMVisualisationEngine *GetVisualizationEngine() {
+    return visualisationEngine;
+  }
+
+  const IITMVisualisationEngine *GetVisualizationEngine() const {
+    return visualisationEngine;
+  }
+
   SUPPORT_EIGEN_FIELDS;
 
  private:

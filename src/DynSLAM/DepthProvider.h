@@ -32,6 +32,9 @@ struct StereoCalibration {
 /// return their results into pre-allocated out parameters.
 class DepthProvider {
  public:
+  static constexpr float kMetersToMillimeters = 1000.0f;
+
+ public:
   DepthProvider (const DepthProvider&) = default;
   DepthProvider (DepthProvider&&) = default;
   DepthProvider& operator=(const DepthProvider&) = default;
@@ -90,7 +93,8 @@ class DepthProvider {
                              cv::Mat1s &out_depth
   ) {
     assert(disparity.size() == out_depth.size());
-    float kMetersToMillimeters = 1000.0;
+    assert(!input_is_depth_ && "Should not attempt to compute depth from disparity when the read "
+        "data is already a depth map, and not just a disparity map.");
 
     // The max depth is an important factor for the quality of the resulting maps. Too big, and
     // our map will be very noisy; too small, and we only map the road and a couple of meters of

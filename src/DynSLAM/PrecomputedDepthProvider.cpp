@@ -35,12 +35,37 @@ void PrecomputedDepthProvider::ReadPrecomputed(int frame_idx, cv::Mat &out) cons
     out = cv::imread(depth_fpath, CV_LOAD_IMAGE_UNCHANGED);
   }
 
-  if (out .cols == 0 || out.rows == 0) {
+  if (out.cols == 0 || out.rows == 0) {
     throw runtime_error(utils::Format(
         "Could not read precomputed depth map from file [%s]. Please check that the file exists, "
             "and is a readable, valid, image.",
         depth_fpath.c_str()));
   }
+
+  if (this->input_is_depth_) {
+    // We're reading depth directly, so we need to ensure the max depth here.
+    float max_depth_mm_f = GetMaxDepthMeters() * kMetersToMillimeters;
+    uint16_t max_depth_mm_ui = static_cast<uint16_t>(round(max_depth_mm_f));
+
+    for(int i = 0; i < out.rows; ++i) {
+      for(int j = 0; j < out.cols; ++j) {
+        // TODO-LOW(andrei): Do this in a nicer way...
+        if(out.type() == CV_32FC1) {
+          float depth = out.at<float>(i, j);
+          if (depth > max_depth_mm_f) {
+            out.at<float>(i, j) = 0.0f;
+          }
+        }
+        else {
+          uint16_t depth = out.at<uint16_t>(i, j);
+          if (depth > max_depth_mm_ui) {
+            out.at<uint16_t>(i, j) = 0;
+          }
+        }
+      }
+    }
+  }
+
 }
 
 float PrecomputedDepthProvider::DepthFromDisparity(const float disparity_px,

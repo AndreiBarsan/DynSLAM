@@ -18,6 +18,7 @@
 #include "PrecomputedDepthProvider.h"
 #include "InstRecLib/VisoSparseSFProvider.h"
 #include "DSHandler3D.h"
+#include "Evaluation/Evaluation.h"
 
 
 const std::string kKittiOdometry = "kitti-odometry";
@@ -77,6 +78,15 @@ using namespace dynslam::utils;
 
 static const int kUiWidth = 300;
 
+/// \brief What reconstruction error to visualize.
+enum VisualizeError {
+  kNone = 0,
+  kInputVsLidar,
+  kFusionVsLidar,
+  kInputVsFusion,
+  kEnd
+};
+
 /// \brief The main GUI and entry point for DynSLAM.
 class PangolinGui {
 public:
@@ -109,6 +119,7 @@ public:
     while (!pangolin::ShouldQuit()) {
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       glColor3f(1.0, 1.0, 1.0);
+      pangolin::GlFont &font = pangolin::GlFont::I();
 
       if (autoplay_->Get()) {
         ProcessFrame();
@@ -122,8 +133,8 @@ public:
 
       // Some experimental code for getting the camera to move on its own.
       if (wiggle_mode_->Get()) {
-        struct timeval tp;
-        gettimeofday(&tp, NULL);
+        timeval tp;
+        gettimeofday(&tp, nullptr);
         double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
         double time_scale = 1500.0;
         double r = 0.2;
@@ -139,13 +150,6 @@ public:
       }
 
       if (dyn_slam_->GetCurrentFrameNo() > 1) {
-//        const unsigned char *preview = dyn_slam_->GetStaticMapRaycastPreview(
-//            pane_cam_->GetModelViewMatrix(),
-//            static_cast<PreviewType>(current_preview_type_));
-//          pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
-//          pane_texture_->RenderToViewport(true);
-
-        //*
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
 //        auto lidar_pointcloud = velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1);
         auto lidar_pointcloud = velodyne->GetLatestFrame();
@@ -190,28 +194,57 @@ public:
           }
         }
 
-//        UploadCvTexture(input_depthmap_uc, *pane_texture_mono_uchar_, false);
-        pane_texture_mono_uchar_->Upload(input_depthmap_uc, GL_RGBA, GL_UNSIGNED_BYTE);
-        pane_texture_mono_uchar_->RenderToViewport(true);
+        const uchar * compare_lidar_vs = nullptr;
+        int delta_max_visualization = 3;
+        string message;
+        switch(current_lidar_vis_) {
+          case kNone:
+            message = "Free cam preview";
+            break;
+          case kInputVsLidar:
+            message = utils::Format("Input depth vs. LIDAR | delta_max = %d", delta_max_visualization);
+            compare_lidar_vs = input_depthmap_uc;
+            break;
+          case kFusionVsLidar:
+            message = utils::Format("Fused map vs. LIDAR | delta_max = %d", delta_max_visualization);
+            compare_lidar_vs = synthesized_depthmap;
+            break;
 
-//        pane_texture_->Upload(synthesized_depthmap, GL_RGBA, GL_UNSIGNED_BYTE);
-//        pane_texture_->Upload(input_depthmap_uc, GL_RGBA, GL_UNSIGNED_BYTE);
-//        pane_texture_->RenderToViewport(true);
+          case kInputVsFusion:
+            message = "Input depth vs. fusion";
+            // TODO(andrei): Implement.
+            break;
 
-        // TODO(andrei): Only call this from the evaluation, and cache this preview, so we don't
-        // have to keep recomputing it.
-        PreviewError(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb,
-                     *main_view_,
-//                     synthesized_depthmap,
-                     input_depthmap_uc,
-                     width_,
-                     height_,
-                     max_depth_meters);
-        //*/
+          default:
+          case kEnd:
+            throw runtime_error("Unexpected 'current_lidar_vis_' error visualization mode.");
+            break;
+        }
+
+        if (compare_lidar_vs != nullptr) {
+          pane_texture_->Upload(compare_lidar_vs, GL_RGBA, GL_UNSIGNED_BYTE);
+          pane_texture_->RenderToViewport(true);
+          PreviewError(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb,
+                       *main_view_,
+                       compare_lidar_vs,
+                       width_,
+                       height_,
+                       max_depth_meters,
+                       delta_max_visualization);
+        }
+        else {
+          // Render the normal preview with no lidar overlay
+          const unsigned char *preview = dyn_slam_->GetStaticMapRaycastPreview(
+              pane_cam_->GetModelViewMatrix(),
+              static_cast<PreviewType>(current_preview_type_));
+          pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
+          pane_texture_->RenderToViewport(true);
+        }
+
+        font.Text(message).Draw(-0.95f, 0.80f);
       }
 
-      pangolin::GlFont &font = pangolin::GlFont::I();
-      font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.95, 0.9);
+      font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.95f, 0.90f);
 
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
@@ -386,7 +419,8 @@ public:
     const uchar * const computed_depth,
     int width,
     int height,
-    float max_depth_meters
+    float max_depth_meters,
+    const int delta_max
   ) {
     static GLfloat verts[2000000];
     static GLubyte colors[2000000];
@@ -394,13 +428,6 @@ public:
     size_t idx_v = 0;
     size_t idx_c = 0;
 
-    // TODO(andrei): Image comparison approach, maybe: generate LIDAR "depth map", then compare
-    // with synthesized one as follows: for all pixels which are not both black, compute the delta.
-
-    // TODO(andrei): Loop for delta_max in [0, 8] like Sengupta et al. BUT, instead of showing just
-    // a single plot, consider making a richer one showing maybe even the distribution of the errors
-    // over time.
-    static const int delta_max = 3;
     int errors = 0;
     int measurements = 0;
 
@@ -678,6 +705,17 @@ protected:
     pangolin::Var<function<void(void)>> npt("ui.Next Preview Type [k]", next_preview_type);
     pangolin::RegisterKeyPressCallback('k', next_preview_type);
 
+    pangolin::RegisterKeyPressCallback('0', [&]() {
+      if(++current_lidar_vis_ >= VisualizeError::kEnd) {
+        current_lidar_vis_ = 0;
+      }
+    });
+    pangolin::RegisterKeyPressCallback('9', [&]() {
+      if(--current_lidar_vis_ < 0) {
+        current_lidar_vis_ = (VisualizeError::kEnd - 1);
+      }
+    });
+
     /***************************************************************************
      * GUI Checkboxes
      **************************************************************************/
@@ -904,6 +942,8 @@ private:
 
   int current_preview_type_ = kColor;
 
+  int current_lidar_vis_ = VisualizeError::kFusionVsLidar;
+
   /// \brief Prepares the contents of an OpenCV Mat object for rendering with Pangolin (OpenGL).
   /// Does not actually render the texture.
   static void UploadCvTexture(
@@ -946,8 +986,8 @@ private:
 /// This is useful when you want to focus on the quality of the reconstruction, instead of that of
 /// the odometry.
 void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
-  Input::Config input_config = Input::KittiOdometryConfig();
-//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+//  Input::Config input_config = Input::KittiOdometryConfig();
+  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
   VoxelDecayParams voxel_decay_params(
       FLAGS_voxel_decay,
@@ -1036,8 +1076,9 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
                                                   left_cam_proj,
                                                   driver_settings->sceneParams.voxelSize);
 
-  *dyn_slam_out = new gui::DynSlam();
-  (*dyn_slam_out)->Initialize(driver, segmentation_provider, sparse_sf_provider, evaluation);
+  Vector2i input_shape((*input_out)->GetRgbSize().width, (*input_out)->GetRgbSize().height);
+  *dyn_slam_out = new gui::DynSlam(
+      driver, segmentation_provider, sparse_sf_provider, evaluation, input_shape, input_config.max_depth_m);
 }
 
 } // namespace dynslam
