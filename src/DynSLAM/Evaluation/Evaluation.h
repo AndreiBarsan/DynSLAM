@@ -5,6 +5,7 @@
 #include "../DynSlam.h"
 #include "../Input.h"
 #include "Velodyne.h"
+#include "ILidarEvalCallback.h"
 
 namespace dynslam {
 class DynSlam;
@@ -137,11 +138,12 @@ class Evaluation {
   static std::string GetCsvName(const std::string &dataset_root,
                                 const Input *input,
                                 float voxel_size_meters) {
-    return utils::Format("%s-offset-%d-depth-%s-voxelsize-%.4f-results.csv",
+    return utils::Format("%s-offset-%d-depth-%s-voxelsize-%.4f-max-depth-m-%.2f-results.csv",
                          input->GetDatasetIdentifier().c_str(),
                          input->GetCurrentFrame(),
                          input->GetDepthProvider()->GetName().c_str(),
-                         voxel_size_meters);
+                         voxel_size_meters,
+                         input->GetDepthProvider()->GetMaxDepthMeters());
   }
 
  public:
@@ -191,23 +193,19 @@ class Evaluation {
   /// float metric depth, and make the deltas also metric, i.e., more meaningful...
   ///
   /// [0]: Sengupta, S., Greveson, E., Shahrokni, A., & Torr, P. H. S. (2013). Urban 3D semantic modelling using stereo vision. Proceedings - IEEE International Conference on Robotics and Automation, 580–585. https://doi.org/10.1109/ICRA.2013.6630632
-  DepthEvaluation EvaluateDepth(
-      const Eigen::MatrixX4f &lidar_points,
-      const uchar *rendered_depth,
-      const uchar *input_depth,
-      const Eigen::Matrix4d &velo_to_cam,
-      const Eigen::Matrix<double, 3, 4> &cam_proj,
-      int frame_width,
-      int frame_height,
-      float min_depth_meters,
-      float max_depth_meters,
-      uint delta_max,
-      uint rendered_stride = 4,
-      uint input_stride = 4,
-      // TODO get rid of these
-      bool generate_visualization = false,
-      bool visualize_input = false
-  ) const;
+  DepthEvaluation EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
+                                const uchar *rendered_depth,
+                                const uchar *input_depth,
+                                const Eigen::Matrix4d &velo_to_cam,
+                                const Eigen::Matrix<double, 3, 4> &cam_proj,
+                                int frame_width,
+                                int frame_height,
+                                float min_depth_meters,
+                                float max_depth_meters,
+                                uint delta_max,
+                                uint rendered_stride,
+                                uint input_stride,
+                                ILidarEvalCallback *callback) const;
 
   Velodyne *GetVelodyne() {
     return velodyne_;
