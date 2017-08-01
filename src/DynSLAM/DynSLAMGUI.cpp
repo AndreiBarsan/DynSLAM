@@ -19,7 +19,7 @@
 #include "InstRecLib/VisoSparseSFProvider.h"
 #include "DSHandler3D.h"
 #include "Evaluation/Evaluation.h"
-
+#include "Evaluation/ErrorVisualizationCallback.h"
 
 const std::string kKittiOdometry = "kitti-odometry";
 const std::string kKitti         = "kitti";
@@ -93,7 +93,9 @@ class PangolinGui {
 public:
   PangolinGui(DynSlam *dyn_slam, Input *input)
       : dyn_slam_(dyn_slam),
-        dyn_slam_input_(input)
+        dyn_slam_input_(input),
+        lidar_vis_colors_(new unsigned char[2500000]),
+        lidar_vis_vertices_(new float[2500000])
   {
     cout << "Pangolin GUI initializing..." << endl;
 
@@ -112,6 +114,9 @@ public:
     delete dummy_image_texture_;
     delete pane_texture_;
     delete pane_texture_mono_uchar_;
+
+    delete lidar_vis_colors_;
+    delete lidar_vis_vertices_;
   }
 
   /// \brief Executes the main Pangolin input and rendering loop.
@@ -154,6 +159,7 @@ public:
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
 //        auto lidar_pointcloud = velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1);
         auto lidar_pointcloud = velodyne->GetLatestFrame();
+        float min_depth_meters = dyn_slam_input_->GetDepthProvider()->GetMinDepthMeters();
         float max_depth_meters = dyn_slam_input_->GetDepthProvider()->GetMaxDepthMeters();
 
         // TODO(andrei): Pose history in dynslam; will be necessary in delayed evaluation, as well
@@ -182,7 +188,9 @@ public:
               byte_depth = 0;
             }
             else {
-              byte_depth = static_cast<uchar>(in_depth / 1000.0 / max_depth_meters * 255);
+              // TODO(andrei): Eval the impact of rounding, maybe..
+              byte_depth = static_cast<uchar>(round(
+                  in_depth / 1000.0 / max_depth_meters * 255));
             }
 
 //            input_depthmap_uc.at<uchar>(row, col) = byte_depth;
@@ -238,20 +246,33 @@ public:
         if (compare_lidar_vs != nullptr) {
           pane_texture_->Upload(compare_lidar_vs, GL_RGBA, GL_UNSIGNED_BYTE);
           pane_texture_->RenderToViewport(true);
-          // TODO readd once you remove the redundant code
-//          DepthResult result = PreviewError(
-//              lidar_pointcloud,
-//              dyn_slam_->GetProjectionMatrix(),
-//              velodyne->velodyne_to_rgb,
-//              *main_view_,
-//              compare_lidar_vs,
-//              width_,
-//              height_,
-//              max_depth_meters,
-//              delta_max_visualization);
-//          message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
-//                                   result.GetCorrectPixelRatio(true),
-//                                   result.GetCorrectPixelRatio(false));
+
+          bool visualize_input = (current_lidar_vis_ == kInputVsLidar);
+
+          eval::ErrorVisualizationCallback vis_callback(
+              delta_max_visualization, visualize_input, Eigen::Vector2f(
+                  main_view_->GetBounds().w, main_view_->GetBounds().h), lidar_vis_colors_, lidar_vis_vertices_);
+
+          DepthEvaluation result = dyn_slam_->GetEvaluation()->EvaluateDepth(
+              lidar_pointcloud,
+              synthesized_depthmap,
+              input_depthmap_uc,
+              velodyne->velodyne_to_rgb,
+              dyn_slam_->GetProjectionMatrix().cast<double>(),
+              width_,
+              height_,
+              min_depth_meters,
+              max_depth_meters,
+              delta_max_visualization,
+              4,
+              4,
+              &vis_callback
+          );
+          DepthResult depth_result = current_lidar_vis_ == kFusionVsLidar ? result.fused_result
+                                                                          : result.input_result;
+          message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
+                                   depth_result.GetCorrectPixelRatio(true),
+                                   depth_result.GetCorrectPixelRatio(false));
         }
 
         font.Text(message).Draw(-0.90f, 0.80f);
@@ -594,8 +615,8 @@ public:
     if (lidar_points.rows() == 0) {
       return;
     }
-    static GLfloat verts[2000000];
-    static GLubyte colors[2000000];
+//    static GLfloat verts[2000000];
+//    static GLubyte colors[2000000];
 
     size_t idx_v = 0;
     size_t idx_c = 0;
@@ -628,14 +649,14 @@ public:
 
 //      verts[idx_v++] = x;
 //      verts[idx_v++] = y;
-      verts[idx_v++] = p3d(0);
-      verts[idx_v++] = p3d(1);
-      verts[idx_v++] = p3d(2);
+      lidar_vis_vertices_[idx_v++] = p3d(0);
+      lidar_vis_vertices_[idx_v++] = p3d(1);
+      lidar_vis_vertices_[idx_v++] = p3d(2);
 
       float intensity = min(8.0f / Z, 1.0f);
-      colors[idx_c++] = static_cast<uchar>(intensity * 255);
-      colors[idx_c++] = static_cast<uchar>(intensity * 255);
-      colors[idx_c++] = static_cast<uchar>(reflectance * 255);
+      lidar_vis_colors_[idx_c++] = static_cast<uchar>(intensity * 255);
+      lidar_vis_colors_[idx_c++] = static_cast<uchar>(intensity * 255);
+      lidar_vis_colors_[idx_c++] = static_cast<uchar>(reflectance * 255);
     }
 
     float fx = P(0, 0);
@@ -654,7 +675,7 @@ public:
     // TODO-LOW(andrei): For increased performance (unnecessary), consider just passing ptr to
     // internal eigen data. Make sure its row-major though, and the modelview matrix is set properly
     // based on the velo-to-camera matrix.
-    pangolin::glDrawColoredVertices<float>(idx_v / 3, verts, colors, GL_POINTS, 3, 3);
+    pangolin::glDrawColoredVertices<float>(idx_v / 3, lidar_vis_vertices_, lidar_vis_colors_, GL_POINTS, 3, 3);
     glEnable(GL_DEPTH_TEST);
   }
 
@@ -989,6 +1010,9 @@ private:
 
   int current_lidar_vis_ = VisualizeError::kFusionVsLidar;
 
+  unsigned char *lidar_vis_colors_;
+  float *lidar_vis_vertices_;
+
   /// \brief Prepares the contents of an OpenCV Mat object for rendering with Pangolin (OpenGL).
   /// Does not actually render the texture.
   static void UploadCvTexture(
@@ -1112,8 +1136,8 @@ ITMLib::Objects::ITMRGBDCalib* CreateItmCalib(
 /// This is useful when you want to focus on the quality of the reconstruction, instead of that of
 /// the odometry.
 void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
-  Input::Config input_config = Input::KittiOdometryConfig();
-//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+//  Input::Config input_config = Input::KittiOdometryConfig();
+  Input::Config input_config = Input::KittiOdometryDispnetConfig();
 
   Eigen::Matrix<double, 3, 4> left_cam_proj;
   Eigen::Matrix4d velo_to_left_cam;
