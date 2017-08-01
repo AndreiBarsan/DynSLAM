@@ -238,22 +238,26 @@ public:
         if (compare_lidar_vs != nullptr) {
           pane_texture_->Upload(compare_lidar_vs, GL_RGBA, GL_UNSIGNED_BYTE);
           pane_texture_->RenderToViewport(true);
-          DepthResult result = PreviewError(lidar_pointcloud, velodyne->rgb_project, velodyne->velodyne_to_rgb,
-                       *main_view_,
-                       compare_lidar_vs,
-                       width_,
-                       height_,
-                       max_depth_meters,
-                       delta_max_visualization);
-          message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
-                                   result.GetCorrectPixelRatio(true),
-                                   result.GetCorrectPixelRatio(false));
+          // TODO readd once you remove the redundant code
+//          DepthResult result = PreviewError(
+//              lidar_pointcloud,
+//              dyn_slam_->GetProjectionMatrix(),
+//              velodyne->velodyne_to_rgb,
+//              *main_view_,
+//              compare_lidar_vs,
+//              width_,
+//              height_,
+//              max_depth_meters,
+//              delta_max_visualization);
+//          message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
+//                                   result.GetCorrectPixelRatio(true),
+//                                   result.GetCorrectPixelRatio(false));
         }
 
-        font.Text(message).Draw(-0.95f, 0.80f);
+        font.Text(message).Draw(-0.90f, 0.80f);
       }
 
-      font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.95f, 0.90f);
+      font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.90f, 0.90f);
 
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
@@ -268,11 +272,16 @@ public:
         Tic("LIDAR render (partially naive)");
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
         if (velodyne->HasLatestFrame()) {
-          PreviewLidar(velodyne->GetLatestFrame(),velodyne->rgb_project, velodyne->velodyne_to_rgb, rgb_view_);
+          PreviewLidar(velodyne->GetLatestFrame(),
+                       dyn_slam_->GetProjectionMatrix(),
+                       velodyne->velodyne_to_rgb.cast<float>(),
+                       rgb_view_);
         }
         else {
           PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
-                       velodyne->rgb_project, velodyne->velodyne_to_rgb, rgb_view_);
+                       dyn_slam_->GetProjectionMatrix(),
+                       velodyne->velodyne_to_rgb.cast<float>(),
+                       rgb_view_);
         }
 
         Toc(true);
@@ -350,24 +359,6 @@ public:
     }
   }
 
-  /// \brief Converts the pixel coordinates into [-1, +1]-style OpenGL coordinates.
-  /// \note The GL coordinates range from (-1.0, -1.0) in the bottom-left, to (+1.0, +1.0) in the
-  ///       top-right.
-  cv::Vec2f PixelsToGl(Eigen::Vector2f px, Eigen::Vector2f px_range, const pangolin::View &view) {
-    float view_w = view.GetBounds().w;
-    float view_h = view.GetBounds().h;
-
-    float px_x = px(0) * (view_w / px_range(0));
-    float px_y = px(1) * (view_h / px_range(1));
-
-    float gl_x = ((px_x - view_w) / view_w + 0.5f) * 2.0f;
-    // We need the opposite sign here since pixel coordinates are assumed to have the origin in the
-    // top-left, while the GL origin is in the bottom-left.
-    float gl_y = ((view_h - px_y) / view_h - 0.5f) * 2.0f;
-
-    return cv::Vec2f(gl_x, gl_y);
-  }
-
   /// \brief Renders informative labels regardin the currently active bounding boxes.
   /// Meant to be rendered over the segmentation preview window pane.
   void DrawInstanceLables() {
@@ -383,9 +374,10 @@ public:
 
       InstanceDetection latest_detection = track.GetLastFrame().instance_view.GetInstanceDetection();
       const auto &bbox = latest_detection.copy_mask->GetBoundingBox();
-      cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(bbox.r.x0, bbox.r.y0 - font.Height()),
-                                    Eigen::Vector2f(width_, height_),
-                                    segment_view_);
+      auto gl_pos = utils::PixelsToGl(Eigen::Vector2f(bbox.r.x0, bbox.r.y0 - font.Height()),
+                                      Eigen::Vector2f(width_, height_),
+                                      Eigen::Vector2f(segment_view_.GetBounds().w,
+                                                      segment_view_.GetBounds().h));
 
       stringstream info_label;
       info_label << latest_detection.GetClassName() << "#" << track.GetId()
@@ -405,11 +397,12 @@ public:
     // We don't need z-checks since we're rendering UI stuff.
     glDisable(GL_DEPTH_TEST);
     for(const RawFlow &match : flow) {
-      cv::Vec2f gl_pos = PixelsToGl(match.curr_left, frame_size, view);
-      cv::Vec2f gl_pos_old = PixelsToGl(match.prev_left, frame_size, view);
+      Eigen::Vector2f bounds(segment_view_.GetBounds().w, segment_view_.GetBounds().h);
+      Eigen::Vector2f gl_pos = PixelsToGl(match.curr_left, frame_size, bounds);
+      Eigen::Vector2f gl_pos_old = PixelsToGl(match.prev_left, frame_size, bounds);
 
-      cv::Vec2f delta = gl_pos - gl_pos_old;
-      float magnitude = 15.0f * static_cast<float>(cv::norm(delta));
+      Eigen::Vector2f delta = gl_pos - gl_pos_old;
+      float magnitude = 15.0f * static_cast<float>(delta.norm());
 
       glColor4f(0.3f, 0.3f, 0.9f, 1.0f);
       pangolin::glDrawCross(gl_pos[0], gl_pos[1], 0.025f);
@@ -459,10 +452,11 @@ public:
 
   }
 
+  /*
   DepthResult PreviewError(
     const Eigen::MatrixX4f &lidar_points,
-    const Eigen::MatrixXf &P,
-    const Eigen::Matrix4f &Tr,
+    const Eigen::Matrix<double, 3, 4> &P,
+    const Eigen::Matrix4d &Tr,
     const pangolin::View &view,
     const uchar * const computed_depth,
     int width,
@@ -488,7 +482,7 @@ public:
     // Doing this via a loop is much slower, but clearer and less likely to lead to evaluation
     // mistakes than simply rendering the lidar in 2D and comparing it with the map.
     for (int i = 0; i < lidar_points.rows(); ++i) {
-      Eigen::Vector4f point = lidar_points.row(i);
+      Eigen::Vector4d point = lidar_points.row(i);
       float reflectance = lidar_points(i, 3);
       point(3) = 1.0f;                // Replace reflectance with the homogeneous 1.
 
@@ -561,7 +555,7 @@ public:
 //      }
 
       Eigen::Vector2f frame_size(width_, height_);
-      cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(p2d(0), p2d(1)), frame_size, view);
+      Eigen::Vector2f gl_pos = PixelsToGl(Eigen::Vector2f(p2d(0), p2d(1)), frame_size, view);
 
       GLfloat x = gl_pos(0);
       GLfloat y = gl_pos(1);
@@ -579,6 +573,7 @@ public:
 
     return DepthResult(measurements, errors, missing, correct);
   }
+   */
 
   /// \brief Renders the velodyne points for visual inspection.
   /// \param lidar_points
@@ -1023,22 +1018,114 @@ private:
     // use fast 4-byte alignment (default anyway) if possible
     glPixelStorei(GL_UNPACK_ALIGNMENT, (dummy_img_.step & 3) ? 1 : 4);
     //set length of one complete row in data (doesn't need to equal img.cols)
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, dummy_img_.step/dummy_img_.elemSize());
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, dummy_img_.step / dummy_img_.elemSize());
     dummy_image_texture_->Upload(dummy_img_.data, GL_BGR, GL_UNSIGNED_BYTE);
   }
 };
 
 } // namespace gui
 
+void ReadKittiOdometryCalibration(const string &fpath,
+                                  Eigen::Matrix<double, 3, 4> &left_cam_proj,
+                                  Eigen::Matrix4d &velo_to_left_cam) {
+  ifstream in(fpath);
+  string dummy;
+  in >> dummy;
+  assert(dummy == "P0:");
+
+  for (int row = 0; row < 3; ++row) {
+    for (int col = 0; col < 4; ++col) {
+      in >> left_cam_proj(row, col);
+    }
+  }
+
+  // Skip until the Velodyne calibration line.
+  std::getline(in, dummy);
+  std::getline(in, dummy);
+  std::getline(in, dummy);
+  std::getline(in, dummy);
+
+  in >> dummy;
+  assert(dummy == "Tr:");
+  for (int row = 0; row < 3; ++row) {
+    for (int col = 0; col < 4; ++col) {
+      in >> velo_to_left_cam(row, col);
+    }
+  }
+  velo_to_left_cam(3, 0) = 0.0;
+  velo_to_left_cam(3, 1) = 0.0;
+  velo_to_left_cam(3, 2) = 0.0;
+  velo_to_left_cam(3, 3) = 1.0;
+}
+
+/// \brief Probes a dataset folder to find the frame dimentsions.
+/// \note This is useful for pre-allocating buffers in the rest of the pipeline.
+/// \returns A (width, height), i.e., (cols, rows)-style dimension.
+Eigen::Vector2i GetFrameSize(const string &dataset_root, const Input::Config &config) {
+  string lc_folder = dataset_root + "/" + config.left_color_folder;
+  stringstream lc_fpath_ss;
+  lc_fpath_ss << lc_folder << "/" << utils::Format(config.fname_format, 1);
+
+  cv::Mat frame = imread(lc_fpath_ss.str());
+
+  return Eigen::Vector2i(
+      frame.cols,
+      frame.rows
+  );
+}
+
+// TODO(andrei): Move this to the ITM driver once it's done.
+ITMLib::Objects::ITMRGBDCalib* CreateItmCalib(
+    const Eigen::Matrix<double, 3, 4> &left_cam_proj,
+    const Eigen::Vector2i &frame_size
+) {
+  ITMRGBDCalib *calib = new ITMRGBDCalib;
+  float kMetersToMillimeters = 1.0f / 1000.0f;
+
+  ITMIntrinsics intrinsics;
+  float fx = static_cast<float>(left_cam_proj(0, 0));
+  float fy = static_cast<float>(left_cam_proj(1, 1));
+  float cx = static_cast<float>(left_cam_proj(0, 2));
+  float cy = static_cast<float>(left_cam_proj(1, 2));
+  float sizeX = frame_size(0);
+  float sizeY = frame_size(1);
+  intrinsics.SetFrom(fx, fy, cx, cy, sizeX, sizeY);
+
+  // Our intrinsics are always the same for RGB and depth since we compute depth from stereo.
+  calib->intrinsics_rgb = intrinsics;
+  calib->intrinsics_d = intrinsics;
+
+  // RGB and depth "sensors" are one and the same, so the relative pose is the identity matrix.
+  Matrix4f identity; identity.setIdentity();
+  calib->trafo_rgb_to_depth.SetFrom(identity);
+
+  // These parameters are used by ITM to convert from the input depth, expressed in millimeters, to
+  // the internal depth, which is expressed in meters.
+  calib->disparityCalib.SetFrom(kMetersToMillimeters, 0.0f, ITMDisparityCalib::TRAFO_AFFINE);
+  return calib;
+}
+
 /// \brief Constructs a DynSLAM instance to run on a KITTI Odometry dataset sequence, using the
 ///        ground truth pose information from the Inertial Navigation System (INS) instead of any
 ///        visual odometry.
+/// XXX: Update docs once you add proper support for selecting GT or libviso2 odometry.
 /// This is useful when you want to focus on the quality of the reconstruction, instead of that of
 /// the odometry.
 void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
   Input::Config input_config = Input::KittiOdometryConfig();
 //  Input::Config input_config = Input::KittiOdometryDispnetConfig();
-  auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
+
+  Eigen::Matrix<double, 3, 4> left_cam_proj;
+  Eigen::Matrix4d velo_to_left_cam;
+
+  // Read all the calibration info we need.
+  ReadKittiOdometryCalibration(dataset_root + "/" + input_config.calibration_fname,
+                               left_cam_proj, velo_to_left_cam);
+  Eigen::Vector2i frame_size = GetFrameSize(dataset_root, input_config);
+
+  cout << "Read calibration from KITTI-style data..." << endl << "Proj: " << endl << left_cam_proj
+       << endl << "Velo: " << endl << velo_to_left_cam << endl;
+
   VoxelDecayParams voxel_decay_params(
       FLAGS_voxel_decay,
       FLAGS_min_decay_age,
@@ -1047,16 +1134,16 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 
   int frame_offset = FLAGS_frame_offset;
 
-  // TODO(andrei): Read baseline from a file.
+  // TODO-LOW(andrei): Read baseline from a file.
   float baseline_m = 0.537150654273f;
-  float focal_length_px = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx;
+  float focal_length_px = left_cam_proj(0, 0);
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
 
   *input_out = new Input(
       dataset_root,
       input_config,
       nullptr,          // set the depth later
-      itm_calibration,
+      frame_size,
       stereo_calibration,
       frame_offset);
   DepthProvider *depth = new PrecomputedDepthProvider(
@@ -1080,7 +1167,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 
   drivers::InfiniTamDriver *driver = new InfiniTamDriver(
       driver_settings,
-      new ITMRGBDCalib(itm_calibration),
+      CreateItmCalib(left_cam_proj, frame_size),
       ToItmVec((*input_out)->GetRgbSize()),
       ToItmVec((*input_out)->GetDepthSize()),
       voxel_decay_params);
@@ -1102,34 +1189,26 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   sf_params.inlier_threshold = 3.0;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
                                       // object instances
   sf_params.bucket.max_features = 10;    // Default = 2
-  sf_params.calib.cu = itm_calibration.intrinsics_rgb.projectionParamsSimple.px;
-  sf_params.calib.cv = itm_calibration.intrinsics_rgb.projectionParamsSimple.py;
-  sf_params.calib.f  = itm_calibration.intrinsics_rgb.projectionParamsSimple.fx; // TODO should we average fx and fy?
+  sf_params.calib.cu = left_cam_proj(0, 2);
+  sf_params.calib.cv = left_cam_proj(1, 2);
+  sf_params.calib.f  = left_cam_proj(0, 0);
 
   auto sparse_sf_provider = new instreclib::VisoSparseSFProvider(sf_params);
 
-  // Set up the evaluation component
-  Eigen::MatrixXf left_cam_proj(3, 4);
-  auto &proj_params = itm_calibration.intrinsics_rgb.projectionParamsSimple;
-  left_cam_proj << proj_params.fx,            0.0, proj_params.px, 0.0,
-                   0.0, proj_params.fy, proj_params.py, 0.0,
-                   0.0,            0.0,            1.0, 0.0;
-
-  // This is fixed for the entire KITTI family of datasets.
-  // XXX: NO IT's NOT!!!
-  Eigen::Matrix4f velo_to_cam;
-  velo_to_cam
-      << -1.857739385241e-03, -9.999659513510e-01, -8.039975204516e-03, -4.784029760483e-03,
-      -6.481465826011e-03, 8.051860151134e-03, -9.999466081774e-01, -7.337429464231e-02,
-      9.999773098287e-01, -1.805528627661e-03, -6.496203536139e-03, -3.339968064433e-01,
-      0, 0, 0, 1;
-  auto evaluation = new dynslam::eval::Evaluation(dataset_root, *input_out, velo_to_cam,
-                                                  left_cam_proj,
+  auto evaluation = new dynslam::eval::Evaluation(dataset_root, *input_out,
+                                                  velo_to_left_cam,
                                                   driver_settings->sceneParams.voxelSize);
 
   Vector2i input_shape((*input_out)->GetRgbSize().width, (*input_out)->GetRgbSize().height);
   *dyn_slam_out = new gui::DynSlam(
-      driver, segmentation_provider, sparse_sf_provider, evaluation, input_shape, input_config.max_depth_m);
+      driver,
+      segmentation_provider,
+      sparse_sf_provider,
+      evaluation,
+      input_shape,
+      input_config.max_depth_m,
+      left_cam_proj.cast<float>()
+  );
 }
 
 } // namespace dynslam

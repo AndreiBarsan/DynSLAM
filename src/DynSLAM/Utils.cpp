@@ -136,6 +136,22 @@ int64_t TocMicro(bool quiet) {
   return TocMicro(name, quiet);
 }
 
+Eigen::Vector2f PixelsToGl(const Eigen::Vector2f &px, const Eigen::Vector2f &px_range,
+                           const Eigen::Vector2f &view_bounds) {
+  float view_w = view_bounds(0);
+  float view_h = view_bounds(1);
+
+  float px_x = px(0) * (view_w / px_range(0));
+  float px_y = px(1) * (view_h / px_range(1));
+
+  float gl_x = ((px_x - view_w) / view_w + 0.5f) * 2.0f;
+  // We need the opposite sign here since pixel coordinates are assumed to have the origin in the
+  // top-left, while the GL origin is in the bottom-left.
+  float gl_y = ((view_h - px_y) / view_h - 0.5f) * 2.0f;
+
+  return Eigen::Vector2f(gl_x, gl_y);
+}
+
 } // namespace utils
 } // namespace dynslam
 
