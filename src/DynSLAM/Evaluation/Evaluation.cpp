@@ -1,5 +1,6 @@
 
 #include "Evaluation.h"
+#include "ILidarEvalCallback.h"
 
 namespace dynslam {
 namespace eval {
@@ -110,21 +111,20 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
   }
 
   std::vector<DepthEvaluation> evals;
-
-  // TODO(andrei): Nicer loop, use produced results, etc.
   for(uint delta_max = 0; delta_max <= 10; ++delta_max) {
-    evals.push_back(EvaluateDepth(
-        lidar_pointcloud,
-        rendered_depthmap,
-        input_depthmap_uc,
-        velodyne_->velodyne_to_rgb,
-        dyn_slam->GetProjectionMatrix().cast<double>(),
-        width,
-        height,
-        min_depth_meters,
-        max_depth_meters,
-        delta_max
-    ));
+    evals.push_back(EvaluateDepth(lidar_pointcloud,
+                                  rendered_depthmap,
+                                  input_depthmap_uc,
+                                  velodyne_->velodyne_to_rgb,
+                                  dyn_slam->GetProjectionMatrix().cast<double>(),
+                                  width,
+                                  height,
+                                  min_depth_meters,
+                                  max_depth_meters,
+                                  delta_max,
+                                  4,
+                                  4,
+                                  nullptr));
   }
 
   DepthEvaluationMeta meta(frame_idx, input->GetDatasetIdentifier());
@@ -146,9 +146,7 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                           const uint delta_max,
                                           const uint rendered_stride,
                                           const uint input_stride,
-                                          const bool generate_visualization,
-                                          const bool visualize_input
-) const {
+                                          ILidarEvalCallback *callback) const {
   const int kTargetTypeRange = std::numeric_limits<uchar>::max();
   long missing_rendered = 0;
   long errors_rendered = 0;
@@ -157,6 +155,8 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
   long errors_input = 0;
   long correct_input = 0;
   long measurements = 0;
+
+//  cout << "EvaluateDepth [" << min_depth_meters << "--" << max_depth_meters << "]" << endl;
 
   for (int i = 0; i < lidar_points.rows(); ++i) {
     // TODO extract maybe loop body as separate method? => Simpler visualization without code dupe
@@ -216,39 +216,8 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
 
     measurements++;
 
-    if (generate_visualization) {
-      // TODO(andrei): To keep complexity under control, just use a callback-style approach for
-      // building the visualization.
-
-      Eigen::Matrix<uchar, 3, 1> color;
-
-      uint target_delta = (visualize_input) ? input_delta : rendered_delta;
-      uchar target_val = (visualize_input) ? input_depth_val : rendered_depth_val;
-
-      if (target_val != 0) {
-        if (target_delta > delta_max) {
-          color(0) = min(255, static_cast<int>(target_delta * 10));
-          color(1) = 160;
-          color(2) = 160;
-        } else {
-          color(0) = 10;
-          color(1) = 255 - target_delta * 10;
-          color(2) = 255 - target_delta * 10;
-        }
-      }
-
-      Eigen::Vector2f frame_size(frame_width, frame_height);
-//      cv::Vec2f gl_pos = utils::PixelsToGl(Eigen::Vector2f(velo_2d(0), velo_2d(1)), frame_size, view);
-
-//      GLfloat x = gl_pos(0);
-//      GLfloat y = gl_pos(1);
-
-//      verts[idx_v++] = x;
-//      verts[idx_v++] = y;
-//
-//      colors[idx_c++] = color(0);
-//      colors[idx_c++] = color(1);
-//      colors[idx_c++] = color(2);
+    if (nullptr != callback) {
+      callback->ProcessItem(i, velo_2d, rendered_depth_val, input_depth_val, velo_z_uc, frame_width, frame_height);
     }
   }
 
