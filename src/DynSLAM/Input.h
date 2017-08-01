@@ -47,7 +47,7 @@ class Input {
     bool odometry_oxts = false;   // TODO(andrei): Support this.
     std::string odometry_fname = "";
 
-    /// \brief The velodyne LIDAR data used only for evaluation.
+    /// \brief The Velodyne LIDAR data (used only for evaluation).
     std::string velodyne_folder = "";
     std::string velodyne_fname_format = "";
   };
@@ -61,10 +61,11 @@ class Input {
     config.left_color_folder      = "image_2";
     config.right_color_folder     = "image_3";
     config.fname_format           = "%06d.png";
+//    config.calibration_fname      = "calib.txt";
     config.itm_calibration_fname  = "itm-calib.txt";
 
     config.min_depth_m            =  0.5f;
-    config.max_depth_m            = 16.0f;
+    config.max_depth_m            = 25.0f;
     config.depth_folder           = "precomputed-depth/Frames";
     config.depth_fname_format     = "%04d.pgm";
     config.read_depth             = true;

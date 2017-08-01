@@ -1036,8 +1036,8 @@ private:
 /// This is useful when you want to focus on the quality of the reconstruction, instead of that of
 /// the odometry.
 void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
-//  Input::Config input_config = Input::KittiOdometryConfig();
-  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+  Input::Config input_config = Input::KittiOdometryConfig();
+//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
   auto itm_calibration = ReadITMCalibration(dataset_root + "/" + input_config.itm_calibration_fname);
   VoxelDecayParams voxel_decay_params(
       FLAGS_voxel_decay,
@@ -1116,6 +1116,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
                    0.0,            0.0,            1.0, 0.0;
 
   // This is fixed for the entire KITTI family of datasets.
+  // XXX: NO IT's NOT!!!
   Eigen::Matrix4f velo_to_cam;
   velo_to_cam
       << -1.857739385241e-03, -9.999659513510e-01, -8.039975204516e-03, -4.784029760483e-03,
