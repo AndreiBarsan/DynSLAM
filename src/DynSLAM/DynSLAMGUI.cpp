@@ -273,6 +273,8 @@ public:
           message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
                                    depth_result.GetCorrectPixelRatio(true),
                                    depth_result.GetCorrectPixelRatio(false));
+
+          vis_callback.Render();
         }
 
         font.Text(message).Draw(-0.90f, 0.80f);
