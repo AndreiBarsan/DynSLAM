@@ -25,12 +25,12 @@ class Input {
     std::string left_color_folder;
     std::string right_color_folder;
     std::string fname_format;
-    std::string itm_calibration_fname;
+    std::string calibration_fname;
 
     /// \brief Minimum depth to keep when computing depth maps.
-    float min_depth_m;
+    float min_depth_m = -1.0f;
     /// \brief Maximum depth to keep when computing depth maps.
-    float max_depth_m;
+    float max_depth_m = -1.0f;
 
     // These are optional, and only used for precomputed depth/segmentation.
     std::string depth_folder = "";
@@ -44,7 +44,8 @@ class Input {
 
     // Whether to read ground truth odometry information from an OxTS dump folder (e.g., KITTI
     // dataset), or from a single-file ground truth, as provided with the kitti-odometry dataset.
-    bool odometry_oxts = false;   // TODO(andrei): Support this.
+    // UNSUPPORTED AT THE MOMENT TODO(andrei): Support this.
+    bool odometry_oxts = false;
     std::string odometry_fname = "";
 
     /// \brief The Velodyne LIDAR data (used only for evaluation).
@@ -52,7 +53,7 @@ class Input {
     std::string velodyne_fname_format = "";
   };
 
-  /// We don't use constants here in order to make the code easier to read.
+  /// We don't define the configs as constants here in order to make the code easier to read.
   static Config KittiOdometryConfig() {
     Config config;
     config.dataset_name           = "kitti-odometry";
@@ -61,8 +62,7 @@ class Input {
     config.left_color_folder      = "image_2";
     config.right_color_folder     = "image_3";
     config.fname_format           = "%06d.png";
-//    config.calibration_fname      = "calib.txt";
-    config.itm_calibration_fname  = "itm-calib.txt";
+    config.calibration_fname      = "calib.txt";
 
     config.min_depth_m            =  0.5f;
     config.max_depth_m            = 25.0f;
@@ -78,12 +78,11 @@ class Input {
     config.velodyne_folder        = "velodyne";
     config.velodyne_fname_format  = "%06d.bin";
 
-
     return config;
   };
 
   static Config KittiOdometryDispnetConfig() {
-    Config config = KittiOdometryConfig();
+    Config config                 = KittiOdometryConfig();
     config.depth_folder           = "precomputed-depth-dispnet";
     config.depth_fname_format     = "%06d.pfm";
     config.read_depth             = false;
@@ -94,17 +93,18 @@ class Input {
   Input(const std::string &dataset_folder,
         const Config &config,
         DepthProvider *depth_provider,
-        const ITMLib::Objects::ITMRGBDCalib &calibration,
+//        const ITMLib::Objects::ITMRGBDCalib &calibration,
+        const Eigen::Vector2i &frame_size,
         const StereoCalibration &stereo_calibration,
         int frame_offset = 0)
       : dataset_folder_(dataset_folder),
         config_(config),
         depth_provider_(depth_provider),
         frame_idx_(frame_offset),
-        calibration_(calibration),
+        frame_width_(frame_size(0)),
+        frame_height_(frame_size(1)),
         stereo_calibration_(stereo_calibration),
-        depth_buf_(static_cast<int>(calibration.intrinsics_d.sizeY),
-                   static_cast<int>(calibration.intrinsics_d.sizeX))
+        depth_buf_(frame_size(1), frame_size(0))
   {}
 
   bool HasMoreImages();
@@ -121,13 +121,11 @@ class Input {
   void GetCvStereoGray(cv::Mat1b **left, cv::Mat1b **right);
 
   cv::Size2i GetRgbSize() const {
-    return cv::Size2i(static_cast<int>(calibration_.intrinsics_rgb.sizeX),
-                      static_cast<int>(calibration_.intrinsics_rgb.sizeY));
+    return cv::Size2i(frame_width_, frame_height_);
   }
 
   cv::Size2i GetDepthSize() const {
-    return cv::Size2i(static_cast<int>(calibration_.intrinsics_d.sizeX),
-                      static_cast<int>(calibration_.intrinsics_d.sizeY));
+    return cv::Size2i(frame_width_, frame_height_);
   }
 
   /// \brief Gets the name of the dataset folder which we are using.
@@ -166,8 +164,9 @@ class Input {
   Config config_;
   DepthProvider *depth_provider_;
   int frame_idx_;
-  // TODO-LOW(andrei): get rid of this and replace with a similar object which doesn't require ITM.
-  ITMLib::Objects::ITMRGBDCalib calibration_;
+  int frame_width_;
+  int frame_height_;
+
   StereoCalibration stereo_calibration_;
 
   cv::Mat3b left_frame_color_buf_;

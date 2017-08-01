@@ -262,6 +262,13 @@ inline float TranslationError(const Eigen::Matrix4f &pose_error) {
   return sqrt(dx * dx + dy * dy + dz * dz);
 }
 
+/// \brief Converts the pixel coordinates into [-1, +1]-style OpenGL coordinates.
+/// \note The GL coordinates range from (-1.0, -1.0) in the bottom-left, to (+1.0, +1.0) in the
+///       top-right.
+Eigen::Vector2f PixelsToGl(const Eigen::Vector2f &px, const Eigen::Vector2f &px_range,
+                           const Eigen::Vector2f &view_bounds);
+
+
 } // namespace utils
 } // namespace dynslam
 
