@@ -147,15 +147,13 @@ class Evaluation {
  public:
   Evaluation(const std::string &dataset_root,
              const Input *input,
-             const Eigen::Matrix4f &velodyne_to_rgb,
-             const Eigen::MatrixXf &left_cam_projection,
+             const Eigen::Matrix4d &velodyne_to_rgb,
              float voxel_size_meters)
       : velodyne_(new Velodyne(utils::Format("%s/%s",
                                              dataset_root.c_str(),
                                              input->GetConfig().velodyne_folder.c_str()),
                                 input->GetConfig().velodyne_fname_format,
-                                velodyne_to_rgb,
-                                left_cam_projection)),
+                                velodyne_to_rgb)),
         csv_dump_(new std::ofstream(GetCsvName(dataset_root, input, voxel_size_meters)))
   {}
 
@@ -197,15 +195,18 @@ class Evaluation {
       const Eigen::MatrixX4f &lidar_points,
       const uchar *rendered_depth,
       const uchar *input_depth,
-      const Eigen::Matrix4f &velo_to_cam,
-      const Eigen::MatrixXf &cam_proj,
+      const Eigen::Matrix4d &velo_to_cam,
+      const Eigen::Matrix<double, 3, 4> &cam_proj,
       int frame_width,
       int frame_height,
       float min_depth_meters,
       float max_depth_meters,
       uint delta_max,
       uint rendered_stride = 4,
-      uint input_stride = 4
+      uint input_stride = 4,
+      // TODO get rid of these
+      bool generate_visualization = false,
+      bool visualize_input = false
   ) const;
 
   Velodyne *GetVelodyne() {
@@ -215,6 +216,8 @@ class Evaluation {
   const Velodyne *GetVelodyne() const {
     return velodyne_;
   }
+
+  SUPPORT_EIGEN_FIELDS;
 
  private:
   Velodyne *velodyne_;

@@ -35,7 +35,8 @@ class DynSlam {
           SparseSFProvider *sparse_sf_provider,
           dynslam::eval::Evaluation *evaluation,
           const Vector2i &input_shape,
-          float max_depth_meters)
+          float max_depth_meters,
+          Eigen::Matrix<float, 3, 4> projection_matrix)
     : static_scene_(itm_static_scene_engine),
       segmentation_provider_(segmentation_provider),
       instance_reconstructor_(new InstanceReconstructor(itm_static_scene_engine)),
@@ -50,7 +51,8 @@ class DynSlam {
       input_width_(input_shape.x),
       input_height_(input_shape.y),
       max_depth_meters_(max_depth_meters),
-      poses_({ Eigen::Matrix4f::Identity() })
+      poses_({ Eigen::Matrix4f::Identity() }),
+      projection_matrix_(projection_matrix)
   {}
 
   /// \brief Reads in and processes the next frame from the data source.
@@ -185,6 +187,10 @@ class DynSlam {
     static_scene_->WaitForMeshDump();
   }
 
+  const Eigen::Matrix<float, 3, 4> GetProjectionMatrix() const {
+    return projection_matrix_;
+  };
+
   SUPPORT_EIGEN_FIELDS;
 
 private:
@@ -209,6 +215,10 @@ private:
   float max_depth_meters_;
 
   std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> poses_;
+
+  /// \brief Matrix for projecting 3D homogeneous coordinates in the camera's coordinate frame to
+  ///       2D homogeneous coordinates expressed in pixels.
+  const Eigen::Matrix<float, 3, 4> projection_matrix_;
 
   /// \brief Returns a path to the folder where the dataset's meshes should be dumped, creating it
   ///        using a naive system call if it does not exist.

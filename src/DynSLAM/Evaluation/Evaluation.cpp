@@ -118,7 +118,7 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
         rendered_depthmap,
         input_depthmap_uc,
         velodyne_->velodyne_to_rgb,
-        velodyne_->rgb_project,
+        dyn_slam->GetProjectionMatrix().cast<double>(),
         width,
         height,
         min_depth_meters,
@@ -137,15 +137,18 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
 DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                           const uchar *const rendered_depth,
                                           const uchar *const input_depth,
-                                          const Eigen::Matrix4f &velo_to_cam,
-                                          const Eigen::MatrixXf &cam_proj,
+                                          const Eigen::Matrix4d &velo_to_cam,
+                                          const Eigen::Matrix<double, 3, 4> &cam_proj,
                                           const int frame_width,
                                           const int frame_height,
                                           const float min_depth_meters,
                                           const float max_depth_meters,
                                           const uint delta_max,
                                           const uint rendered_stride,
-                                          const uint input_stride) const {
+                                          const uint input_stride,
+                                          const bool generate_visualization,
+                                          const bool visualize_input
+) const {
   const int kTargetTypeRange = std::numeric_limits<uchar>::max();
   long missing_rendered = 0;
   long errors_rendered = 0;
@@ -157,29 +160,28 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
 
   for (int i = 0; i < lidar_points.rows(); ++i) {
     // TODO extract maybe loop body as separate method? => Simpler visualization without code dupe
-    Eigen::Vector4f velo_point = lidar_points.row(i);
+    Eigen::Vector4d velo_point = lidar_points.row(i).cast<double>();
     // Ignore the reflectance; we only care about 3D homogeneous coordinates.
     velo_point(3) = 1.0f;
-    Eigen::Vector4f cam_point = velo_to_cam * velo_point;
+    Eigen::Vector4d cam_point = velo_to_cam * velo_point;
     cam_point /= cam_point(3);
 
-    float velo_z = cam_point(2);
+    double velo_z = cam_point(2);
 
     if (velo_z < min_depth_meters || velo_z > max_depth_meters) {
       continue;
     }
 
-    float velo_z_scaled = (velo_z / max_depth_meters) * kTargetTypeRange;
+    double velo_z_scaled = (velo_z / max_depth_meters) * kTargetTypeRange;
     assert(velo_z_scaled > 0 && velo_z_scaled <= kTargetTypeRange);
     uchar velo_z_uc = static_cast<uchar>(velo_z_scaled);
 
-    Eigen::Vector3f velo_2d = cam_proj * cam_point;
+    Eigen::Vector3d velo_2d = cam_proj * cam_point;
     velo_2d /= velo_2d(2);
 
     // We ignore LIDAR points which fall outside the camera's retina.
     if (velo_2d(0) < 0 || velo_2d(0) >= frame_width ||
-        velo_2d(1) < 0 || velo_2d(1) >= frame_height
-        ) {
+        velo_2d(1) < 0 || velo_2d(1) >= frame_height) {
       continue;
     }
 
@@ -213,6 +215,41 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
     }
 
     measurements++;
+
+    if (generate_visualization) {
+      // TODO(andrei): To keep complexity under control, just use a callback-style approach for
+      // building the visualization.
+
+      Eigen::Matrix<uchar, 3, 1> color;
+
+      uint target_delta = (visualize_input) ? input_delta : rendered_delta;
+      uchar target_val = (visualize_input) ? input_depth_val : rendered_depth_val;
+
+      if (target_val != 0) {
+        if (target_delta > delta_max) {
+          color(0) = min(255, static_cast<int>(target_delta * 10));
+          color(1) = 160;
+          color(2) = 160;
+        } else {
+          color(0) = 10;
+          color(1) = 255 - target_delta * 10;
+          color(2) = 255 - target_delta * 10;
+        }
+      }
+
+      Eigen::Vector2f frame_size(frame_width, frame_height);
+//      cv::Vec2f gl_pos = utils::PixelsToGl(Eigen::Vector2f(velo_2d(0), velo_2d(1)), frame_size, view);
+
+//      GLfloat x = gl_pos(0);
+//      GLfloat y = gl_pos(1);
+
+//      verts[idx_v++] = x;
+//      verts[idx_v++] = y;
+//
+//      colors[idx_c++] = color(0);
+//      colors[idx_c++] = color(1);
+//      colors[idx_c++] = color(2);
+    }
   }
 
   DepthResult rendered_result(measurements, errors_rendered, missing_rendered, correct_rendered);

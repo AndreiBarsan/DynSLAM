@@ -13,6 +13,11 @@ namespace dynslam {
 namespace eval {
 
 /// \brief Reads and manages *corrected* Velodyne point clouds.
+/// \note From the documentation of the KITTI-odometry dataset: Note that the velodyne scanner takes
+/// depth measurements/continuously while rotating around its vertical axis (in contrast to the
+/// cameras, which are triggered at a certain point in time). This effect has been eliminated from
+/// this postprocessed data by compensating for the egomotion!! Note that this is in contrast to the
+/// raw data.
 class Velodyne {
  public:
   using LidarReadings = Eigen::Matrix<float, Eigen::Dynamic, 4, Eigen::RowMajor>;
@@ -25,11 +30,7 @@ class Velodyne {
 
   /// \brief 4x4 matrix which transforms 3D homogeneous coordinates from the Velodyne LIDAR's
   ///        coordinate frame to the camera's coordinate frame.
-  const Eigen::Matrix4f velodyne_to_rgb;
-
-  /// \brief 3x4 matrix which projects 3D homogeneous coordinates in the camera's coordinate
-  ///        frame to 2D homogeneous coordinates expressed in pixels.
-  const Eigen::MatrixXf rgb_project;
+  const Eigen::Matrix4d velodyne_to_rgb;
 
  private:
   const std::string folder_;
@@ -42,9 +43,8 @@ class Velodyne {
   SUPPORT_EIGEN_FIELDS;
 
   Velodyne(const std::string &folder_, const std::string &fname_format_,
-           const Eigen::Matrix4f &velodyne_to_rgb, const Eigen::MatrixXf &rgb_project)
-      : velodyne_to_rgb(velodyne_to_rgb),
-        rgb_project(rgb_project),
+           const Eigen::Matrix4d &velodyne_to_rgb_)
+      : velodyne_to_rgb(velodyne_to_rgb_),
         folder_(folder_),
         fname_format_(fname_format_),
         data_buffer_(new float[kBufferSize]),
