@@ -208,7 +208,7 @@ public:
 
         const uchar * compare_lidar_vs = nullptr;
         const unsigned char *preview = nullptr;
-        int delta_max_visualization = 3;
+        int delta_max_visualization = 1;
         string message;
         switch(current_lidar_vis_) {
           case kNone:

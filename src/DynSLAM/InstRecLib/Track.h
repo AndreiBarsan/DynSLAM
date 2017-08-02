@@ -33,6 +33,13 @@ struct Pose {
     return *this;
   }
 
+  void SetIdentity() {
+    matrix_form = Eigen::Matrix4d::Identity();
+    for (int i = 0; i < 6; ++i) {
+      se3_form[i] = 0.0;
+    }
+  }
+
   SUPPORT_EIGEN_FIELDS;
 };
 

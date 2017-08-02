@@ -45,12 +45,6 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
           << " @ " << eval.input_result.correct_count << " correct px "
            << endl;
     }
-
-    cerr << "Something looks fishy when visualizing the DispNet fusion result. Check it out! TODO "
-         << "Maybe it's computed for the right image??" << endl;
-    cerr << "TODO Try lower res models" << endl;
-    cerr << "TODO Try higher-res depth computation" << endl;
-    cerr << "TODO Try rendering the original and synthesized depth map deltas themselves!" << endl;
   }
 }
 

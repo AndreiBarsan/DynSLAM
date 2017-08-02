@@ -209,8 +209,8 @@ private:
   int input_width_;
   int input_height_;
 
-  /// Whether to force instance reconstruction even for static ones.
-  bool always_reconstruct_objects_ = false;
+  /// Whether to force instance reconstruction even for non-dynamic objects, like parked cars.
+  bool always_reconstruct_objects_ = true;
 
   float max_depth_meters_;
 
