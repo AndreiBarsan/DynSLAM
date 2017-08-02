@@ -110,7 +110,8 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
                                   rendered_depthmap,
                                   input_depthmap_uc,
                                   velodyne_->velodyne_to_rgb,
-                                  dyn_slam->GetProjectionMatrix().cast<double>(),
+                                  dyn_slam->GetLeftRgbProjectionMatrix().cast<double>(),
+                                  dyn_slam->GetRightRgbProjectionMatrix().cast<double>(),
                                   width,
                                   height,
                                   min_depth_meters,
@@ -125,14 +126,12 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
   return DepthFrameEvaluation(std::move(meta), max_depth_meters, std::move(evals));
 }
 
-// TODO(andrei): Support rendering onto texture which then gets saved OR just render for a particular
-// fixed delta_max on the fly from the GUI (simpler, but would require some serious refactoring of
-// this method, which would be nice anyway).
 DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                           const uchar *const rendered_depth,
                                           const uchar *const input_depth,
-                                          const Eigen::Matrix4d &velo_to_cam,
-                                          const Eigen::Matrix<double, 3, 4> &cam_proj,
+                                          const Eigen::Matrix4d &velo_to_left_gray_cam,
+                                          const Eigen::Matrix34d &proj_left_color,
+                                          const Eigen::Matrix34d &proj_right_color,
                                           const int frame_width,
                                           const int frame_height,
                                           const float min_depth_meters,
@@ -152,12 +151,14 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
 
 //  cout << "EvaluateDepth [" << min_depth_meters << "--" << max_depth_meters << "]" << endl;
 
+  int epi_errors = 0;
+  int too_big_disps = 0;
+
   for (int i = 0; i < lidar_points.rows(); ++i) {
-    // TODO extract maybe loop body as separate method? => Simpler visualization without code dupe
     Eigen::Vector4d velo_point = lidar_points.row(i).cast<double>();
     // Ignore the reflectance; we only care about 3D homogeneous coordinates.
     velo_point(3) = 1.0f;
-    Eigen::Vector4d cam_point = velo_to_cam * velo_point;
+    Eigen::Vector4d cam_point = velo_to_left_gray_cam * velo_point;
     cam_point /= cam_point(3);
 
     double velo_z = cam_point(2);
@@ -170,21 +171,46 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
     assert(velo_z_scaled > 0 && velo_z_scaled <= kTargetTypeRange);
     uchar velo_z_uc = static_cast<uchar>(velo_z_scaled);
 
-    Eigen::Vector3d velo_2d = cam_proj * cam_point;
-    velo_2d /= velo_2d(2);
+    Eigen::Vector3d velo_2d_left = proj_left_color * cam_point;
+    Eigen::Vector3d velo_2d_right = proj_right_color * cam_point;
+    velo_2d_left /= velo_2d_left(2);
+    velo_2d_right /= velo_2d_right(2);
+
+    // TODO(andrei): Compute LIDAR disparity (!), then extract raycast and input disparities (!,
+    // i.e., not depths) and compare.
 
     // We ignore LIDAR points which fall outside the camera's retina.
-    if (velo_2d(0) < 0 || velo_2d(0) >= frame_width ||
-        velo_2d(1) < 0 || velo_2d(1) >= frame_height) {
+    if (velo_2d_left(0) < 0 || velo_2d_left(0) >= frame_width ||
+        velo_2d_left(1) < 0 || velo_2d_left(1) >= frame_height) {
       continue;
     }
 
-    // TODO-LOW(andrei): Using bilinear interpolation can slightly increase the accuracy of the
-    // evaluation.
-    int row = static_cast<int>(round(velo_2d(1)));
-    int col = static_cast<int>(round(velo_2d(0)));
-    int idx_in_rendered = (row * frame_width + col) * rendered_stride;
-    int idx_in_input = (row * frame_width + col) * input_stride;
+    int row_left = static_cast<int>(round(velo_2d_left(1)));
+    int col_left = static_cast<int>(round(velo_2d_left(0)));
+    int row_right = static_cast<int>(round(velo_2d_right(1)));
+    int col_right = static_cast<int>(round(velo_2d_right(0)));
+
+    if (row_left != row_right) {
+      int delta = row_left - row_right;
+      float fdelta = velo_2d_left(1) - velo_2d_right(1);
+
+      if (abs(fdelta) > 1.0) {
+        epi_errors++;
+        cerr << "Warning: epipolar violation or something! Delta: " << delta << "; float: "
+             << fdelta << endl;
+        cerr << "Whereby left float row was: " << velo_2d_left(1) << " and right float row was: "
+             << velo_2d_right(1) << endl;
+      }
+    }
+
+    // "Manually" compute the disparity of a LIDAR reading.
+    int lidar_disp = col_left - col_right;
+
+    // TODO(andrei): Get depth as float from engine, and compute disparity here.
+    // TODO(andrei): Get depth map as float or at least short and compute disparity here.
+
+    int idx_in_rendered = (row_left * frame_width + col_left) * rendered_stride;
+    int idx_in_input = (row_left * frame_width + col_left) * input_stride;
 
     uchar rendered_depth_val = rendered_depth[idx_in_rendered];
     uchar input_depth_val = input_depth[idx_in_input];
@@ -211,9 +237,11 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
     measurements++;
 
     if (nullptr != callback) {
-      callback->ProcessItem(i, velo_2d, rendered_depth_val, input_depth_val, velo_z_uc, frame_width, frame_height);
+      callback->ProcessItem(i, velo_2d_left, rendered_depth_val, input_depth_val, velo_z_uc, frame_width, frame_height);
     }
   }
+//  cout << "Epipolar violations: " << epi_errors << " out of " << measurements << "." << endl;
+  cout << "Found " << too_big_disps << " suspiciously large disparities." << endl;
 
   DepthResult rendered_result(measurements, errors_rendered, missing_rendered, correct_rendered);
   DepthResult input_result(measurements, errors_input, missing_input, correct_input);
