@@ -350,8 +350,8 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
   // We don't want to create an (expensive) meshing engine for every instance.
   settings->createMeshingEngine = false;
 
-//  settings->sceneParams.mu = 0.3f;
-//  settings->sceneParams.voxelSize = 0.035f;
+  settings->sceneParams.mu = 0.5f;
+  settings->sceneParams.voxelSize = 0.035f;
   // Set the volume to roughly represent 5m x 5m x 10m, which should be more than enough for most
   // common vehicles.
   settings->sdfLocalBlockNum = static_cast<long>(5 * 5 * 10 / settings->sceneParams.voxelSize);

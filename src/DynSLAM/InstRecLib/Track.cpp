@@ -204,6 +204,9 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
           if (verbose) {
             cout << id_ << ": Uncertain -> Static object!" << endl;
           }
+          // If the motion is below the threshold, meaning that the object is stationary, set it to
+          // identity to make the result more accurate.
+          latest_motion->Get().SetIdentity();
           this->track_state_ = kStatic;
         }
 
@@ -233,7 +236,12 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
                            kMaxUncertainFramesDynamic;
 
       if (latest_motion->IsPresent()) {
-        this->last_known_motion_ = latest_motion->Get();
+        if (track_state_ == kStatic) {
+          this->last_known_motion_.SetIdentity();
+        }
+        else {
+          this->last_known_motion_ = latest_motion->Get();
+        }
         this->last_known_motion_time_ = current_frame_idx;
       }
       else {
