@@ -80,9 +80,6 @@ class ErrorVisualizationCallback : public ILidarEvalCallback {
   }
 
  private:
-  unsigned char *colors_;
-  float *vertices_;
-
   int idx_v = 0;
   int idx_c = 0;
 
@@ -92,6 +89,9 @@ class ErrorVisualizationCallback : public ILidarEvalCallback {
   bool visualize_input_;
 
   Eigen::Vector2f output_pane_bounds_;
+
+  unsigned char *colors_;
+  float *vertices_;
 };
 
 }

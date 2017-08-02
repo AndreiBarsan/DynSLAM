@@ -258,7 +258,8 @@ public:
               synthesized_depthmap,
               input_depthmap_uc,
               velodyne->velodyne_to_rgb,
-              dyn_slam_->GetProjectionMatrix().cast<double>(),
+              dyn_slam_->GetLeftRgbProjectionMatrix().cast<double>(),
+              dyn_slam_->GetRightRgbProjectionMatrix().cast<double>(),
               width_,
               height_,
               min_depth_meters,
@@ -292,17 +293,17 @@ public:
         }
         pane_texture_->RenderToViewport(true);
 
-        Tic("LIDAR render (partially naive)");
+        Tic("LIDAR render");
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
         if (velodyne->HasLatestFrame()) {
           PreviewLidar(velodyne->GetLatestFrame(),
-                       dyn_slam_->GetProjectionMatrix(),
+                       dyn_slam_->GetLeftRgbProjectionMatrix(),
                        velodyne->velodyne_to_rgb.cast<float>(),
                        rgb_view_);
         }
         else {
           PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
-                       dyn_slam_->GetProjectionMatrix(),
+                       dyn_slam_->GetRightRgbProjectionMatrix(),
                        velodyne->velodyne_to_rgb.cast<float>(),
                        rgb_view_);
         }
@@ -1051,26 +1052,41 @@ private:
 
 } // namespace gui
 
-void ReadKittiOdometryCalibration(const string &fpath,
-                                  Eigen::Matrix<double, 3, 4> &left_cam_proj,
-                                  Eigen::Matrix4d &velo_to_left_cam) {
-  ifstream in(fpath);
-  string dummy;
-  in >> dummy;
-  assert(dummy == "P0:");
+Eigen::Matrix<double, 3, 4> ReadProjection(const string &expected_label, istream &in) {
+  Eigen::Matrix<double, 3, 4> matrix;
+  string label;
+  in >> label;
+  assert(expected_label == label && "Unexpected token in calibration file.");
 
   for (int row = 0; row < 3; ++row) {
     for (int col = 0; col < 4; ++col) {
-      in >> left_cam_proj(row, col);
+      in >> matrix(row, col);
     }
   }
 
-  // Skip until the Velodyne calibration line.
-  std::getline(in, dummy);
-  std::getline(in, dummy);
-  std::getline(in, dummy);
-  std::getline(in, dummy);
+  return matrix;
+};
 
+/// \brief Reads the projection and transformation matrices for a KITTI-odometry sequence.
+/// \note P0 = left-gray, P1 = right-gray, P2 = left-color, P3 = right-color
+void ReadKittiOdometryCalibration(const string &fpath,
+                                  Eigen::Matrix<double, 3, 4> &left_gray_proj,
+                                  Eigen::Matrix<double, 3, 4> &right_gray_proj,
+                                  Eigen::Matrix<double, 3, 4> &left_color_proj,
+                                  Eigen::Matrix<double, 3, 4> &right_color_proj,
+                                  Eigen::Matrix4d &velo_to_left_cam) {
+  static const string kLeftGray = "P0:";
+  static const string kRightGray = "P1:";
+  static const string kLeftColor = "P2:";
+  static const string kRightColor = "P3:";
+  ifstream in(fpath);
+
+  left_gray_proj = ReadProjection(kLeftGray, in);
+  right_gray_proj = ReadProjection(kRightGray, in);
+  left_color_proj = ReadProjection(kLeftColor, in);
+  right_color_proj = ReadProjection(kRightColor, in);
+
+  string dummy;
   in >> dummy;
   assert(dummy == "Tr:");
   for (int row = 0; row < 3; ++row) {
@@ -1138,19 +1154,30 @@ ITMLib::Objects::ITMRGBDCalib* CreateItmCalib(
 /// This is useful when you want to focus on the quality of the reconstruction, instead of that of
 /// the odometry.
 void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
-//  Input::Config input_config = Input::KittiOdometryConfig();
-  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+  Input::Config input_config = Input::KittiOdometryConfig();
+//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
 
-  Eigen::Matrix<double, 3, 4> left_cam_proj;
-  Eigen::Matrix4d velo_to_left_cam;
+  Eigen::Matrix34d left_gray_proj;
+  Eigen::Matrix34d right_gray_proj;
+  Eigen::Matrix34d left_color_proj;
+  Eigen::Matrix34d right_color_proj;
+  Eigen::Matrix4d velo_to_left_gray_cam;
 
   // Read all the calibration info we need.
+  // HERE BE DRAGONS (for noobs like myself): Make sure you're using the correct matrix for the
+  // grayscale and/or color cameras!
   ReadKittiOdometryCalibration(dataset_root + "/" + input_config.calibration_fname,
-                               left_cam_proj, velo_to_left_cam);
+                               left_gray_proj, right_gray_proj, left_color_proj, right_color_proj,
+                               velo_to_left_gray_cam);
+
   Eigen::Vector2i frame_size = GetFrameSize(dataset_root, input_config);
 
-  cout << "Read calibration from KITTI-style data..." << endl << "Proj: " << endl << left_cam_proj
-       << endl << "Velo: " << endl << velo_to_left_cam << endl;
+  cout << "Read calibration from KITTI-style data..." << endl
+       << "Proj (left, gray): " << endl << left_gray_proj << endl
+       << "Proj (right, gray): " << endl << right_gray_proj << endl
+       << "Proj (left, color): " << endl << left_color_proj << endl
+       << "Proj (right, color): " << endl << right_color_proj << endl
+       << "Velo: " << endl << velo_to_left_gray_cam << endl;
 
   VoxelDecayParams voxel_decay_params(
       FLAGS_voxel_decay,
@@ -1160,9 +1187,11 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 
   int frame_offset = FLAGS_frame_offset;
 
-  // TODO-LOW(andrei): Read baseline from a file.
+  // TODO-LOW(andrei): Compute the baseline from the projection matrices.
   float baseline_m = 0.537150654273f;
-  float focal_length_px = left_cam_proj(0, 0);
+  // TODO(andrei): Be aware of which camera you're using for the depth estimation. (for pure focal
+  // length it doesn't matter, though, since it's the same)
+  float focal_length_px = left_gray_proj(0, 0);
   StereoCalibration stereo_calibration(baseline_m, focal_length_px);
 
   *input_out = new Input(
@@ -1193,7 +1222,7 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
 
   drivers::InfiniTamDriver *driver = new InfiniTamDriver(
       driver_settings,
-      CreateItmCalib(left_cam_proj, frame_size),
+      CreateItmCalib(left_color_proj, frame_size),
       ToItmVec((*input_out)->GetRgbSize()),
       ToItmVec((*input_out)->GetDepthSize()),
       voxel_decay_params);
@@ -1215,14 +1244,15 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
   sf_params.inlier_threshold = 3.0;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
                                       // object instances
   sf_params.bucket.max_features = 10;    // Default = 2
-  sf_params.calib.cu = left_cam_proj(0, 2);
-  sf_params.calib.cv = left_cam_proj(1, 2);
-  sf_params.calib.f  = left_cam_proj(0, 0);
+  // VO is computed using the grayscale frames.
+  sf_params.calib.cu = left_gray_proj(0, 2);
+  sf_params.calib.cv = left_gray_proj(1, 2);
+  sf_params.calib.f  = left_gray_proj(0, 0);
 
   auto sparse_sf_provider = new instreclib::VisoSparseSFProvider(sf_params);
 
   auto evaluation = new dynslam::eval::Evaluation(dataset_root, *input_out,
-                                                  velo_to_left_cam,
+                                                  velo_to_left_gray_cam,
                                                   driver_settings->sceneParams.voxelSize);
 
   Vector2i input_shape((*input_out)->GetRgbSize().width, (*input_out)->GetRgbSize().height);
@@ -1233,7 +1263,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       evaluation,
       input_shape,
       input_config.max_depth_m,
-      left_cam_proj.cast<float>()
+      left_color_proj.cast<float>(),
+      right_color_proj.cast<float>()
   );
 }
 

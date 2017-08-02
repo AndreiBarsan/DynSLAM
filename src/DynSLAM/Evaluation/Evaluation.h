@@ -189,15 +189,13 @@ class Evaluation {
   /// quantized depth and the LIDAR point's is below 'delta_max'. Based on the evaluation method
   /// from [0].
   ///
-  /// TODO-LOW(andrei): Honestly, the [0] approach is not perfect. It would make more sense to use
-  /// float metric depth, and make the deltas also metric, i.e., more meaningful...
-  ///
   /// [0]: Sengupta, S., Greveson, E., Shahrokni, A., & Torr, P. H. S. (2013). Urban 3D semantic modelling using stereo vision. Proceedings - IEEE International Conference on Robotics and Automation, 580–585. https://doi.org/10.1109/ICRA.2013.6630632
   DepthEvaluation EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                 const uchar *rendered_depth,
                                 const uchar *input_depth,
-                                const Eigen::Matrix4d &velo_to_cam,
-                                const Eigen::Matrix<double, 3, 4> &cam_proj,
+                                const Eigen::Matrix4d &velo_to_left_gray_cam,
+                                const Eigen::Matrix34d &proj_left_color,
+                                const Eigen::Matrix34d &proj_right_color,
                                 int frame_width,
                                 int frame_height,
                                 float min_depth_meters,
