@@ -38,6 +38,12 @@ void DynSlam::ProcessFrame(Input *input) {
     utils::Tic("Sparse Scene Flow");
     cv::Mat1b *left_gray, *right_gray;
     input->GetCvStereoGray(&left_gray, &right_gray);
+
+    // TODO(andrei): Compute only matches here, the make the instance reconstructor process the
+    // frame and remove clearly-dynamic SF vectors (e.g., from tracks which are clearly dynamic,
+    // as marked from a prev frame), before computing the egomotion, and then processing the
+    // reconstructions. This may improve VO accuracy, and it could give us an excuse to also
+    // evaluate ATE and compare it with the results from e.g., StereoScan, woo!
     sparse_sf_provider_->ComputeSparseSF(
         make_pair((cv::Mat1b *) nullptr, (cv::Mat1b *) nullptr),
         make_pair(left_gray, right_gray)
