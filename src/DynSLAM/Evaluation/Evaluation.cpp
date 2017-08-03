@@ -62,64 +62,34 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
   Eigen::Matrix4f epose = dyn_slam->GetPose().inverse();
   auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
-//  const uchar *rendered_depthmap = dyn_slam->GetStaticMapRaycastPreview(
-//      pango_pose,
-//      PreviewType::kDepth
-//  );
   const float *rendered_depthmap = dyn_slam->GetStaticMapRaycastDepthPreview(pango_pose);
   auto input_depthmap = shared_ptr<cv::Mat1s>(nullptr);
   auto input_rgb = shared_ptr<cv::Mat3b>(nullptr);
-
   input->GetFrameCvImages(frame_idx, input_rgb, input_depthmap);
-
-//    const cv::Mat1s *input_depthmap = dyn_slam->GetDepthPreview();
-//        cv::Mat1b input_depthmap_uc(height_, width_);
 
   int width = dyn_slam->GetInputWidth();
   int height = dyn_slam->GetInputHeight();
   float min_depth_meters = input->GetDepthProvider()->GetMinDepthMeters();
   float max_depth_meters = input->GetDepthProvider()->GetMaxDepthMeters();
 
-  // TODO(andrei): Don't waste memory...
-//  uchar input_depthmap_uc[width * height * 4];
-  // TODO(andrei): Use the affine depth calib params here
-//  float input_pixels_to_meters = 1 / 1000.0f;
-
-//  for(int row = 0; row < height; ++row) {
-//    for(int col = 0; col < width; ++col) {
-//      // The (signed) short-valued depth map encodes the depth expressed in millimeters.
-//      short in_depth = input_depthmap->at<short>(row, col);
-//      uchar byte_depth;
-//      if (in_depth == std::numeric_limits<short>::max()) {
-//        byte_depth = 0;
-//      }
-//      else {
-//        byte_depth = static_cast<uchar>(round(in_depth * input_pixels_to_meters / max_depth_meters * 255));
-//      }
-//
-//      int idx = (row * width + col) * 4;
-//      input_depthmap_uc[idx] =     byte_depth;
-//      input_depthmap_uc[idx + 1] = byte_depth;
-//      input_depthmap_uc[idx + 2] = byte_depth;
-//      input_depthmap_uc[idx + 3] = byte_depth;
-//    }
-//  }
-
   // TODO(andrei): Once you get this working, wrap images in OpenCV objects for readability and flexibility.
   std::vector<DepthEvaluation> evals;
-  for(uint delta_max = 0; delta_max <= 15; ++delta_max) {
+  const int kLargestMaxDelta = 12;
+  bool compare_on_intersection = true;
+  for(uint delta_max = 1; delta_max <= kLargestMaxDelta; ++delta_max) {
     evals.push_back(EvaluateDepth(lidar_pointcloud,
                                   rendered_depthmap,
                                   *input_depthmap,
                                   velodyne_->velodyne_to_rgb,
                                   dyn_slam->GetLeftRgbProjectionMatrix().cast<double>(),
                                   dyn_slam->GetRightRgbProjectionMatrix().cast<double>(),
+                                  dyn_slam->GetStereoBaseline(),
                                   width,
                                   height,
                                   min_depth_meters,
                                   max_depth_meters,
                                   delta_max,
-                                  1,
+                                  compare_on_intersection,
                                   nullptr));
   }
 
@@ -129,18 +99,20 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
 
 DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                           const float *const rendered_depth,
-                                          const cv::Mat1s &input_depth,
+                                          const cv::Mat1s &input_depth_mm,
                                           const Eigen::Matrix4d &velo_to_left_gray_cam,
                                           const Eigen::Matrix34d &proj_left_color,
                                           const Eigen::Matrix34d &proj_right_color,
+                                          const float baseline_m,
                                           const int frame_width,
                                           const int frame_height,
                                           const float min_depth_meters,
                                           const float max_depth_meters,
                                           const uint delta_max,
-                                          const uint rendered_stride,
+                                          const bool compare_on_intersection,
                                           ILidarEvalCallback *callback) const {
   const int kTargetTypeRange = std::numeric_limits<uchar>::max();
+  const float left_focal_length_px = static_cast<float>(proj_left_color(0, 0));
   long missing_rendered = 0;
   long errors_rendered = 0;
   long correct_rendered = 0;
@@ -148,12 +120,6 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
   long errors_input = 0;
   long correct_input = 0;
   long measurements = 0;
-
-  const float left_focal_length_px = static_cast<float>(proj_left_color(0, 0));
-  // TODO parameter
-  const float baseline_m = 0.537150654273f;
-
-//  cout << "EvaluateDepth [" << min_depth_meters << "--" << max_depth_meters << "]" << endl;
 
   int epi_errors = 0;
   int too_big_disps = 0;
@@ -180,73 +146,84 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
     velo_2d_left /= velo_2d_left(2);
     velo_2d_right /= velo_2d_right(2);
 
-    // TODO(andrei): Compute LIDAR disparity (!), then extract raycast and input disparities (!,
-    // i.e., not depths) and compare.
-
-    // We ignore LIDAR points which fall outside the camera's retina.
-    if (velo_2d_left(0) < 0 || velo_2d_left(0) >= frame_width ||
-        velo_2d_left(1) < 0 || velo_2d_left(1) >= frame_height) {
-      continue;
-    }
-
     int row_left = static_cast<int>(round(velo_2d_left(1)));
     int col_left = static_cast<int>(round(velo_2d_left(0)));
     int row_right = static_cast<int>(round(velo_2d_right(1)));
     int col_right = static_cast<int>(round(velo_2d_right(0)));
 
+    // We ignore LIDAR points which fall outside the left camera's retina.
+    if (col_left < 0 || col_left >= frame_width ||
+        row_left < 0 || row_left >= frame_height) {
+      continue;
+    }
+
     if (row_left != row_right) {
       int delta = row_left - row_right;
       float fdelta = velo_2d_left(1) - velo_2d_right(1);
 
-      if (abs(fdelta) > 1.0) {
+      // Note that the LIDAR pointclouds aren't perfectly aligned, so this could occasionally happen.
+      if (abs(fdelta) > 1.2) {
         epi_errors++;
-        cerr << "Warning: epipolar violation or something! Delta: " << delta << "; float: "
+        cerr << "Warning: epipolar violation! Delta: " << delta << "; float: "
              << fdelta << endl;
         cerr << "Whereby left float row was: " << velo_2d_left(1) << " and right float row was: "
              << velo_2d_right(1) << endl;
       }
     }
 
-    // "Manually" compute the disparity of a LIDAR reading.
-    int lidar_disparity = col_left - col_right;
+    const float lidar_disp = velo_2d_left(0) - velo_2d_right(0);
+    if (lidar_disp < 0.0f) {
+      throw std::runtime_error("Negative disparity in ground truth.");
+    }
 
     int idx_in_rendered = (row_left * frame_width + col_left) * rendered_stride;
-//    int idx_in_input = (row_left * frame_width + col_left) * input_stride;
-
     const float rendered_depth_val = rendered_depth[idx_in_rendered];
-    const float input_depth_val = input_depth.at<short>(row_left, col_left) / 1000.0f;
+    const float input_depth_val = input_depth_mm.at<short>(row_left, col_left) / 1000.0f;
+    if (input_depth_mm.at<short>(row_left, col_left) < 0) {
+      cerr << "WARNING: Input depth negative value of " << input_depth_mm.at<short>(row_left, col_left)
+           << " at "  << row_left << ", " << col_left << "." << endl;
+    }
 
     // Units of measurement: px = (m * px) / m;
-    // TODO(andrei): Just pass disparity maps. (Will require some extra engineering.)
-    const int rendered_disp = static_cast<int>(round((baseline_m * left_focal_length_px) / rendered_depth_val));
-    const int input_disp = static_cast<int>(round((baseline_m * left_focal_length_px) / input_depth_val));
+//    const int rendered_disp = static_cast<int>(round((baseline_m * left_focal_length_px) / rendered_depth_val));
+//    const uint rendered_disp_delta = static_cast<uint>(std::abs(rendered_disp - lidar_disp));
+//    const int input_disp = static_cast<int>(round((baseline_m * left_focal_length_px) / input_depth_val));
+//    const uint input_disp_delta = static_cast<uint>(std::abs(input_disp - lidar_disp));
 
-    // TODO(andrei): Flag for switching between depth comparisons and disparity ones.
-//    uint rendered_delta = depth_delta(rendered_depth_val, velo_z_uc);
-//    uint input_delta = depth_delta(input_depth_val, velo_z_uc);
+    const float rendered_disp = baseline_m * left_focal_length_px / rendered_depth_val;
+    const float rendered_disp_delta = fabs(rendered_disp - lidar_disp);
+    const float input_disp = baseline_m * left_focal_length_px / input_depth_val;
+    const float input_disp_delta = fabs(input_disp - lidar_disp);
 
-    const uint rendered_disp_delta = static_cast<uint>(std::abs(rendered_disp - lidar_disparity));
-    const uint input_disp_delta = static_cast<uint>(std::abs(input_disp - lidar_disparity));
-
-    if (fabs(rendered_depth_val) < 1e-5) {
+    /// We want to compare the fusion and the input map only where they're both present, since
+    /// otherwise the fusion covers a much larger area, so its evaluation is tougher.
+    // experimental metric
+    if (compare_on_intersection && (fabs(input_depth_val) < 1e-5 || fabs(rendered_depth_val) < 1e-5)) {
+      missing_input++;
       missing_rendered++;
     }
-    else if (rendered_disp_delta > delta_max) {
-      errors_rendered++;
-    }
     else {
-      correct_rendered++;
+      if (fabs(input_depth_val) < 1e-5) {
+        missing_input++;
+      } else {
+        if (input_disp_delta > delta_max) {
+          errors_input++;
+        } else {
+          correct_input++;
+        }
+      }
+
+      if (rendered_depth_val < 1e-5) {
+        missing_rendered++;
+      } else {
+        if (rendered_disp_delta > delta_max) {
+          errors_rendered++;
+        } else {
+          correct_rendered++;
+        }
+      }
     }
 
-    if (input_depth_val == 0) {
-      missing_input++;
-    }
-    else if (input_disp_delta > delta_max) {
-      errors_input++;
-    }
-    else {
-      correct_input++;
-    }
 
     /*
     if (fabs(rendered_depth_val) < 1e-5) {
@@ -269,11 +246,20 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
     measurements++;
 
     if (nullptr != callback) {
-      callback->ProcessItem(i, velo_2d_left, rendered_depth_val, input_depth_val, velo_z_uc, frame_width, frame_height);
+      callback->LidarPoint(i,
+                           velo_2d_left,
+                           rendered_disp,
+                           rendered_depth_val,
+                           input_disp,
+                           input_depth_val,
+                           lidar_disp,
+                           frame_width,
+                           frame_height);
     }
+
   }
 //  cout << "Epipolar violations: " << epi_errors << " out of " << measurements << "." << endl;
-  cout << "Found " << too_big_disps << " suspiciously large disparities." << endl;
+//  cout << "Found " << too_big_disps << " suspiciously large disparities." << endl;
 
   DepthResult rendered_result(measurements, errors_rendered, missing_rendered, correct_rendered);
   DepthResult input_result(measurements, errors_input, missing_input, correct_input);

@@ -102,9 +102,7 @@ public:
     delete last_egomotion_;
   }
 
-  // TODO(andrei): I was passing a Mat4b as rgb, which caused a nasty bug, but didn't even get a
-  // warning. Is that normal? I was expecting a little more type safety...
-  void UpdateView(const cv::Mat3b &rgb_image, const cv::Mat_<uint16_t> &raw_depth_image);
+  void UpdateView(const cv::Mat3b &rgb_image, const cv::Mat1s &raw_depth_image);
 
   // used by the instance reconstruction
   void SetView(ITMView *view) {

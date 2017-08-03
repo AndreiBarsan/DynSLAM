@@ -181,27 +181,32 @@ class Evaluation {
 
   /// \brief Compares a fused depth map and input depth map to the corresponding LIDAR pointcloud,
   ///        which is considered to be the ground truth.
+  /// \param compare_on_intersection If true, then the accuracy of both input and fused depth is
+  /// computed only for ground truth LIDAR points which have both corresponding input depth, as well
+  /// as fused depth. Otherwise, the input and depth accuracies are compute separately.
   ///
-  /// Projects each LIDAR point (expressed in the LIDAR's reference frame) into the camera's frame,
-  /// and compares its depth to that of both the fused depth map (rendered_depth) and to the input
-  /// depth map (input_depth). All depths are quantized to bytes (uchar) before comparison, and a
-  /// depth value is considered to match the ground truth if the absolute difference between its
-  /// quantized depth and the LIDAR point's is below 'delta_max'. Based on the evaluation method
-  /// from [0].
+  /// Projects each LIDAR point into both the left and the right camera frames, in order to compute
+  /// the ground truth disparity. Then, if input and/or rendered depth values are available at
+  /// those coordinates, computes their corresponding disparity as well, comparing it to the ground
+  /// truth disparity.
+  ///
+  /// A disparity is counted as accurate if the absoluted difference between it and the ground truth
+  /// disparity is less than 'delta_max'. Based on the evaluation method from [0].
   ///
   /// [0]: Sengupta, S., Greveson, E., Shahrokni, A., & Torr, P. H. S. (2013). Urban 3D semantic modelling using stereo vision. Proceedings - IEEE International Conference on Robotics and Automation, 580–585. https://doi.org/10.1109/ICRA.2013.6630632
   DepthEvaluation EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
-                                const float *const rendered_depth,
-                                const cv::Mat1s &input_depth,
+                                const float *rendered_depth,
+                                const cv::Mat1s &input_depth_mm,
                                 const Eigen::Matrix4d &velo_to_left_gray_cam,
                                 const Eigen::Matrix34d &proj_left_color,
                                 const Eigen::Matrix34d &proj_right_color,
-                                const int frame_width,
-                                const int frame_height,
-                                const float min_depth_meters,
-                                const float max_depth_meters,
-                                const uint delta_max,
-                                const uint rendered_stride,
+                                float baseline_m,
+                                int frame_width,
+                                int frame_height,
+                                float min_depth_meters,
+                                float max_depth_meters,
+                                uint delta_max,
+                                bool compare_on_intersection,
                                 ILidarEvalCallback *callback) const;
 
   Velodyne *GetVelodyne() {

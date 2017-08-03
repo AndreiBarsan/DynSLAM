@@ -37,7 +37,8 @@ class DynSlam {
           const Vector2i &input_shape,
           float max_depth_meters,
           const Eigen::Matrix34f& proj_left_rgb,
-          const Eigen::Matrix34f& proj_right_rgb)
+          const Eigen::Matrix34f& proj_right_rgb,
+          float stereo_baseline_m)
     : static_scene_(itm_static_scene_engine),
       segmentation_provider_(segmentation_provider),
       instance_reconstructor_(new InstanceReconstructor(itm_static_scene_engine)),
@@ -53,8 +54,9 @@ class DynSlam {
       input_height_(input_shape.y),
       max_depth_meters_(max_depth_meters),
       poses_({ Eigen::Matrix4f::Identity() }),
-      projection_matrix_left_rgb_(proj_left_rgb),
-      projection_matrix_right_rgb_(proj_right_rgb)
+      projection_left_rgb_(proj_left_rgb),
+      projection_right_rgb_(proj_right_rgb),
+      stereo_baseline_m_(stereo_baseline_m)
   {}
 
   /// \brief Reads in and processes the next frame from the data source.
@@ -195,12 +197,16 @@ class DynSlam {
   }
 
   const Eigen::Matrix34f GetLeftRgbProjectionMatrix() const {
-    return projection_matrix_left_rgb_;
+    return projection_left_rgb_;
   };
 
   const Eigen::Matrix34f GetRightRgbProjectionMatrix() const {
-    return projection_matrix_right_rgb_;
+    return projection_right_rgb_;
   };
+
+  float GetStereoBaseline() const {
+    return stereo_baseline_m_;
+  }
 
   SUPPORT_EIGEN_FIELDS;
 
@@ -229,8 +235,9 @@ private:
 
   /// \brief Matrix for projecting 3D homogeneous coordinates in the camera's coordinate frame to
   ///       2D homogeneous coordinates expressed in pixels.
-  const Eigen::Matrix34f projection_matrix_left_rgb_;
-  const Eigen::Matrix34f projection_matrix_right_rgb_;
+  const Eigen::Matrix34f projection_left_rgb_;
+  const Eigen::Matrix34f projection_right_rgb_;
+  const float stereo_baseline_m_;
 
   /// \brief Returns a path to the folder where the dataset's meshes should be dumped, creating it
   ///        using a naive system call if it does not exist.

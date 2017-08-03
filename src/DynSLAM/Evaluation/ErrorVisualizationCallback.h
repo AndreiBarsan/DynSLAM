@@ -28,25 +28,33 @@ class ErrorVisualizationCallback : public ILidarEvalCallback {
         vertices_(vertices)
   {}
 
-  // TODO(andrei): Fix this to work with disparities
-  void ProcessItem(int idx,
-                   const Eigen::Vector3d &velo_2d_homo,
-                   unsigned char rendered_depth,
-                   unsigned char input_depth,
-                   unsigned char velodyne_depth,
-                   int width,
-                   int height
-  ) override {
+  void LidarPoint(int idx,
+                  const Eigen::Vector3d &velo_2d_homo,
+                  int rendered_disp,
+                  float rendered_depth,
+                  int input_disp,
+                  float input_depth,
+                  int velodyne_disp,
+                  int width,
+                  int height) override {
     Eigen::Matrix<uchar, 3, 1> color;
 
-    uint target_delta = static_cast<uint>(
-        (visualize_input_) ? abs(input_depth - velodyne_depth)
-                           : abs(rendered_depth - velodyne_depth));
-    uchar target_val = (visualize_input_) ? input_depth : rendered_depth;
+    uint target_disp_delta = static_cast<uint>(
+        (visualize_input_) ? abs(input_disp - velodyne_disp)
+                           : abs(rendered_disp - velodyne_disp));
+    int target_val = (visualize_input_) ? input_disp : rendered_disp;
+    if (input_disp < 0 && fabs(input_depth) > 1e-5) {
+      throw std::runtime_error(utils::Format(
+          "Cannot have negative disparities, but found input_disp = %d!", input_disp));
+    }
+    if (rendered_disp < 0 && fabs(rendered_depth) > 1e-5) {
+      throw std::runtime_error(utils::Format(
+          "Cannot have negative disparities, but found rendered_disp = %d.", rendered_disp));
+    }
 
-    if (target_val != 0) {
-      if (target_delta > delta_max_) {
-        color(0) = std::min(255, static_cast<int>(180 + (target_delta - delta_max_ - 1) * 10));
+    if (target_val > 0) {
+      if (target_disp_delta > delta_max_) {
+        color(0) = std::min(255, static_cast<int>(100 + (target_disp_delta - delta_max_ - 1) * 10));
         color(1) = 40;
         color(2) = 40;
       } else {
@@ -76,6 +84,7 @@ class ErrorVisualizationCallback : public ILidarEvalCallback {
 
   void Render() {
     glDisable(GL_DEPTH_TEST);
+//    cout << "Should render " << idx_v / 2 << " points..." << endl;
     pangolin::glDrawColoredVertices<float>(idx_v / 2, vertices_, colors_, GL_POINTS, 2, 3);
     glEnable(GL_DEPTH_TEST);
   }
