@@ -162,6 +162,12 @@ public:
       const pangolin::OpenGlMatrix &model_view = pangolin::IdentityMatrix()
   );
 
+  void GetFloatImage(
+      ITMFloatImage *out,
+      dynslam::PreviewType get_image_type,
+      const pangolin::OpenGlMatrix &model_view = pangolin::IdentityMatrix()
+  );
+
   /// \brief Returns the RGB "seen" by this particular InfiniTAM instance.
   /// This may not be the full original RGB frame due to, e.g., masking.
   const cv::Mat3b* GetRgbPreview() const {

@@ -45,13 +45,13 @@ class ErrorVisualizationCallback : public ILidarEvalCallback {
 
     if (target_val != 0) {
       if (target_delta > delta_max_) {
-        color(0) = std::min(255, static_cast<int>(50 +target_delta * 20));
-        color(1) = 160;
-        color(2) = 160;
+        color(0) = std::min(255, static_cast<int>(180 + (target_delta - delta_max_ - 1) * 10));
+        color(1) = 40;
+        color(2) = 40;
       } else {
         color(0) = 10;
-        color(1) = 255 - target_delta * 10;
-        color(2) = 255 - target_delta * 10;
+        color(1) = 255; //- target_delta * 10;
+        color(2) = 255; //- target_delta * 10;
       }
     }
     else {

@@ -137,14 +137,44 @@ void InfiniTamDriver::GetImage(ITMUChar4Image *out,
   if (nullptr != this->view) {
     ITMPose itm_freeview_pose = PoseFromPangolin(model_view);
 
+    if (get_image_type == PreviewType::kDepth) {
+      // TODO(andrei): Make this possible again.
+      cerr << "Warning: Cannot preview depth normally anymore." << endl;
+      return;
+    }
+
     ITMIntrinsics intrinsics = this->viewBuilder->GetCalib()->intrinsics_d;
     ITMMainEngine::GetImage(
         out,
+        nullptr,
         GetItmVisualization(get_image_type),
         &itm_freeview_pose,
         &intrinsics);
   }
   // Otherwise: We're before the very first frame, so no raycast is available yet.
+}
+
+void InfiniTamDriver::GetFloatImage(
+    ITMFloatImage *out,
+    dynslam::PreviewType get_image_type,
+    const pangolin::OpenGlMatrix &model_view
+) {
+  if (nullptr != this->view) {
+    ITMPose itm_freeview_pose = PoseFromPangolin(model_view);
+
+    if (get_image_type != PreviewType::kDepth) {
+      cerr << "Warning: Can only preview depth as float." << endl;
+      return;
+    }
+
+    ITMIntrinsics intrinsics = this->viewBuilder->GetCalib()->intrinsics_d;
+    ITMMainEngine::GetImage(
+        nullptr,
+        out,
+        GetItmVisualization(get_image_type),
+        &itm_freeview_pose,
+        &intrinsics);
+  }
 }
 
 void InfiniTamDriver::UpdateView(const cv::Mat3b &rgb_image,

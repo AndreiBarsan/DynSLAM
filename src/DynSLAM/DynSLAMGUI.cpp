@@ -1154,8 +1154,9 @@ ITMLib::Objects::ITMRGBDCalib* CreateItmCalib(
 /// This is useful when you want to focus on the quality of the reconstruction, instead of that of
 /// the odometry.
 void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
-  Input::Config input_config = Input::KittiOdometryConfig();
-//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+
+//  Input::Config input_config = Input::KittiOdometryConfig();
+  Input::Config input_config = Input::KittiOdometryDispnetConfig();
 
   Eigen::Matrix34d left_gray_proj;
   Eigen::Matrix34d right_gray_proj;
