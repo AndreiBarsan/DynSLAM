@@ -53,7 +53,7 @@ class DynSlam {
       input_width_(input_shape.x),
       input_height_(input_shape.y),
       max_depth_meters_(max_depth_meters),
-      poses_({ Eigen::Matrix4f::Identity() }),
+      pose_history_({ Eigen::Matrix4f::Identity() }),
       projection_left_rgb_(proj_left_rgb),
       projection_right_rgb_(proj_right_rgb),
       stereo_baseline_m_(stereo_baseline_m)
@@ -231,7 +231,7 @@ private:
 
   float max_depth_meters_;
 
-  std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> poses_;
+  std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> pose_history_;
 
   /// \brief Matrix for projecting 3D homogeneous coordinates in the camera's coordinate frame to
   ///       2D homogeneous coordinates expressed in pixels.

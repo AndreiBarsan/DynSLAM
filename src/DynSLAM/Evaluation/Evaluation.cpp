@@ -111,7 +111,6 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                           const uint delta_max,
                                           const bool compare_on_intersection,
                                           ILidarEvalCallback *callback) const {
-  const int kTargetTypeRange = std::numeric_limits<uchar>::max();
   const float left_focal_length_px = static_cast<float>(proj_left_color(0, 0));
   long missing_rendered = 0;
   long errors_rendered = 0;
@@ -122,7 +121,6 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
   long measurements = 0;
 
   int epi_errors = 0;
-  int too_big_disps = 0;
 
   for (int i = 0; i < lidar_points.rows(); ++i) {
     Eigen::Vector4d velo_point = lidar_points.row(i).cast<double>();
@@ -137,10 +135,6 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
       continue;
     }
 
-    double velo_z_scaled = (velo_z / max_depth_meters) * kTargetTypeRange;
-    assert(velo_z_scaled > 0 && velo_z_scaled <= kTargetTypeRange);
-    uchar velo_z_uc = static_cast<uchar>(velo_z_scaled);
-
     Eigen::Vector3d velo_2d_left = proj_left_color * cam_point;
     Eigen::Vector3d velo_2d_right = proj_right_color * cam_point;
     velo_2d_left /= velo_2d_left(2);
@@ -149,7 +143,7 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
     int row_left = static_cast<int>(round(velo_2d_left(1)));
     int col_left = static_cast<int>(round(velo_2d_left(0)));
     int row_right = static_cast<int>(round(velo_2d_right(1)));
-    int col_right = static_cast<int>(round(velo_2d_right(0)));
+//    int col_right = static_cast<int>(round(velo_2d_right(0)));
 
     // We ignore LIDAR points which fall outside the left camera's retina.
     if (col_left < 0 || col_left >= frame_width ||
@@ -176,36 +170,39 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
       throw std::runtime_error("Negative disparity in ground truth.");
     }
 
-    int idx_in_rendered = (row_left * frame_width + col_left) * rendered_stride;
-    const float rendered_depth_val = rendered_depth[idx_in_rendered];
-    const float input_depth_val = input_depth_mm.at<short>(row_left, col_left) / 1000.0f;
+    int idx_in_rendered = row_left * frame_width + col_left;
+    const float rendered_depth_m = rendered_depth[idx_in_rendered];
+    const float input_depth_m = input_depth_mm.at<short>(row_left, col_left) / 1000.0f;
     if (input_depth_mm.at<short>(row_left, col_left) < 0) {
       cerr << "WARNING: Input depth negative value of " << input_depth_mm.at<short>(row_left, col_left)
            << " at "  << row_left << ", " << col_left << "." << endl;
     }
 
-    // Units of measurement: px = (m * px) / m;
-//    const int rendered_disp = static_cast<int>(round((baseline_m * left_focal_length_px) / rendered_depth_val));
+    // Old code which rounded before computing the disparity; slightly less accurate. We don't ever
+    // have to round, actually!
+//    const int rendered_disp = static_cast<int>(round((baseline_m * left_focal_length_px) / rendered_depth_m));
 //    const uint rendered_disp_delta = static_cast<uint>(std::abs(rendered_disp - lidar_disp));
 //    const int input_disp = static_cast<int>(round((baseline_m * left_focal_length_px) / input_depth_val));
 //    const uint input_disp_delta = static_cast<uint>(std::abs(input_disp - lidar_disp));
 
-    const float rendered_disp = baseline_m * left_focal_length_px / rendered_depth_val;
+    // Units of measurement: px = (m * px) / m;
+    const float rendered_disp = baseline_m * left_focal_length_px / rendered_depth_m;
     const float rendered_disp_delta = fabs(rendered_disp - lidar_disp);
-    const float input_disp = baseline_m * left_focal_length_px / input_depth_val;
+    const float input_disp = baseline_m * left_focal_length_px / input_depth_m;
     const float input_disp_delta = fabs(input_disp - lidar_disp);
 
     /// We want to compare the fusion and the input map only where they're both present, since
     /// otherwise the fusion covers a much larger area, so its evaluation is tougher.
     // experimental metric
-    if (compare_on_intersection && (fabs(input_depth_val) < 1e-5 || fabs(rendered_depth_val) < 1e-5)) {
+    if (compare_on_intersection && (fabs(input_depth_m) < 1e-5 || fabs(rendered_depth_m) < 1e-5)) {
       missing_input++;
       missing_rendered++;
     }
     else {
-      if (fabs(input_depth_val) < 1e-5) {
+      if (fabs(input_depth_m) < 1e-5) {
         missing_input++;
       } else {
+//        if (input_disp_delta > delta_max && (input_disp_delta > 0.03 * lidar_disp)) {
         if (input_disp_delta > delta_max) {
           errors_input++;
         } else {
@@ -213,9 +210,10 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
         }
       }
 
-      if (rendered_depth_val < 1e-5) {
+      if (rendered_depth_m < 1e-5) {
         missing_rendered++;
       } else {
+//        if (rendered_disp_delta > delta_max && (rendered_disp_delta > 0.03 * lidar_disp)) {
         if (rendered_disp_delta > delta_max) {
           errors_rendered++;
         } else {
@@ -226,7 +224,7 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
 
 
     /*
-    if (fabs(rendered_depth_val) < 1e-5) {
+    if (fabs(rendered_depth_m) < 1e-5) {
       missing_rendered++;
     } else if (rendered_delta > delta_max) {
       errors_rendered++;
@@ -249,17 +247,20 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
       callback->LidarPoint(i,
                            velo_2d_left,
                            rendered_disp,
-                           rendered_depth_val,
+                           rendered_depth_m,
                            input_disp,
-                           input_depth_val,
+                           input_depth_m,
                            lidar_disp,
                            frame_width,
                            frame_height);
     }
 
   }
-//  cout << "Epipolar violations: " << epi_errors << " out of " << measurements << "." << endl;
-//  cout << "Found " << too_big_disps << " suspiciously large disparities." << endl;
+
+  if (epi_errors > 5) {
+    cerr << "WARNING: Found " << epi_errors << " possible epipolar violations in the ground truth, "
+         << "out of " << measurements << "." << endl;
+  }
 
   DepthResult rendered_result(measurements, errors_rendered, missing_rendered, correct_rendered);
   DepthResult input_result(measurements, errors_input, missing_input, correct_input);
