@@ -39,9 +39,9 @@ DEFINE_int32(frame_offset, 0, "The frame index from which to start reading the d
 
 DEFINE_bool(voxel_decay, true, "Whether to enable map regularization via voxel decay (a.k.a. voxel "
                                "garbage collection).");
-DEFINE_int32(min_decay_age, 50, "The minimum voxel *block* age for voxels within it to be eligible "
+DEFINE_int32(min_decay_age, 20, "The minimum voxel *block* age for voxels within it to be eligible "
                                 " for deletion (garbage collection).");
-DEFINE_int32(max_decay_weight, 2, "The maximum voxle weight for decay. Voxels which have "
+DEFINE_int32(max_decay_weight, 11, "The maximum voxle weight for decay. Voxels which have "
                                   "accumulated more than this many measurements will not be "
                                   "removed.");
 
@@ -172,35 +172,6 @@ public:
         );
         const cv::Mat1s *input_depthmap = dyn_slam_->GetDepthPreview();
 
-//        cv::Mat1b input_depthmap_uc(height_, width_);
-
-//        // TODO(andrei): Don't waste memory...
-//        uchar input_depthmap_uc[width_ * height_ * 4];
-//
-//        for(int row = 0; row < height_; ++row) {
-//          for(int col = 0; col < width_; ++col) {
-//            // The (signed) short-valued depth map encodes the depth expressed in millimeters.
-//            short in_depth = input_depthmap->at<short>(row, col);
-//            // TODO(andrei): Use the affine depth calib params here if needed...
-//            uchar byte_depth;
-//            if (in_depth == std::numeric_limits<short>::max()) {
-//              byte_depth = 0;
-//            }
-//            else {
-//              // TODO(andrei): Eval the impact of rounding, maybe..
-//              byte_depth = static_cast<uchar>(round(
-//                  in_depth / 1000.0 / max_depth_meters * 255));
-//            }
-//
-////            input_depthmap_uc.at<uchar>(row, col) = byte_depth;
-//
-//            int idx = (row * width_ + col) * 4;
-//            input_depthmap_uc[idx] =     byte_depth;
-//            input_depthmap_uc[idx + 1] = byte_depth;
-//            input_depthmap_uc[idx + 2] = byte_depth;
-//            input_depthmap_uc[idx + 3] = byte_depth;
-//          }
-//        }
 
 //        uchar diff_buffer[width_ * height_ * 4];
 //        memset(diff_buffer, '\0', sizeof(uchar) * width_ * height_ * 4);
@@ -244,6 +215,7 @@ public:
         }
 
         UploadCvTexture(*input_depthmap, *pane_texture_, false, GL_SHORT);
+//        pane_texture_->Upload(synthesized_depthmap, *pane_texture_, GL_FLOAT);
 
         if (need_lidar) {
           pane_texture_->RenderToViewport(true);
@@ -254,6 +226,7 @@ public:
               delta_max_visualization, visualize_input, Eigen::Vector2f(
                   main_view_->GetBounds().w, main_view_->GetBounds().h), lidar_vis_colors_, lidar_vis_vertices_);
 
+          bool compare_on_intersection = true;
           DepthEvaluation result = dyn_slam_->GetEvaluation()->EvaluateDepth(
               lidar_pointcloud,
               synthesized_depthmap,
@@ -261,12 +234,13 @@ public:
               velodyne->velodyne_to_rgb,
               dyn_slam_->GetLeftRgbProjectionMatrix().cast<double>(),
               dyn_slam_->GetRightRgbProjectionMatrix().cast<double>(),
+              dyn_slam_->GetStereoBaseline(),
               width_,
               height_,
               min_depth_meters,
               max_depth_meters,
               delta_max_visualization,
-              1,
+              compare_on_intersection,
               &vis_callback
           );
           DepthResult depth_result = current_lidar_vis_ == kFusionVsLidar ? result.fused_result
@@ -474,129 +448,6 @@ public:
     }
 
   }
-
-  /*
-  DepthResult PreviewError(
-    const Eigen::MatrixX4f &lidar_points,
-    const Eigen::Matrix<double, 3, 4> &P,
-    const Eigen::Matrix4d &Tr,
-    const pangolin::View &view,
-    const uchar * const computed_depth,
-    int width,
-    int height,
-    float max_depth_meters,
-    const int delta_max
-  ) {
-    // TODO(andrei) XXX reduce code duplication between this and the main eval module
-    static GLfloat verts[2000000];
-    static GLubyte colors[2000000];
-
-    size_t idx_v = 0;
-    size_t idx_c = 0;
-
-    int errors = 0;
-    int missing = 0;
-    int measurements = 0;
-    int correct = 0;
-
-//    long delta_sum = 0;
-
-    glDisable(GL_DEPTH_TEST);
-    // Doing this via a loop is much slower, but clearer and less likely to lead to evaluation
-    // mistakes than simply rendering the lidar in 2D and comparing it with the map.
-    for (int i = 0; i < lidar_points.rows(); ++i) {
-      Eigen::Vector4d point = lidar_points.row(i);
-      float reflectance = lidar_points(i, 3);
-      point(3) = 1.0f;                // Replace reflectance with the homogeneous 1.
-
-      Eigen::Vector4f p3d = Tr * point;
-      p3d /= p3d(3);
-      float Z = p3d(2);
-
-      // TODO(andrei): Document these limits and explain them in the thesis as well.
-      if (Z < 0.5 || Z >= max_depth_meters) {
-        continue;
-      }
-
-      float Z_scaled = (Z / max_depth_meters) * 255;
-      if (Z_scaled <= 0 || Z_scaled > 255) {
-        throw runtime_error("Unexpected Z value");
-      }
-
-      uchar depth_lidar_uc = static_cast<uchar>(Z_scaled);
-
-      // Note that Sengupta et al. operate on pixels, not individually projected LIDAR points, so it
-      // should be OK if we do a 2d rendering of the lidar and compare all nonblack pixels.
-
-      Eigen::VectorXf p2d = P * p3d;
-      p2d /= p2d(2);
-
-      if (p2d(0) < 0 || p2d(0) >= width_ || p2d(1) < 0 || p2d(1) >= height_) {
-        continue;
-      }
-
-      Eigen::Matrix<uchar, 3, 1> color;
-
-      // We should probably do bilinear interpolation here
-      int row = static_cast<int>(round(p2d(1)));
-      int col = static_cast<int>(round(p2d(0)));
-      uchar depth_computed_uc = computed_depth[(row * width_ + col) * 4];
-
-      int delta_signed = static_cast<int>(depth_computed_uc) - static_cast<int>(depth_lidar_uc);
-
-        int delta = abs(delta_signed);
-        measurements++;
-//        delta_sum += delta_signed;
-
-        // If the delta is larger than the max value OR if we don't have a measurement for the depth
-      if(depth_computed_uc == 0) {
-        missing++;
-      }
-      else if (delta > delta_max) {
-        errors++;
-      }
-      else {
-        correct++;
-      }
-        if (delta > delta_max || depth_computed_uc == 0) {
-
-          color(0) = min(255, delta * 10);
-          color(1) = 160;
-          color(2) = 160;
-        } else {
-          color(0) = 10;
-          color(1) = 255 - delta * 10;
-          color(2) = 255 - delta * 10;
-//          float intensity = min(8.0f / Z, 1.0f);
-//          color(0) = static_cast<uchar>(intensity * 255);
-//          color(1) = static_cast<uchar>(intensity * 255);
-//          color(2) = static_cast<uchar>(reflectance * 255);
-        }
-//      }
-//      else {
-//        continue;
-//      }
-
-      Eigen::Vector2f frame_size(width_, height_);
-      Eigen::Vector2f gl_pos = PixelsToGl(Eigen::Vector2f(p2d(0), p2d(1)), frame_size, view);
-
-      GLfloat x = gl_pos(0);
-      GLfloat y = gl_pos(1);
-
-      verts[idx_v++] = x;
-      verts[idx_v++] = y;
-
-      colors[idx_c++] = color(0);
-      colors[idx_c++] = color(1);
-      colors[idx_c++] = color(2);
-    }
-
-    pangolin::glDrawColoredVertices<float>(idx_v / 2, verts, colors, GL_POINTS, 2, 3);
-    glEnable(GL_DEPTH_TEST);
-
-    return DepthResult(measurements, errors, missing, correct);
-  }
-   */
 
   /// \brief Renders the velodyne points for visual inspection.
   /// \param lidar_points
@@ -1146,13 +997,11 @@ ITMLib::Objects::ITMRGBDCalib* CreateItmCalib(
   return calib;
 }
 
-/// \brief Constructs a DynSLAM instance to run on a KITTI Odometry dataset sequence, using the
-///        ground truth pose information from the Inertial Navigation System (INS) instead of any
-///        visual odometry.
-/// XXX: Update docs once you add proper support for selecting GT or libviso2 odometry.
-/// This is useful when you want to focus on the quality of the reconstruction, instead of that of
-/// the odometry.
-void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
+/// \brief Constructs a DynSLAM instance to run on a KITTI Odometry dataset sequence, using liviso2
+///        for visual odometry.
+void BuildDynSlamKittiOdometry(const string &dataset_root,
+                               DynSlam **dyn_slam_out,
+                               Input **input_out) {
 
   Input::Config input_config = Input::KittiOdometryConfig();
 //  Input::Config input_config = Input::KittiOdometryDispnetConfig();
@@ -1264,7 +1113,8 @@ void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_
       input_shape,
       input_config.max_depth_m,
       left_color_proj.cast<float>(),
-      right_color_proj.cast<float>()
+      right_color_proj.cast<float>(),
+      baseline_m
   );
 }
 
@@ -1298,7 +1148,7 @@ int main(int argc, char **argv) {
 
   dynslam::DynSlam *dyn_slam;
   dynslam::Input *input;
-  BuildDynSlamKittiOdometryGT(dataset_root, &dyn_slam, &input);
+  BuildDynSlamKittiOdometry(dataset_root, &dyn_slam, &input);
 
   dynslam::gui::PangolinGui pango_gui(dyn_slam, input);
   pango_gui.Run();

@@ -54,15 +54,13 @@ void DynSlam::ProcessFrame(Input *input) {
     utils::Toc("Sparse Scene Flow", false);
 
     utils::Tic("Visual Odometry");
-    // TODO(andrei): More proper way of doing this, e.g., by defining a new ITM tracker and giving
-    // it a reference to the viso object.
     Eigen::Matrix4f delta = sparse_sf_provider_->GetLatestMotion();
-    Eigen::Matrix4f new_pose = delta * poses_[poses_.size() - 1];
+    Eigen::Matrix4f new_pose = delta * pose_history_[pose_history_.size() - 1];
     static_scene_->SetPose(new_pose.inverse());
-    poses_.push_back(new_pose);
+    pose_history_.push_back(new_pose);
 
+    // Used when we're *not* computing VO as part of the SF estimation process.
 //    static_scene_->Track();
-
     utils::Toc("Visual Odometry", false);
 
   });
