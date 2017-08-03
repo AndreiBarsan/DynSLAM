@@ -121,7 +121,8 @@ void DynSlam::ProcessFrame(Input *input) {
     }
   }
 
-  if (FLAGS_enable_evaluation) {
+  int evaluation_begin_ = 5;
+  if (FLAGS_enable_evaluation && current_frame_no_ >= evaluation_begin_) {
     utils::Tic("Evaluation");
     evaluation_->EvaluateFrame(input, this);
     utils::Toc();

@@ -101,6 +101,11 @@ class DynSlam {
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
+  const float* GetStaticMapRaycastDepthPreview(const pangolin::OpenGlMatrix &model_view) {
+    static_scene_->GetFloatImage(out_image_float_, PreviewType::kDepth, model_view);
+    return out_image_float_->GetData(MEMORYDEVICE_CPU);
+  }
+
   /// \brief Returns an RGBA unsigned char frame containing the preview of the most recent frame's
   /// semantic segmentation.
   const cv::Mat3b* GetSegmentationPreview() {

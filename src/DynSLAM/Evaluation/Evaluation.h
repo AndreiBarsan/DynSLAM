@@ -191,18 +191,17 @@ class Evaluation {
   ///
   /// [0]: Sengupta, S., Greveson, E., Shahrokni, A., & Torr, P. H. S. (2013). Urban 3D semantic modelling using stereo vision. Proceedings - IEEE International Conference on Robotics and Automation, 580–585. https://doi.org/10.1109/ICRA.2013.6630632
   DepthEvaluation EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
-                                const uchar *rendered_depth,
-                                const uchar *input_depth,
+                                const float *const rendered_depth,
+                                const cv::Mat1s &input_depth,
                                 const Eigen::Matrix4d &velo_to_left_gray_cam,
                                 const Eigen::Matrix34d &proj_left_color,
                                 const Eigen::Matrix34d &proj_right_color,
-                                int frame_width,
-                                int frame_height,
-                                float min_depth_meters,
-                                float max_depth_meters,
-                                uint delta_max,
-                                uint rendered_stride,
-                                uint input_stride,
+                                const int frame_width,
+                                const int frame_height,
+                                const float min_depth_meters,
+                                const float max_depth_meters,
+                                const uint delta_max,
+                                const uint rendered_stride,
                                 ILidarEvalCallback *callback) const;
 
   Velodyne *GetVelodyne() {

@@ -28,6 +28,7 @@ class ErrorVisualizationCallback : public ILidarEvalCallback {
         vertices_(vertices)
   {}
 
+  // TODO(andrei): Fix this to work with disparities
   void ProcessItem(int idx,
                    const Eigen::Vector3d &velo_2d_homo,
                    unsigned char rendered_depth,
