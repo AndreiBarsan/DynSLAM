@@ -157,7 +157,6 @@ public:
 
       if (dyn_slam_->GetCurrentFrameNo() > 1) {
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
-//        auto lidar_pointcloud = velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1);
         auto lidar_pointcloud = velodyne->GetLatestFrame();
         float min_depth_meters = dyn_slam_input_->GetDepthProvider()->GetMinDepthMeters();
         float max_depth_meters = dyn_slam_input_->GetDepthProvider()->GetMaxDepthMeters();
@@ -167,11 +166,12 @@ public:
         Eigen::Matrix4f epose = dyn_slam_->GetPose().inverse();
         auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
-//        const float *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastDepthPreview(
-//            pango_pose
-////            pane_cam_->GetModelViewMatrix(),
-//        );
-//        const cv::Mat1s *input_depthmap = dyn_slam_->GetDepthPreview();
+        const float *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastDepthPreview(
+            pango_pose
+//            pane_cam_->GetModelViewMatrix(),
+        );
+        const cv::Mat1s *input_depthmap = dyn_slam_->GetDepthPreview();
+
 //        cv::Mat1b input_depthmap_uc(height_, width_);
 
 //        // TODO(andrei): Don't waste memory...
@@ -205,9 +205,9 @@ public:
 //        uchar diff_buffer[width_ * height_ * 4];
 //        memset(diff_buffer, '\0', sizeof(uchar) * width_ * height_ * 4);
 
-        const uchar * compare_lidar_vs = nullptr;
+        bool need_lidar = false;
         const unsigned char *preview = nullptr;
-        int delta_max_visualization = 1;
+        const uint delta_max_visualization = 0;
         string message;
         switch(current_lidar_vis_) {
           case kNone:
@@ -221,15 +221,16 @@ public:
             break;
           case kInputVsLidar:
             message = utils::Format("Input depth vs. LIDAR | delta_max = %d", delta_max_visualization);
-//            compare_lidar_vs = input_depthmap_uc;
+            need_lidar = true;
             break;
           case kFusionVsLidar:
             message = utils::Format("Fused map vs. LIDAR | delta_max = %d", delta_max_visualization);
-//            compare_lidar_vs = synthesized_depthmap;
+            need_lidar = true;
             break;
 
           case kInputVsFusion:
             message = "Input depth vs. fusion";
+            // TODO(andrei): Implement this as a callback for the evaluation.
 //            DiffDepthmaps(input_depthmap_uc, synthesized_depthmap, width_, height_,
 //                          delta_max_visualization, diff_buffer);
 //            pane_texture_->Upload(diff_buffer, GL_RGBA, GL_UNSIGNED_BYTE);
@@ -242,39 +243,38 @@ public:
             break;
         }
 
-        if (compare_lidar_vs != nullptr) {
-//          pane_texture_->Upload(compare_lidar_vs, GL_RGBA, GL_UNSIGNED_BYTE);
-//          pane_texture_->RenderToViewport(true);
+        UploadCvTexture(*input_depthmap, *pane_texture_, false, GL_SHORT);
 
-//          bool visualize_input = (current_lidar_vis_ == kInputVsLidar);
+        if (need_lidar) {
+          pane_texture_->RenderToViewport(true);
 
-//          eval::ErrorVisualizationCallback vis_callback(
-//              delta_max_visualization, visualize_input, Eigen::Vector2f(
-//                  main_view_->GetBounds().w, main_view_->GetBounds().h), lidar_vis_colors_, lidar_vis_vertices_);
+          bool visualize_input = (current_lidar_vis_ == kInputVsLidar);
 
-//          DepthEvaluation result = dyn_slam_->GetEvaluation()->EvaluateDepth(
-//              lidar_pointcloud,
-//              synthesized_depthmap,
-//              input_depthmap_uc,
-//              velodyne->velodyne_to_rgb,
-//              dyn_slam_->GetLeftRgbProjectionMatrix().cast<double>(),
-//              dyn_slam_->GetRightRgbProjectionMatrix().cast<double>(),
-//              width_,
-//              height_,
-//              min_depth_meters,
-//              max_depth_meters,
-//              delta_max_visualization,
-//              4,
-//              4,
-//              &vis_callback
-//          );
-//          DepthResult depth_result = current_lidar_vis_ == kFusionVsLidar ? result.fused_result
-//                                                                          : result.input_result;
-//          message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
-//                                   depth_result.GetCorrectPixelRatio(true),
-//                                   depth_result.GetCorrectPixelRatio(false));
-//
-//          vis_callback.Render();
+          eval::ErrorVisualizationCallback vis_callback(
+              delta_max_visualization, visualize_input, Eigen::Vector2f(
+                  main_view_->GetBounds().w, main_view_->GetBounds().h), lidar_vis_colors_, lidar_vis_vertices_);
+
+          DepthEvaluation result = dyn_slam_->GetEvaluation()->EvaluateDepth(
+              lidar_pointcloud,
+              synthesized_depthmap,
+              *input_depthmap,
+              velodyne->velodyne_to_rgb,
+              dyn_slam_->GetLeftRgbProjectionMatrix().cast<double>(),
+              dyn_slam_->GetRightRgbProjectionMatrix().cast<double>(),
+              width_,
+              height_,
+              min_depth_meters,
+              max_depth_meters,
+              delta_max_visualization,
+              1,
+              &vis_callback
+          );
+          DepthResult depth_result = current_lidar_vis_ == kFusionVsLidar ? result.fused_result
+                                                                          : result.input_result;
+          message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
+                                   depth_result.GetCorrectPixelRatio(true),
+                                   depth_result.GetCorrectPixelRatio(false));
+          vis_callback.Render();
         }
 
         font.Text(message).Draw(-0.90f, 0.80f);
@@ -1154,8 +1154,8 @@ ITMLib::Objects::ITMRGBDCalib* CreateItmCalib(
 /// the odometry.
 void BuildDynSlamKittiOdometryGT(const string &dataset_root, DynSlam **dyn_slam_out, Input **input_out) {
 
-//  Input::Config input_config = Input::KittiOdometryConfig();
-  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+  Input::Config input_config = Input::KittiOdometryConfig();
+//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
 
   Eigen::Matrix34d left_gray_proj;
   Eigen::Matrix34d right_gray_proj;
