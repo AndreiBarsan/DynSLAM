@@ -167,44 +167,43 @@ public:
         Eigen::Matrix4f epose = dyn_slam_->GetPose().inverse();
         auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
-        const uchar *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastPreview(
-            pango_pose,
-//            pane_cam_->GetModelViewMatrix(),
-            PreviewType::kDepth
-        );
-        const cv::Mat1s *input_depthmap = dyn_slam_->GetDepthPreview();
+//        const float *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastDepthPreview(
+//            pango_pose
+////            pane_cam_->GetModelViewMatrix(),
+//        );
+//        const cv::Mat1s *input_depthmap = dyn_slam_->GetDepthPreview();
 //        cv::Mat1b input_depthmap_uc(height_, width_);
 
-        // TODO(andrei): Don't waste memory...
-        uchar input_depthmap_uc[width_ * height_ * 4];
+//        // TODO(andrei): Don't waste memory...
+//        uchar input_depthmap_uc[width_ * height_ * 4];
+//
+//        for(int row = 0; row < height_; ++row) {
+//          for(int col = 0; col < width_; ++col) {
+//            // The (signed) short-valued depth map encodes the depth expressed in millimeters.
+//            short in_depth = input_depthmap->at<short>(row, col);
+//            // TODO(andrei): Use the affine depth calib params here if needed...
+//            uchar byte_depth;
+//            if (in_depth == std::numeric_limits<short>::max()) {
+//              byte_depth = 0;
+//            }
+//            else {
+//              // TODO(andrei): Eval the impact of rounding, maybe..
+//              byte_depth = static_cast<uchar>(round(
+//                  in_depth / 1000.0 / max_depth_meters * 255));
+//            }
+//
+////            input_depthmap_uc.at<uchar>(row, col) = byte_depth;
+//
+//            int idx = (row * width_ + col) * 4;
+//            input_depthmap_uc[idx] =     byte_depth;
+//            input_depthmap_uc[idx + 1] = byte_depth;
+//            input_depthmap_uc[idx + 2] = byte_depth;
+//            input_depthmap_uc[idx + 3] = byte_depth;
+//          }
+//        }
 
-        for(int row = 0; row < height_; ++row) {
-          for(int col = 0; col < width_; ++col) {
-            // The (signed) short-valued depth map encodes the depth expressed in millimeters.
-            short in_depth = input_depthmap->at<short>(row, col);
-            // TODO(andrei): Use the affine depth calib params here if needed...
-            uchar byte_depth;
-            if (in_depth == std::numeric_limits<short>::max()) {
-              byte_depth = 0;
-            }
-            else {
-              // TODO(andrei): Eval the impact of rounding, maybe..
-              byte_depth = static_cast<uchar>(round(
-                  in_depth / 1000.0 / max_depth_meters * 255));
-            }
-
-//            input_depthmap_uc.at<uchar>(row, col) = byte_depth;
-
-            int idx = (row * width_ + col) * 4;
-            input_depthmap_uc[idx] =     byte_depth;
-            input_depthmap_uc[idx + 1] = byte_depth;
-            input_depthmap_uc[idx + 2] = byte_depth;
-            input_depthmap_uc[idx + 3] = byte_depth;
-          }
-        }
-
-        uchar diff_buffer[width_ * height_ * 4];
-        memset(diff_buffer, '\0', sizeof(uchar) * width_ * height_ * 4);
+//        uchar diff_buffer[width_ * height_ * 4];
+//        memset(diff_buffer, '\0', sizeof(uchar) * width_ * height_ * 4);
 
         const uchar * compare_lidar_vs = nullptr;
         const unsigned char *preview = nullptr;
@@ -222,19 +221,19 @@ public:
             break;
           case kInputVsLidar:
             message = utils::Format("Input depth vs. LIDAR | delta_max = %d", delta_max_visualization);
-            compare_lidar_vs = input_depthmap_uc;
+//            compare_lidar_vs = input_depthmap_uc;
             break;
           case kFusionVsLidar:
             message = utils::Format("Fused map vs. LIDAR | delta_max = %d", delta_max_visualization);
-            compare_lidar_vs = synthesized_depthmap;
+//            compare_lidar_vs = synthesized_depthmap;
             break;
 
           case kInputVsFusion:
             message = "Input depth vs. fusion";
-            DiffDepthmaps(input_depthmap_uc, synthesized_depthmap, width_, height_,
-                          delta_max_visualization, diff_buffer);
-            pane_texture_->Upload(diff_buffer, GL_RGBA, GL_UNSIGNED_BYTE);
-            pane_texture_->RenderToViewport(true);
+//            DiffDepthmaps(input_depthmap_uc, synthesized_depthmap, width_, height_,
+//                          delta_max_visualization, diff_buffer);
+//            pane_texture_->Upload(diff_buffer, GL_RGBA, GL_UNSIGNED_BYTE);
+//            pane_texture_->RenderToViewport(true);
             break;
 
           default:
@@ -244,38 +243,38 @@ public:
         }
 
         if (compare_lidar_vs != nullptr) {
-          pane_texture_->Upload(compare_lidar_vs, GL_RGBA, GL_UNSIGNED_BYTE);
-          pane_texture_->RenderToViewport(true);
+//          pane_texture_->Upload(compare_lidar_vs, GL_RGBA, GL_UNSIGNED_BYTE);
+//          pane_texture_->RenderToViewport(true);
 
-          bool visualize_input = (current_lidar_vis_ == kInputVsLidar);
+//          bool visualize_input = (current_lidar_vis_ == kInputVsLidar);
 
-          eval::ErrorVisualizationCallback vis_callback(
-              delta_max_visualization, visualize_input, Eigen::Vector2f(
-                  main_view_->GetBounds().w, main_view_->GetBounds().h), lidar_vis_colors_, lidar_vis_vertices_);
+//          eval::ErrorVisualizationCallback vis_callback(
+//              delta_max_visualization, visualize_input, Eigen::Vector2f(
+//                  main_view_->GetBounds().w, main_view_->GetBounds().h), lidar_vis_colors_, lidar_vis_vertices_);
 
-          DepthEvaluation result = dyn_slam_->GetEvaluation()->EvaluateDepth(
-              lidar_pointcloud,
-              synthesized_depthmap,
-              input_depthmap_uc,
-              velodyne->velodyne_to_rgb,
-              dyn_slam_->GetLeftRgbProjectionMatrix().cast<double>(),
-              dyn_slam_->GetRightRgbProjectionMatrix().cast<double>(),
-              width_,
-              height_,
-              min_depth_meters,
-              max_depth_meters,
-              delta_max_visualization,
-              4,
-              4,
-              &vis_callback
-          );
-          DepthResult depth_result = current_lidar_vis_ == kFusionVsLidar ? result.fused_result
-                                                                          : result.input_result;
-          message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
-                                   depth_result.GetCorrectPixelRatio(true),
-                                   depth_result.GetCorrectPixelRatio(false));
-
-          vis_callback.Render();
+//          DepthEvaluation result = dyn_slam_->GetEvaluation()->EvaluateDepth(
+//              lidar_pointcloud,
+//              synthesized_depthmap,
+//              input_depthmap_uc,
+//              velodyne->velodyne_to_rgb,
+//              dyn_slam_->GetLeftRgbProjectionMatrix().cast<double>(),
+//              dyn_slam_->GetRightRgbProjectionMatrix().cast<double>(),
+//              width_,
+//              height_,
+//              min_depth_meters,
+//              max_depth_meters,
+//              delta_max_visualization,
+//              4,
+//              4,
+//              &vis_callback
+//          );
+//          DepthResult depth_result = current_lidar_vis_ == kFusionVsLidar ? result.fused_result
+//                                                                          : result.input_result;
+//          message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
+//                                   depth_result.GetCorrectPixelRatio(true),
+//                                   depth_result.GetCorrectPixelRatio(false));
+//
+//          vis_callback.Render();
         }
 
         font.Text(message).Draw(-0.90f, 0.80f);
