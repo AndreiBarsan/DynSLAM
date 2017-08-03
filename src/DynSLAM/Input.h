@@ -81,6 +81,24 @@ class Input {
     return config;
   };
 
+  // TODO(andrei): Use this for lowres experiments.
+  static Config KittiOdometryLowresConfig(float factor) {
+    Config config = KittiOdometryConfig();
+    // TODO(andrei): Consider using full-res gray input for VO, in case it starts to fail at low resolutions.
+    config.left_gray_folder       = utils::Format("image_0_scale_%.2f", factor);
+    config.right_gray_folder      = utils::Format("image_1_scale_%.2f", factor);
+    config.left_color_folder      = utils::Format("image_2_scale_%.2f", factor);
+    config.right_color_folder     = utils::Format("image_3_scale_%.2f", factor);
+
+    // TODO(andrei): Adjust calibration parameters accordingly for the downscaling factor.
+    // Effectively: same area covered, so each pixel becomes twice as large.
+
+    config.depth_folder           = utils::Format("precomputed-depth/Frames_scale_%.2f", factor);
+    config.segmentation_folder    = utils::Format("seg_image_2_scale_%.2f/mnc", factor);
+
+    return config;
+  }
+
   static Config KittiOdometryDispnetConfig() {
     Config config                 = KittiOdometryConfig();
     config.depth_folder           = "precomputed-depth-dispnet";
