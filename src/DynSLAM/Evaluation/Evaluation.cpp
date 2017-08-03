@@ -62,10 +62,11 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
   Eigen::Matrix4f epose = dyn_slam->GetPose().inverse();
   auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
-  const uchar *rendered_depthmap = dyn_slam->GetStaticMapRaycastPreview(
-      pango_pose,
-      PreviewType::kDepth
-  );
+//  const uchar *rendered_depthmap = dyn_slam->GetStaticMapRaycastPreview(
+//      pango_pose,
+//      PreviewType::kDepth
+//  );
+  const float *rendered_depthmap = dyn_slam->GetStaticMapRaycastDepthPreview(pango_pose);
   auto input_depthmap = shared_ptr<cv::Mat1s>(nullptr);
   auto input_rgb = shared_ptr<cv::Mat3b>(nullptr);
 
@@ -80,35 +81,36 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
   float max_depth_meters = input->GetDepthProvider()->GetMaxDepthMeters();
 
   // TODO(andrei): Don't waste memory...
-  uchar input_depthmap_uc[width * height * 4];
+//  uchar input_depthmap_uc[width * height * 4];
   // TODO(andrei): Use the affine depth calib params here
-  float input_pixels_to_meters = 1 / 1000.0f;
+//  float input_pixels_to_meters = 1 / 1000.0f;
 
-  for(int row = 0; row < height; ++row) {
-    for(int col = 0; col < width; ++col) {
-      // The (signed) short-valued depth map encodes the depth expressed in millimeters.
-      short in_depth = input_depthmap->at<short>(row, col);
-      uchar byte_depth;
-      if (in_depth == std::numeric_limits<short>::max()) {
-        byte_depth = 0;
-      }
-      else {
-        byte_depth = static_cast<uchar>(round(in_depth * input_pixels_to_meters / max_depth_meters * 255));
-      }
+//  for(int row = 0; row < height; ++row) {
+//    for(int col = 0; col < width; ++col) {
+//      // The (signed) short-valued depth map encodes the depth expressed in millimeters.
+//      short in_depth = input_depthmap->at<short>(row, col);
+//      uchar byte_depth;
+//      if (in_depth == std::numeric_limits<short>::max()) {
+//        byte_depth = 0;
+//      }
+//      else {
+//        byte_depth = static_cast<uchar>(round(in_depth * input_pixels_to_meters / max_depth_meters * 255));
+//      }
+//
+//      int idx = (row * width + col) * 4;
+//      input_depthmap_uc[idx] =     byte_depth;
+//      input_depthmap_uc[idx + 1] = byte_depth;
+//      input_depthmap_uc[idx + 2] = byte_depth;
+//      input_depthmap_uc[idx + 3] = byte_depth;
+//    }
+//  }
 
-      int idx = (row * width + col) * 4;
-      input_depthmap_uc[idx] =     byte_depth;
-      input_depthmap_uc[idx + 1] = byte_depth;
-      input_depthmap_uc[idx + 2] = byte_depth;
-      input_depthmap_uc[idx + 3] = byte_depth;
-    }
-  }
-
+  // TODO(andrei): Once you get this working, wrap images in OpenCV objects for readability and flexibility.
   std::vector<DepthEvaluation> evals;
-  for(uint delta_max = 0; delta_max <= 10; ++delta_max) {
+  for(uint delta_max = 0; delta_max <= 15; ++delta_max) {
     evals.push_back(EvaluateDepth(lidar_pointcloud,
                                   rendered_depthmap,
-                                  input_depthmap_uc,
+                                  *input_depthmap,
                                   velodyne_->velodyne_to_rgb,
                                   dyn_slam->GetLeftRgbProjectionMatrix().cast<double>(),
                                   dyn_slam->GetRightRgbProjectionMatrix().cast<double>(),
@@ -117,8 +119,7 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
                                   min_depth_meters,
                                   max_depth_meters,
                                   delta_max,
-                                  4,
-                                  4,
+                                  1,
                                   nullptr));
   }
 
@@ -127,8 +128,8 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
 }
 
 DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
-                                          const uchar *const rendered_depth,
-                                          const uchar *const input_depth,
+                                          const float *const rendered_depth,
+                                          const cv::Mat1s &input_depth,
                                           const Eigen::Matrix4d &velo_to_left_gray_cam,
                                           const Eigen::Matrix34d &proj_left_color,
                                           const Eigen::Matrix34d &proj_right_color,
@@ -138,7 +139,6 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                           const float max_depth_meters,
                                           const uint delta_max,
                                           const uint rendered_stride,
-                                          const uint input_stride,
                                           ILidarEvalCallback *callback) const {
   const int kTargetTypeRange = std::numeric_limits<uchar>::max();
   long missing_rendered = 0;
@@ -148,6 +148,10 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
   long errors_input = 0;
   long correct_input = 0;
   long measurements = 0;
+
+  const float left_focal_length_px = static_cast<float>(proj_left_color(0, 0));
+  // TODO parameter
+  const float baseline_m = 0.537150654273f;
 
 //  cout << "EvaluateDepth [" << min_depth_meters << "--" << max_depth_meters << "]" << endl;
 
@@ -204,21 +208,48 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
     }
 
     // "Manually" compute the disparity of a LIDAR reading.
-    int lidar_disp = col_left - col_right;
-
-    // TODO(andrei): Get depth as float from engine, and compute disparity here.
-    // TODO(andrei): Get depth map as float or at least short and compute disparity here.
+    int lidar_disparity = col_left - col_right;
 
     int idx_in_rendered = (row_left * frame_width + col_left) * rendered_stride;
-    int idx_in_input = (row_left * frame_width + col_left) * input_stride;
+//    int idx_in_input = (row_left * frame_width + col_left) * input_stride;
 
-    uchar rendered_depth_val = rendered_depth[idx_in_rendered];
-    uchar input_depth_val = input_depth[idx_in_input];
+    const float rendered_depth_val = rendered_depth[idx_in_rendered];
+    const float input_depth_val = input_depth.at<short>(row_left, col_left) / 1000.0f;
 
-    uint rendered_delta = depth_delta(rendered_depth_val, velo_z_uc);
-    uint input_delta = depth_delta(input_depth_val, velo_z_uc);
+    // Units of measurement: px = (m * px) / m;
+    // TODO(andrei): Just pass disparity maps. (Will require some extra engineering.)
+    const int rendered_disp = static_cast<int>(round((baseline_m * left_focal_length_px) / rendered_depth_val));
+    const int input_disp = static_cast<int>(round((baseline_m * left_focal_length_px) / input_depth_val));
 
-    if (rendered_depth_val == 0) {
+    // TODO(andrei): Flag for switching between depth comparisons and disparity ones.
+//    uint rendered_delta = depth_delta(rendered_depth_val, velo_z_uc);
+//    uint input_delta = depth_delta(input_depth_val, velo_z_uc);
+
+    const uint rendered_disp_delta = static_cast<uint>(std::abs(rendered_disp - lidar_disparity));
+    const uint input_disp_delta = static_cast<uint>(std::abs(input_disp - lidar_disparity));
+
+    if (fabs(rendered_depth_val) < 1e-5) {
+      missing_rendered++;
+    }
+    else if (rendered_disp_delta > delta_max) {
+      errors_rendered++;
+    }
+    else {
+      correct_rendered++;
+    }
+
+    if (input_depth_val == 0) {
+      missing_input++;
+    }
+    else if (input_disp_delta > delta_max) {
+      errors_input++;
+    }
+    else {
+      correct_input++;
+    }
+
+    /*
+    if (fabs(rendered_depth_val) < 1e-5) {
       missing_rendered++;
     } else if (rendered_delta > delta_max) {
       errors_rendered++;
@@ -233,6 +264,7 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
     } else {
       correct_input++;
     }
+     */
 
     measurements++;
 
