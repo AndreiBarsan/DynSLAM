@@ -67,7 +67,7 @@ class Input {
     config.min_depth_m            =  0.5f;
     config.max_depth_m            = 20.0f;
     config.depth_folder           = "precomputed-depth/Frames";
-    config.depth_fname_format     = "%04d.pgm";
+    config.depth_fname_format     = "%04d.xml";
     config.read_depth             = true;
 
     config.segmentation_folder    = "seg_image_2/mnc";

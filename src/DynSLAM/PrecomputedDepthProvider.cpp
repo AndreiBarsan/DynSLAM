@@ -31,8 +31,16 @@ void PrecomputedDepthProvider::ReadPrecomputed(int frame_idx, cv::Mat &out) cons
     // 32-bit image unless it is first converted to 16-bit.
     ReadFilePFM(out, depth_fpath);
   } else {
-    // Other formats we work with (png, pgm, etc.) can be read by OpenCV just fine.
-    out = cv::imread(depth_fpath, CV_LOAD_IMAGE_UNCHANGED);
+    // Otherwise load an OpenCV XML dump (since we need 16-bit signed depth maps, which OpenCV
+    // cannot save as regular images, even though the PNG spec has nothing against them).
+    cv::FileStorage fs(depth_fpath, cv::FileStorage::READ);
+    if(!fs.isOpened()) {
+      throw std::runtime_error("Could not read precomputed depth map.");
+    }
+    fs["depth-frame"] >> out;
+    if (out.type() != CV_16SC1) {
+      throw std::runtime_error("Precomputed depth map had the wrong format.");
+    }
   }
 
   if (out.cols == 0 || out.rows == 0) {
@@ -45,7 +53,7 @@ void PrecomputedDepthProvider::ReadPrecomputed(int frame_idx, cv::Mat &out) cons
   if (this->input_is_depth_) {
     // We're reading depth directly, so we need to ensure the max depth here.
     float max_depth_mm_f = GetMaxDepthMeters() * kMetersToMillimeters;
-    uint16_t max_depth_mm_ui = static_cast<uint16_t>(round(max_depth_mm_f));
+    int16_t max_depth_mm_s = static_cast<int16_t>(round(max_depth_mm_f));
 
     for(int i = 0; i < out.rows; ++i) {
       for(int j = 0; j < out.cols; ++j) {
@@ -57,9 +65,9 @@ void PrecomputedDepthProvider::ReadPrecomputed(int frame_idx, cv::Mat &out) cons
           }
         }
         else {
-          uint16_t depth = out.at<uint16_t>(i, j);
-          if (depth > max_depth_mm_ui) {
-            out.at<uint16_t>(i, j) = 0;
+          int16_t depth = out.at<int16_t>(i, j);
+          if (depth > max_depth_mm_s) {
+            out.at<int16_t>(i, j) = 0;
           }
         }
       }

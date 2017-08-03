@@ -178,7 +178,7 @@ void InfiniTamDriver::GetFloatImage(
 }
 
 void InfiniTamDriver::UpdateView(const cv::Mat3b &rgb_image,
-                                 const cv::Mat_<uint16_t> &raw_depth_image) {
+                                 const cv::Mat1s &raw_depth_image) {
   CvToItm(rgb_image, rgb_itm_);
   CvToItm(raw_depth_image, raw_depth_itm_);
 
@@ -187,6 +187,7 @@ void InfiniTamDriver::UpdateView(const cv::Mat3b &rgb_image,
   //   skip this step in our case, since we have control over how our depth map is computed).
   // * It then filters the shit out of the depth map (maybe we could skip this?) using five steps
   //   of bilateral filtering.
+  // * Note: ITM internally uses ITMShortImages, so SIGNED short.
   this->viewBuilder->UpdateView(&view, rgb_itm_, raw_depth_itm_, settings->useBilateralFilter,
                                 settings->modelSensorNoise);
 }

@@ -59,7 +59,7 @@ class DepthProvider {
     if (out_disparity_.type() == CV_32FC1) {
       DepthFromDisparityMap<float>(out_disparity_, calibration, out_depth);
     } else if (out_disparity_.type() == CV_16SC1) {
-      DepthFromDisparityMap<uint16_t>(out_disparity_, calibration, out_depth);
+      throw std::runtime_error("Cannot currently convert int16_t disparity to depth.");
     } else {
       throw std::runtime_error(utils::Format(
           "Unknown data type for disparity matrix [%s]. Supported are CV_32FC1 and CV_16SC1.",
@@ -79,7 +79,6 @@ class DepthProvider {
     return (calibration.baseline_meters * calibration.focal_length_px) / disparity_px;
   }
 
-  // TODO(andrei): Higher max depth once we're modeling noise properly.
   // TODO-LOW(andrei): This can be sped up trivially using CUDA.
   /// \brief Computes a depth map from a disparity map using the `DepthFromDisparity` function at
   /// every pixel.
@@ -117,8 +116,13 @@ class DepthProvider {
         int32_t depth_mm =
             static_cast<int32_t>(kMetersToMillimeters * DepthFromDisparity(disp, calibration));
 
+        if (abs(disp) < 1e-5) {
+          depth_mm = 0;
+        }
+
         if (depth_mm > max_depth_mm || depth_mm < min_depth_mm) {
-          depth_mm = max_representable_depth;
+//          depth_mm = max_representable_depth;
+          depth_mm = 0;
         }
 
         int16_t depth_mm_short = static_cast<int16_t>(depth_mm);
