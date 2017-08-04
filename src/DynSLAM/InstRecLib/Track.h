@@ -206,7 +206,10 @@ class Track {
   }
 
   void ReapReconstruction() {
-    int reap_weight = max(1, min(5, static_cast<int>(0.33 * fused_frames_)));
+    // TODO(andrei): Pass max fusion weight here and compute this in a smarter way.
+    float factor = 0.33;
+    int max_weight = 5;
+    int reap_weight = max(1, min(max_weight, static_cast<int>(factor * fused_frames_)));
     cout << "Reaping track with max weight [" << reap_weight << "]." << endl;
     reconstruction_->Reap(reap_weight);
   }

@@ -352,9 +352,9 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
 
   settings->sceneParams.mu = 0.5f;
   settings->sceneParams.voxelSize = 0.035f;
-  // Set the volume to roughly represent 5m x 5m x 10m, which should be more than enough for most
+  // Set the volume to roughly represent 4m x 4m x 8m, which should be more than enough for most
   // common vehicles.
-  settings->sdfLocalBlockNum = static_cast<long>(5 * 5 * 10 / settings->sceneParams.voxelSize);
+  settings->sdfLocalBlockNum = static_cast<long>(4 * 4 * 10 / settings->sceneParams.voxelSize);
 
   // To be used in conjunction with coarse feature-based alignment.
   settings->trackerType = ITMLibSettings::TrackerType::TRACKER_ICP;

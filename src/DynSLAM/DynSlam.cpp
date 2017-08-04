@@ -74,7 +74,7 @@ void DynSlam::ProcessFrame(Input *input) {
   utils::Toc();
 
   // TODO make field
-  bool enable_dynamic_ = false;
+  bool enable_dynamic_ = true;
   // Perform semantic segmentation, dense depth computation, and dense fusion every K frames.
   // TODO(andrei): Support instance tracking in this framework: we would need SSF between t and t-k,
   //               so we DEFINITELY need separate VO to run in, say, 50ms at every frame, and then
@@ -131,7 +131,7 @@ void DynSlam::ProcessFrame(Input *input) {
   ITMSafeCall(cudaDeviceSynchronize());
   cudaError_t last_error = cudaGetLastError();
   if (last_error != cudaSuccess) {
-    cerr << "A CUDA error slipped undetected from a component of DynSLAM!" << endl;
+    cerr << "A CUDA error slipped by undetected from a component of DynSLAM!" << endl;
 
     // Trigger the regular error response.
     ITMSafeCall(last_error);
