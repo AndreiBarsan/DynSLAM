@@ -23,25 +23,19 @@
 
 const std::string kKittiOdometry = "kitti-odometry";
 const std::string kKitti         = "kitti";
-const std::string kCityscapes    = "cityscapes";
 
-// Commandline arguments using gflags
+// Commandline arguments using gflags.
 DEFINE_string(dataset_type,
               kKittiOdometry,
-              "The type of the input dataset at which 'dataset_root'is pointing. "
-              "Currently supported is only 'kitti-odometry'.");
+              "The type of the input dataset at which 'dataset_root'is pointing. Currently "
+              "only 'kitti-odometry' is supported.");
 DEFINE_string(dataset_root, "", "The root folder of the dataset sequence to use.");
-
-// Useful offsets for dynamic object reconstruction:
-//  int frame_offset = 85; // for odo seq 02
-//  int frame_offset = 4015;         // Clear dynamic object in odometry sequence 08.
 DEFINE_int32(frame_offset, 0, "The frame index from which to start reading the dataset sequence.");
-
 DEFINE_bool(voxel_decay, true, "Whether to enable map regularization via voxel decay (a.k.a. voxel "
                                "garbage collection).");
-DEFINE_int32(min_decay_age, 20, "The minimum voxel *block* age for voxels within it to be eligible "
-                                " for deletion (garbage collection).");
-DEFINE_int32(max_decay_weight, 11, "The maximum voxle weight for decay. Voxels which have "
+DEFINE_int32(min_decay_age, 60, "The minimum voxel *block* age for voxels within it to be eligible "
+                                "for deletion (garbage collection).");
+DEFINE_int32(max_decay_weight, 2, "The maximum voxel weight for decay. Voxels which have "
                                   "accumulated more than this many measurements will not be "
                                   "removed.");
 
@@ -94,24 +88,17 @@ public:
   PangolinGui(DynSlam *dyn_slam, Input *input)
       : dyn_slam_(dyn_slam),
         dyn_slam_input_(input),
+        width_(dyn_slam->GetInputWidth()),
+        height_(dyn_slam->GetInputHeight()),
+        depth_preview_buffer_(dyn_slam->GetInputHeight(), dyn_slam->GetInputWidth()),
         lidar_vis_colors_(new unsigned char[2500000]),
         lidar_vis_vertices_(new float[2500000])
   {
-    cout << "Pangolin GUI initializing..." << endl;
-
-    // TODO(andrei): Proper scaling to save space and memory.
-    width_ = dyn_slam->GetInputWidth(); // / 1.5;
-    height_ = dyn_slam->GetInputHeight();// / 1.5;
-
-    SetupDummyImage();
     CreatePangolinDisplays();
-
-    cout << "Pangolin GUI initialized." << endl;
   }
 
   virtual ~PangolinGui() {
     // No need to delete any view pointers; Pangolin deletes those itself on shutdown.
-    delete dummy_image_texture_;
     delete pane_texture_;
     delete pane_texture_mono_uchar_;
 
@@ -131,7 +118,7 @@ public:
         ProcessFrame();
       }
 
-      main_view_->Activate();
+      main_view_->Activate(*pane_cam_);
       glColor3f(1.0f, 1.0f, 1.0f);
 
       // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance,
@@ -193,10 +180,13 @@ public:
           case kInputVsLidar:
             message = utils::Format("Input depth vs. LIDAR | delta_max = %d", delta_max_visualization);
             need_lidar = true;
+            UploadCvTexture(*input_depthmap, *pane_texture_, false, GL_SHORT);
             break;
           case kFusionVsLidar:
             message = utils::Format("Fused map vs. LIDAR | delta_max = %d", delta_max_visualization);
             need_lidar = true;
+            FloatDepthmapToShort(synthesized_depthmap, depth_preview_buffer_);
+            UploadCvTexture(depth_preview_buffer_, *pane_texture_, false, GL_SHORT);
             break;
 
           case kInputVsFusion:
@@ -213,9 +203,6 @@ public:
             throw runtime_error("Unexpected 'current_lidar_vis_' error visualization mode.");
             break;
         }
-
-        UploadCvTexture(*input_depthmap, *pane_texture_, false, GL_SHORT);
-//        pane_texture_->Upload(synthesized_depthmap, *pane_texture_, GL_FLOAT);
 
         if (need_lidar) {
           pane_texture_->RenderToViewport(true);
@@ -256,16 +243,23 @@ public:
 
       font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.90f, 0.90f);
 
+      glDisable(GL_DEPTH_TEST);
+      main_view_->Activate(*pane_cam_);
+      pangolin::glDrawColouredCube();
+      glEnable(GL_DEPTH_TEST);
+
+
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
       if(dyn_slam_->GetCurrentFrameNo() >= 1) {
         if (display_raw_previews_->Get()) {
-          UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_);
+          UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_, true, GL_UNSIGNED_BYTE);
         } else {
-          UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_);
+          UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_, true, GL_UNSIGNED_BYTE);
         }
         pane_texture_->RenderToViewport(true);
 
+        /*
         Tic("LIDAR render");
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
         if (velodyne->HasLatestFrame()) {
@@ -282,6 +276,7 @@ public:
         }
 
         Toc(true);
+        //*/
       }
 
       if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
@@ -303,7 +298,7 @@ public:
       segment_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
       if (nullptr != dyn_slam_->GetSegmentationPreview()) {
-        UploadCvTexture(*dyn_slam_->GetSegmentationPreview(), *pane_texture_);
+        UploadCvTexture(*dyn_slam_->GetSegmentationPreview(), *pane_texture_, true, GL_UNSIGNED_BYTE);
         pane_texture_->RenderToViewport(true);
         DrawInstanceLables();
       }
@@ -311,7 +306,7 @@ public:
       object_view_.Activate();
       glColor4f(1.0, 1.0, 1.0, 1.0f);
       pane_texture_->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
-                             GL_RGBA, GL_UNSIGNED_BYTE);
+                            GL_RGBA, GL_UNSIGNED_BYTE);
       // TODO(andrei): Make this gradual; currently it's shown as a single-colored blob
 //      pane_texture_->Upload(dyn_slam_->GetObjectDepthPreview(visualized_object_idx_),
 //                            GL_RED, GL_FLOAT);
@@ -410,6 +405,7 @@ public:
     glEnable(GL_DEPTH_TEST);
   }
 
+  // TODO(andrei): Diff disparity maps and adapt to new codebase!
   void DiffDepthmaps(
       const uchar * input_depthmap,
       const uchar * synthesized_depthmap,
@@ -643,8 +639,12 @@ protected:
     pangolin::RegisterKeyPressCallback('a', [this]() {
       *(this->autoplay_) = ! *(this->autoplay_);
     });
-    display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", true, true);
+    display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", false, true);
     preview_sf_ = new pangolin::Var<bool>("ui.Show Scene Flow", false, true);
+
+    pangolin::RegisterKeyPressCallback('r', [&]() {
+      *display_raw_previews_ = !display_raw_previews_->Get();
+    });
 
 
     // This is used for the free view camera. The focal lengths are not used in rendering, BUT they
@@ -678,7 +678,7 @@ protected:
     segment_view_ = pangolin::Display("segment").SetAspect(aspect_ratio);
     object_view_ = pangolin::Display("object").SetAspect(aspect_ratio);
     float camera_translation_scale = 0.01f;
-    float camera_zoom_scale = 0.01f;
+    float camera_zoom_scale = 1.0f; // This doesn't seem to do anything.
 
     object_reconstruction_view_ = pangolin::Display("object_3d").SetAspect(aspect_ratio)
         .SetHandler(new DSHandler3D(
@@ -732,14 +732,6 @@ protected:
     this->pane_texture_mono_uchar_ = new pangolin::GlTexture(width_, height_, GL_RGB, false, 0,
                                                              GL_RED, GL_UNSIGNED_BYTE);
     cout << "Pangolin UI setup complete." << endl;
-  }
-
-  void SetupDummyImage() {
-    dummy_img_ = cv::imread("../data/george.jpg");
-    const int george_width = dummy_img_.cols;
-    const int george_height = dummy_img_.rows;
-    this->dummy_image_texture_ = new pangolin::GlTexture(
-      george_width, george_height, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
   }
 
   void SelectNextVisualizedObject() {
@@ -827,14 +819,10 @@ private:
   pangolin::Plotter *plotter_;
   pangolin::DataLog data_log_;
 
-  pangolin::GlTexture *dummy_image_texture_;
   pangolin::GlTexture *pane_texture_;
   pangolin::GlTexture *pane_texture_mono_uchar_;
 
   pangolin::Var<string> *reconstructions;
-
-  /// \brief Used for UI testing whenever necessary. Not related to the SLAM system in any way.
-  cv::Mat dummy_img_;
 
   // Atomic because it gets set from a UI callback. Technically, Pangolin shouldn't invoke callbacks
   // from a different thread, but using atomics for this is generally a good practice anyway.
@@ -863,6 +851,8 @@ private:
 
   int current_lidar_vis_ = VisualizeError::kFusionVsLidar;
 
+  cv::Mat1s depth_preview_buffer_;
+
   unsigned char *lidar_vis_colors_;
   float *lidar_vis_vertices_;
 
@@ -871,8 +861,8 @@ private:
   static void UploadCvTexture(
       const cv::Mat &mat,
       pangolin::GlTexture &texture,
-      bool color = true,
-      GLenum data_type = GL_UNSIGNED_BYTE
+      bool color,
+      GLenum data_type
   ) {
     int old_alignment, old_row_length;
     glGetIntegerv(GL_UNPACK_ALIGNMENT, &old_alignment);
@@ -888,15 +878,6 @@ private:
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, old_alignment);
     glPixelStorei(GL_UNPACK_ROW_LENGTH, old_row_length);
-  }
-
-  void UploadDummyTexture() {
-    // Mess with the bytes a little bit for OpenGL <-> OpenCV compatibility.
-    // use fast 4-byte alignment (default anyway) if possible
-    glPixelStorei(GL_UNPACK_ALIGNMENT, (dummy_img_.step & 3) ? 1 : 4);
-    //set length of one complete row in data (doesn't need to equal img.cols)
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, dummy_img_.step / dummy_img_.elemSize());
-    dummy_image_texture_->Upload(dummy_img_.data, GL_BGR, GL_UNSIGNED_BYTE);
   }
 };
 
@@ -1003,8 +984,8 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
                                DynSlam **dyn_slam_out,
                                Input **input_out) {
 
-  Input::Config input_config = Input::KittiOdometryConfig();
-//  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+//  Input::Config input_config = Input::KittiOdometryConfig();
+  Input::Config input_config = Input::KittiOdometryDispnetConfig();
 
   Eigen::Matrix34d left_gray_proj;
   Eigen::Matrix34d right_gray_proj;
