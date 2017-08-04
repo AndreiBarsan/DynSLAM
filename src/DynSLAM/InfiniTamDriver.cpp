@@ -101,15 +101,22 @@ void ItmToCv(const ITMShortImage &itm, cv::Mat1s *out_mat) {
   memcpy(out_mat->data, itm_data, itm.noDims[0] * itm.noDims[1] * sizeof(int16_t));
 }
 
-void ItmToCv(const ITMFloatImage &itm, cv::Mat1s *out_mat) {
-  const float* itm_data = itm.GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
-  for (int i = 0; i < itm.noDims[1]; ++i) {
-    for (int j = 0; j < itm.noDims[0]; ++j) {
-      out_mat->at<int16_t>(i, j) = static_cast<int16_t>(
-          itm_data[i * itm.noDims[0] + j] * (numeric_limits<int16_t>::max() / 4)
+void FloatDepthmapToShort(const float *pixels, cv::Mat1s &out_mat) {
+  const int kMetersToMillimeters = 1000;
+  for (int i = 0; i < out_mat.rows; ++i) {
+    for (int j = 0; j < out_mat.cols; ++j) {
+      /// ITM internal: depth = meters, float
+      /// Our preview:  depth = mm, short int
+      out_mat.at<int16_t>(i, j) = static_cast<int16_t>(
+          pixels[i * out_mat.cols + j] * kMetersToMillimeters
       );
     }
   }
+}
+
+void ItmDepthToCv(const ITMFloatImage &itm, cv::Mat1s *out_mat) {
+  const float* itm_data = itm.GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+  FloatDepthmapToShort(itm_data, *out_mat);
 }
 
 Eigen::Matrix4f ItmToEigen(const Matrix4f &itm_matrix) {

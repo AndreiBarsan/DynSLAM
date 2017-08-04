@@ -62,7 +62,9 @@ void ItmToCv(const ITMUChar4Image &itm, cv::Mat3b *out_mat);
 void ItmToCv(const ITMShortImage &itm, cv::Mat1s *out_mat);
 
 /// \brief Converts an InfiniTAM float depth image into an OpenCV mat.
-void ItmToCv(const ITMFloatImage &itm, cv::Mat1s *out_mat);
+void ItmDepthToCv(const ITMFloatImage &itm, cv::Mat1s *out_mat);
+
+void FloatDepthmapToShort(const float *pixels, cv::Mat1s &out_mat);
 
 /// \brief Converts an InfiniTAM 4x4 matrix to an Eigen object.
 Eigen::Matrix4f ItmToEigen(const Matrix4f &itm_matrix);
@@ -145,7 +147,7 @@ public:
 
       // Keep the OpenCV previews up to date.
       ItmToCv(*this->view->rgb, rgb_cv_);
-      ItmToCv(*this->view->depth, raw_depth_cv_);
+      ItmDepthToCv(*this->view->depth, raw_depth_cv_);
     }
   }
 
