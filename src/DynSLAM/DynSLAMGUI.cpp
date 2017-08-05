@@ -24,6 +24,10 @@
 const std::string kKittiOdometry = "kitti-odometry";
 const std::string kKitti         = "kitti";
 
+// TODO(andrei): If you're depending on OpenCV anyway, try cv::puttext for more flexibility than
+// pangolin's tools. Note the ORB_SLAM2 example, where they use it to draw outlined text in a ghetto
+// but effective way.
+
 // Commandline arguments using gflags.
 DEFINE_string(dataset_type,
               kKittiOdometry,
@@ -127,10 +131,10 @@ public:
       // so you get dark, uncolored images.
 
       // Some experimental code for getting the camera to move on its own.
+      timeval tp;
+      gettimeofday(&tp, nullptr);
+      double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
       if (wiggle_mode_->Get()) {
-        timeval tp;
-        gettimeofday(&tp, nullptr);
-        double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
         double time_scale = 1500.0;
         double r = 0.2;
 //          double cx = cos(time_ms / time_scale) * r;
@@ -178,7 +182,36 @@ public:
                 pane_cam_->GetModelViewMatrix(),
                 static_cast<PreviewType>(current_preview_type_));
             pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
-            pane_texture_->RenderToViewport(false);
+            pane_texture_->RenderToViewport(true);
+
+            // Experimental code for raster rendering atop existing raycast.
+            main_view_->Activate();
+
+            glEnable(GL_DEPTH_TEST);
+            glDepthMask(true);
+
+            glMatrixMode(GL_PROJECTION);
+            proj_.Load();
+
+            glMatrixMode(GL_MODELVIEW);
+            pane_cam_->GetModelViewMatrix().Load();
+
+            {
+              float cube_size = 0.5f;
+              for (int i = -25; i < 25; ++i) {
+                for (int j = -25; j < 25; ++j) {
+                  glPushMatrix();
+                  float cube_z = sin((time_ms + i * 100) / 500.0f) * 5.0;
+                  glTranslatef(
+                      i * 1.5f,
+                      j * 1.5f,
+                      cube_z);
+                  pangolin::glDrawColouredCube(-cube_size, cube_size);
+                  glPopMatrix();
+                }
+              }
+            }
+
             break;
           case kInputVsLidar:
             message = utils::Format("Input depth vs. LIDAR | delta_max = %d", delta_max_visualization);
@@ -246,12 +279,6 @@ public:
       //*/
 
       font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.90f, 0.90f);
-
-      // Experimental code for raster rendering atop existing raycast.
-      main_view_->Activate(*pane_cam_);
-      glEnable(GL_DEPTH_TEST);
-      glDepthMask(true);
-      pangolin::glDrawColouredCube();
 
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
@@ -654,15 +681,58 @@ protected:
     // though).
     const Eigen::Matrix34f real_cam_proj = dyn_slam_->GetLeftRgbProjectionMatrix();
     float cam_focal_length = real_cam_proj(0, 0);
-    proj_ = pangolin::ProjectionMatrix(width_, height_,
-                                       cam_focal_length, cam_focal_length,
-                                       real_cam_proj(0, 2), real_cam_proj(1, 2),
-                                       0.1, 1000);
+//    proj_ = pangolin::ProjectionMatrix(width_, height_,
+//                                       cam_focal_length, cam_focal_length,
+//                                       real_cam_proj(0, 2), real_cam_proj(1, 2),
+//                                       0.1, 10);
+    proj_ = pangolin::ProjectionMatrixRDF_TopLeft(width_, height_, cam_focal_length,
+    cam_focal_length, real_cam_proj(0, 2), real_cam_proj(1, 2), 0.01, 100);
+//
+//    // Credit: https://ksimek.github.io/2013/06/03/calibrated_cameras_in_opengl/
+//    float near = 0.1;
+//    float far = 100.0f;
+//    float alpha = real_cam_proj(0, 0);
+//    float beta = real_cam_proj(1, 1);
+//    float x0 = -real_cam_proj(0, 2);
+//    float y0 = -real_cam_proj(1, 2);
+//
+//    // TODO see if this actually makes sense..
+////    float left = 0.0;
+////    float right = width_;
+////    float bottom = height_;
+////    float top = 0.0;
+//    float left = -width_ / 2;
+//    float right =  width_ / 2;
+//    float bottom = -height_ / 2;
+//    float top = height_/2;
+//
+////    left -= x0;
+////    right -= x0;
+////    bottom -= y0;
+////    top -= y0;
+//
+//    float leftp = (near / alpha) * left;
+//    float rightp = (near / alpha) * right;
+//    float topp = (near / beta) * top;
+//    float bottomp = (near / beta) * bottom;
+//    float Ap = (rightp + leftp) / (rightp - leftp);
+//    float Bp = (topp + bottomp) / (topp - bottomp);
+//    float Cp = - (far + near) / (far - near);
+//    float Dp = - 2 * (far * near) / (far - near);
+//
+//    float col_major_data[16] = {
+//        2 * near / (rightp - leftp), 0, 0, 0,
+//        0, 2 * near / (topp - bottomp), 0, 0,
+//        Ap, Bp, Cp, -1,
+//        0, 0, Dp, 0
+//    };
+//    proj_ = pangolin::OpenGlMatrix::ColMajor4x4(col_major_data);
+    cout << "Pango proj: " << proj_  << endl;
 
     pane_cam_ = new pangolin::OpenGlRenderState(
         proj_,
-        pangolin::ModelViewLookAt(0, 0, 0,
-                                  0, 0, -1,
+        pangolin::ModelViewLookAt(-0.3, 0.4, 3,
+                                  -0.3, 0.4, 2,
                                   pangolin::AxisY));
     instance_cam_ = new pangolin::OpenGlRenderState(
         proj_,
@@ -679,12 +749,12 @@ protected:
 
     segment_view_ = pangolin::Display("segment").SetAspect(aspect_ratio);
     object_view_ = pangolin::Display("object").SetAspect(aspect_ratio);
-    float camera_translation_scale = 0.01f;
-    float camera_zoom_scale = 0.1f; // This doesn't seem to do anything when using our custom handler.
+    float camera_translation_scale = 0.1f;
+    float camera_zoom_scale = 1.0f; // This doesn't yet do anything when using our custom handler.
 
     object_reconstruction_view_ = pangolin::Display("object_3d").SetAspect(aspect_ratio)
-        .SetHandler(new DSHandler3D(
-//        .SetHandler(new pangolin::Handler3D(
+//        .SetHandler(new DSHandler3D(
+        .SetHandler(new pangolin::Handler3D(
             *instance_cam_,
             pangolin::AxisY,
             camera_translation_scale,
@@ -695,8 +765,8 @@ protected:
     // current class.
     main_view_ = &(pangolin::Display("main").SetAspect(aspect_ratio));
     main_view_->SetHandler(
-//        new pangolin::Handler3D(*pane_cam_,
-        new DSHandler3D(*pane_cam_,
+        new pangolin::Handler3D(*pane_cam_,
+//        new DSHandler3D(*pane_cam_,
                         pangolin::AxisY,
                         camera_translation_scale,
                         camera_zoom_scale));

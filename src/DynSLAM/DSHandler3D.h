@@ -10,12 +10,20 @@ namespace gui {
 /// \brief Customized 3D navigation handler for interactive 3D map visualizations.
 class DSHandler3D : public pangolin::Handler3D {
  public:
-  DSHandler3D(pangolin::OpenGlRenderState &cam_state) : Handler3D(cam_state) {}
+  explicit DSHandler3D(pangolin::OpenGlRenderState &cam_state)
+      : Handler3D(cam_state),
+        eye(-0.3, 0.4, 3.0),
+        direction(0, 0, -1)
+  {}
 
   DSHandler3D(pangolin::OpenGlRenderState &cam_state,
               pangolin::AxisDirection enforce_up,
               float trans_scale,
-              float zoom_fraction) : Handler3D(cam_state, enforce_up, trans_scale, zoom_fraction) {}
+              float zoom_fraction)
+      : Handler3D(cam_state, enforce_up, trans_scale, zoom_fraction),
+        eye(-0.3, 0.4, 3.0),
+        direction(0, 0, -1)
+  {}
 
   void Keyboard(pangolin::View &view, unsigned char key, int x, int y, bool pressed) override {
     pangolin::Handler3D::Keyboard(view, key, x, y, pressed);
@@ -30,6 +38,12 @@ class DSHandler3D : public pangolin::Handler3D {
              bool pressed,
              int button_state) override;
 
+ protected:
+  void UpdateModelViewMatrix();
+
+ private:
+  Eigen::Vector3d eye;
+  Eigen::Vector3d direction;
 };
 
 } // namespace gui
