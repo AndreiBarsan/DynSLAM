@@ -14,9 +14,9 @@ class DSHandler3D : public pangolin::Handler {
  public:
   static Eigen::Vector3d GetTranslation(const pangolin::OpenGlRenderState &state) {
     Eigen::Vector3d trans;
-    trans(0) = state.GetModelViewMatrix()(0, 2);
-    trans(1) = state.GetModelViewMatrix()(1, 2);
-    trans(2) = state.GetModelViewMatrix()(2, 2);
+    trans(0) = state.GetModelViewMatrix()(0, 3);
+    trans(1) = state.GetModelViewMatrix()(1, 3);
+    trans(2) = state.GetModelViewMatrix()(2, 3);
     return trans;
   }
 
@@ -45,12 +45,18 @@ class DSHandler3D : public pangolin::Handler {
     Eigen::Matrix4d mv = cam_state->GetModelViewMatrix();
     Eigen::Vector3d euler = GetEuler(mv.block(0, 0, 3, 3));
 
-    // XXX: no more degrees bro
-    yaw_accum_ = euler(1) * 180 / M_PI;
-    pitch_accum_ = euler(0) * 180 / M_PI;
+    yaw_accum_ = euler(1) + M_PI_2;
+    if (yaw_accum_ > 2 * M_PI) {
+      yaw_accum_ -= M_PI;
+    }
 
-    using namespace std;
-    cout << "EULER: " << euler << endl;
+    pitch_accum_ = euler(0);
+    if (pitch_accum_ > M_PI_2) {
+      pitch_accum_ = M_PI_2;
+    }
+    else if (pitch_accum_ < -M_PI_2) {
+      pitch_accum_ = -M_PI_2;
+    }
 
     UpdateModelViewMatrix();
   }
