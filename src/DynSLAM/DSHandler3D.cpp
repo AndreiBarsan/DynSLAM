@@ -1,8 +1,17 @@
 
 #include "DSHandler3D.h"
 
+#include <Eigen/Geometry>
+
 namespace dynslam {
 namespace gui {
+
+void DSHandler3D::UpdateModelViewMatrix() {
+  Eigen::Vector3d target = eye + direction;
+  cam_state->SetModelViewMatrix(pangolin::ModelViewLookAt(eye[0], eye[1], eye[2],
+                                 target[0], target[1], target[2],
+                                 enforce_up));
+}
 
 void DSHandler3D::MouseMotion(pangolin::View &view, int x, int y, int button_state) {
 //    pangolin::Handler3D::MouseMotion(view, x, y, button_state);
@@ -16,23 +25,38 @@ void DSHandler3D::MouseMotion(pangolin::View &view, int x, int y, int button_sta
 
   if (mag < 50.0f * 50.0f) {
     OpenGlMatrix &mv = cam_state->GetModelViewMatrix();
+
+    GLprecision current_trans[3];
+    LieSetTranslation(mv.m, current_trans);
+
     const GLprecision *up = AxisDirectionVector[enforce_up];
-    GLprecision T_nc[3 * 4];
-    LieSetIdentity(T_nc);
-    bool rotation_changed = false;
+//    GLprecision T_nc[3 * 4];
+//    LieSetIdentity(T_nc);
+//    bool rotation_changed = false;
 
     if (button_state == MouseButtonMiddle) {
-      // Middle Drag: Rotate around view
+      // ignore for now
 
-      // Try to correct for different coordinate conventions.
-      GLprecision aboutx = -rf * delta[1];
-      GLprecision abouty = rf * delta[0];
-      OpenGlMatrix &pm = cam_state->GetProjectionMatrix();
-      abouty *= -pm.m[2 * 4 + 3];
-
-      Rotation<>(T_nc, aboutx, abouty, (GLprecision) 0.0);
     } else if (button_state == MouseButtonLeft) {
       // Left Drag: in plane translate
+
+      // Act like WASD
+      Eigen::Vector3d up_v(up[0], up[1], up[2]);
+
+      float dx = delta[0];
+      float dy = delta[1];
+
+      Eigen::Vector3d newMotionX = direction.cross(up_v).normalized() * dx * 0.05f;
+      Eigen::Vector3d newMotionY = direction.cross(up_v).cross(direction).normalized() * dy * 0.05f;
+      eye += newMotionX;
+      eye += newMotionY;
+
+
+      UpdateModelViewMatrix();
+
+
+
+      /*
       if (ValidWinDepth(last_z)) {
         GLprecision np[3];
         PixelUnproject(view, x, y, last_z, np);
@@ -48,7 +72,9 @@ void DSHandler3D::MouseMotion(pangolin::View &view, int x, int y, int button_sta
         const GLprecision t[] = {10 * delta[0] * tf, 10 * delta[1] * tf, 0};    // Removed a -
         LieSetTranslation<>(T_nc, t);
       }
+       */
     } else if (button_state == MouseButtonRight) {
+      /*
       GLprecision aboutx = -rf * delta[1];
       GLprecision abouty = -rf * delta[0];
 
@@ -72,13 +98,14 @@ void DSHandler3D::MouseMotion(pangolin::View &view, int x, int y, int button_sta
       LieSetTranslation<>(T_n2, rot_center);
       LieMulSE3(T_nc, T_n2, T_2c);
       rotation_changed = true;
+       */
     }
 
-    LieMul4x4bySE3<>(mv.m, T_nc, mv.m);
+//    LieMul4x4bySE3<>(mv.m, T_nc, mv.m);
 
-    if (enforce_up != AxisNone && rotation_changed) {
-      EnforceUpT_cw(mv.m, up);
-    }
+//    if (enforce_up != AxisNone && rotation_changed) {
+//      EnforceUpT_cw(mv.m, up);
+//    }
   }
 
   last_pos[0] = (float) x;
@@ -99,7 +126,23 @@ void DSHandler3D::Mouse(pangolin::View &view,
     button_state |= pangolin::MouseButtonRight;
   }
 
-  pangolin::Handler3D::Mouse(view, button, x, y, pressed, button_state);
+  last_pos[0] = static_cast<float>(x);
+  last_pos[1] = static_cast<float>(y);
+
+  if (pressed) {
+    if (button == pangolin::MouseWheelUp) {
+      eye += direction.normalized() * 0.5;
+    }
+    else if(button == pangolin::MouseWheelDown) {
+      eye -= direction.normalized() * 0.5;
+    }
+
+    UpdateModelViewMatrix();
+  }
+
+
+  // would otherwise handle scrolling
+//  pangolin::Handler3D::Mouse(view, button, x, y, pressed, button_state);
 }
 
 } // namespace gui
