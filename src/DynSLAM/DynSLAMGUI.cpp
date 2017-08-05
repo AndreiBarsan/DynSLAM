@@ -697,33 +697,29 @@ protected:
       *display_raw_previews_ = !display_raw_previews_->Get();
     });
 
-
-    // This is used for the free view camera. The focal lengths are not used in rendering, BUT they
-    // impact the sensitivity of the free view camera. The smaller they are, the faster the camera
-    // responds to input (ideally, you should use the translation and zoom scales to control this,
-    // though).
-    const Eigen::Matrix34f real_cam_proj = dyn_slam_->GetLeftRgbProjectionMatrix();
-    float cam_focal_length = real_cam_proj(0, 0);
-    float near = 0.1;
-    float far = 100.0f;
     // This constructs an OpenGL projection matrix from a calibrated camera pinhole projection
     // matrix. They are quite different, and the conversion between them is nontrivial.
     // See https://ksimek.github.io/2013/06/03/calibrated_cameras_in_opengl/ for more info.
-    proj_ = pangolin::ProjectionMatrixRDF_TopLeft(width_, height_, cam_focal_length,
-    cam_focal_length, real_cam_proj(0, 2), real_cam_proj(1, 2), near, far);
+    const Eigen::Matrix34f real_cam_proj = dyn_slam_->GetLeftRgbProjectionMatrix();
+    float near = 0.01;
+    float far = 1000.0f;
+    // -y is up
+    proj_ = pangolin::ProjectionMatrixRDF_TopLeft(width_, height_,
+                                                  real_cam_proj(0, 0), real_cam_proj(1, 1),
+                                                  real_cam_proj(0, 2), real_cam_proj(1, 2),
+                                                  near, far);
 
     pane_cam_ = new pangolin::OpenGlRenderState(
         proj_,
-        pangolin::ModelViewLookAt(-0.3, 0.4, 2,
-                                  -0.3, 0.4, 3,
-                                  pangolin::AxisY));
+        pangolin::ModelViewLookAtRDF(0,  -1.5, 15,
+                                     0,  -1.5, 50,
+                                     0, 1, 0));
     instance_cam_ = new pangolin::OpenGlRenderState(
         proj_,
-        pangolin::ModelViewLookAt(
-          // -y is up
-          0.0, 0.50,  6.75,
-          0.0, 0.50,  4.0,
-          pangolin::AxisY)
+        pangolin::ModelViewLookAtRDF(
+          -0.8, -0.20,  -3,
+          -0.8, -0.20,  15,
+          0, 1, 0)
     );
 
     float aspect_ratio = static_cast<float>(width_) / height_;

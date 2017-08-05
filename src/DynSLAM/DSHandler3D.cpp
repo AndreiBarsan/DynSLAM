@@ -10,6 +10,18 @@ using namespace pangolin;
 using namespace std;
 
 void DSHandler3D::UpdateModelViewMatrix() {
+  // Do NOT do a barrel roll. In fact, don't roll at all because it's not really useful when
+  // flying through a scene.
+  double roll = 0.0f;
+
+  // The ordering of the rotation angles is specific to InfiniTAM's axis conventions.
+  Eigen::Quaterniond rot_quat = Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX())
+      * Eigen::AngleAxisd(yaw_accum_, Eigen::Vector3d::UnitY())
+      * Eigen::AngleAxisd(pitch_accum_, Eigen::Vector3d::UnitZ());
+
+  // This is a bit dirty, but it works for what we need.
+  direction = rot_quat * Eigen::Vector3d(1.0f, 0.0f, 0.0f);
+
   Eigen::Vector3d target = eye + direction;
   cam_state_->SetModelViewMatrix(pangolin::ModelViewLookAt(eye[0], eye[1], eye[2],
                                  target[0], target[1], target[2],
@@ -24,7 +36,7 @@ void DSHandler3D::MouseMotion(pangolin::View &view, int x, int y, int button_sta
   if (mag < 50.0f * 50.0f) {
     const GLprecision *up = AxisDirectionVector[enforce_up_];
     if (button_state == MouseButtonLeft) {
-      // Left Drag: in plane translate
+      // Left drag: in-plane translate.
       Eigen::Vector3d up_v(up[0], up[1], up[2]);
 
       float dx = delta[0];
@@ -36,36 +48,29 @@ void DSHandler3D::MouseMotion(pangolin::View &view, int x, int y, int button_sta
       eye += newMotionY;
 
       UpdateModelViewMatrix();
-
     }
     else if (button_state == MouseButtonRight) {
-      GLprecision aboutx = -0.3 * trans_rot_scale_ * delta[0];
-      GLprecision abouty = -0.3 * trans_rot_scale_ * delta[1];
+      // Right drag: turn camera around.
+      GLprecision aboutx = -0.005 * trans_rot_scale_ * delta[0];
+      GLprecision abouty = -0.005 * trans_rot_scale_ * delta[1];
 
       yaw_accum_ -= aboutx;
       pitch_accum_ -= abouty;
 
-      while (yaw_accum_ < -360.0) { yaw_accum_ += 360.0f; }
-      while (yaw_accum_ > +360.0) { yaw_accum_ -= 360.0f; }
+      if (yaw_accum_ < -2 * M_PI) {
+        yaw_accum_ += 2 * M_PI;
+      }
+      if (yaw_accum_ >  2 * M_PI) {
+        yaw_accum_ -= 2 * M_PI;
+      }
 
-      float pitch_lim = 88.9f;
+      float pitch_lim = static_cast<float>(M_PI_2 * 0.99);
       if (pitch_accum_ > pitch_lim) {
         pitch_accum_ = pitch_lim;
       }
       if (pitch_accum_ < -pitch_lim) {
         pitch_accum_ = -pitch_lim;
       }
-
-      // Do NOT do a barrel roll. In fact, don't roll at all because it's not really useful when
-      // flying through a scene.
-      double roll = 0.0f;
-      double TO_RAD = M_PI / 180.0f;
-      // The ordering of the rotation angles is specific to InfiniTAM's axis conventions.
-      Eigen::Quaterniond rot_quat = Eigen::AngleAxisd(roll * TO_RAD, Eigen::Vector3d::UnitX())
-          * Eigen::AngleAxisd(yaw_accum_ * TO_RAD, Eigen::Vector3d::UnitY())
-          * Eigen::AngleAxisd(pitch_accum_ * TO_RAD, Eigen::Vector3d::UnitZ());
-
-      direction = rot_quat * Eigen::Vector3d(0.0f, 0.0f, 1.0f);
 
       UpdateModelViewMatrix();
     }
