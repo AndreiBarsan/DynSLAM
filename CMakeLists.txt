@@ -64,6 +64,7 @@ endif()
 # Note that this part *must* be after the CUDA setup, lest you get errors about hidden symbols
 # referenced by some DSO.
 #add_subdirectory(src/Pangolin)   # TODO-LOW(andrei): Enabling this causes strange linker issues.
+set(BUILD_PANGOLIN_EIGEN ON CACHE BOOL "")
 find_package(Pangolin REQUIRED)
 
 # Use the Google flag library for sane handling of command-line flags.
