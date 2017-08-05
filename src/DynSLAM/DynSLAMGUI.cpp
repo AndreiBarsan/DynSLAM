@@ -108,6 +108,51 @@ public:
     delete lidar_vis_vertices_;
   }
 
+  void DrawPoses(long current_time_ms) {
+    // Experimental code for raster rendering atop existing raycast.
+    main_view_->Activate();
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(true);
+
+    glMatrixMode(GL_PROJECTION);
+    proj_.Load();
+
+    glMatrixMode(GL_MODELVIEW);
+    pane_cam_->GetModelViewMatrix().Load();
+
+    auto phist = dyn_slam_->GetPoseHistory();
+
+    // Make the poses a little bit more visible.
+    float frustum_root_cube_scale = 0.01f;
+    Eigen::Vector3f color_white(1.0f, 1.0f, 1.0f);
+    for (int i = 2; i < phist.size() - 1; ++i) {
+      DrawPoseFrustum(phist[i], color_white, frustum_root_cube_scale);
+    }
+
+    if (phist.size() > 2) {
+      // Highlight the most recent pose.
+      Eigen::Vector3f glowing_green(0.5f,
+                                    0.5f + static_cast<float>(sin(current_time_ms / 250.0) * 0.5 + 0.5) * 0.5f,
+                                    0.5f);
+      DrawPoseFrustum(phist[phist.size() - 1], glowing_green, frustum_root_cube_scale);
+    }
+  }
+
+  void DrawPoseFrustum(const Eigen::Matrix4f &pose, const Eigen::Vector3f &color,
+                       float frustum_root_cube_scale) const {
+    glPushMatrix();
+    Eigen::Matrix4f inv_pose = pose.inverse();
+    glMultMatrixf(inv_pose.data());
+    pangolin::glDrawColouredCube(-frustum_root_cube_scale, frustum_root_cube_scale);
+    glPopMatrix();
+
+    Eigen::Matrix34f projection = dyn_slam_->GetLeftRgbProjectionMatrix();
+    const Eigen::Matrix3f Kinv = projection.block(0, 0, 3, 3).inverse();
+    glColor3f(color(0), color(1), color(2));
+    pangolin::glDrawFrustrum(Kinv, width_, height_, inv_pose, 1.0f);
+  }
+
   /// \brief Executes the main Pangolin input and rendering loop.
   void Run() {
     // Default hooks for exiting (Esc) and fullscreen (tab).
@@ -181,57 +226,7 @@ public:
                 static_cast<PreviewType>(current_preview_type_));
             pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
             pane_texture_->RenderToViewport(true);
-
-            // Experimental code for raster rendering atop existing raycast.
-            main_view_->Activate();
-
-            glEnable(GL_DEPTH_TEST);
-            glDepthMask(true);
-
-            glMatrixMode(GL_PROJECTION);
-            proj_.Load();
-
-            glMatrixMode(GL_MODELVIEW);
-            pane_cam_->GetModelViewMatrix().Load();
-
-            {
-              // Cube grid for mixed rendering debugging
-//              float cube_size = 0.5f;
-//              for (int i = -25; i < 25; ++i) {
-//                for (int j = -25; j < 25; ++j) {
-//                  glPushMatrix();
-////                  float cube_z = sin((time_ms + i * 100) / 500.0f) * 5.0;
-//                  float cube_z = 5.0f;
-//                  glTranslatef(
-//                      i * 1.5f,
-//                      j * 1.5f,
-//                      cube_z);
-//                  pangolin::glDrawColouredCube(-cube_size, cube_size);
-//                  glPopMatrix();
-//                }
-//              }
-
-              auto phist = dyn_slam_->GetPoseHistory();
-              // Make the poses a little bit more visible.
-              float frustum_root_cube_scale = 0.01f;
-              for (int i = 2; i < phist.size() - 1; ++i) {
-                glPushMatrix();
-                Eigen::Matrix4f pose = phist[i].inverse();
-                glMultMatrixf( pose.data() );
-                pangolin::glDrawColouredCube(-frustum_root_cube_scale, frustum_root_cube_scale);
-                glPopMatrix();
-
-                Eigen::Matrix34f projection = dyn_slam_->GetLeftRgbProjectionMatrix();
-                const Eigen::Matrix3f Kinv = projection.block(0, 0, 3, 3).inverse();
-                glColor3f(1.0f, 1.0f, 1.0f);
-                pangolin::glDrawFrustrum(Kinv, width_, height_, pose, 1.0f);
-              }
-
-              if (phist.size() > 2) {
-                // Highlight the most recent pose.
-              }
-            }
-
+            DrawPoses(time_ms);
             break;
           case kInputVsLidar:
             message = utils::Format("Input depth vs. LIDAR | delta_max = %d", delta_max_visualization);
@@ -259,6 +254,14 @@ public:
             throw runtime_error("Unexpected 'current_lidar_vis_' error visualization mode.");
             break;
         }
+
+        // Ensures we have a blank slate for the pane's overlay text.
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+        glColor3f(1.0f, 1.0f, 1.0f);
+        main_view_->Activate();
 
         if (need_lidar) {
           pane_texture_->RenderToViewport(true);
