@@ -42,10 +42,6 @@ ORUtils::Vector4<T> ToItmVec(const cv::Vec<T, 4> in) {
   return ORUtils::Vector4<T>(in[0], in[1], in[2], in[3]);
 }
 
-// TODO do not depend on infinitam objects. The ITM driver should be the only bit worrying about
-// them.
-ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const std::string& fpath);
-
 // TODO(andrei): Make */& more consistent.
 ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const string &fpath);
 
@@ -72,6 +68,12 @@ Eigen::Matrix4f ItmToEigen(const Matrix4f &itm_matrix);
 Matrix4f EigenToItm(const Eigen::Matrix4f &eigen_matrix);
 
 ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix);
+
+ITMLib::Objects::ITMRGBDCalib* CreateItmCalib(
+    const Eigen::Matrix<double, 3, 4> &left_cam_proj,
+    const Eigen::Vector2i &frame_size
+);
+
 
 /// \brief Interfaces between DynSLAM and InfiniTAM.
 class InfiniTamDriver : public ITMMainEngine {

@@ -108,12 +108,14 @@ public:
     delete lidar_vis_vertices_;
   }
 
+  /// \brief Renders the camera poses as frustums over the free camera view raycast produced by
+  ///        InfiniTAM.
+  /// \param current_time_ms Used for making the latest pose easier to spot by pulsating its color.
   void DrawPoses(long current_time_ms) {
-    // Experimental code for raster rendering atop existing raycast.
     main_view_->Activate();
 
     glEnable(GL_DEPTH_TEST);
-    glDepthMask(true);
+    glDepthMask(GL_TRUE);
 
     glMatrixMode(GL_PROJECTION);
     proj_.Load();
@@ -126,11 +128,11 @@ public:
     // Make the poses a little bit more visible.
     float frustum_root_cube_scale = 0.01f;
     Eigen::Vector3f color_white(1.0f, 1.0f, 1.0f);
-    for (int i = 2; i < phist.size() - 1; ++i) {
+    for (int i = 0; i < static_cast<int>(phist.size()) - 1; ++i) {
       DrawPoseFrustum(phist[i], color_white, frustum_root_cube_scale);
     }
 
-    if (phist.size() > 2) {
+    if (! phist.empty()) {
       // Highlight the most recent pose.
       Eigen::Vector3f glowing_green(0.5f,
                                     0.5f + static_cast<float>(sin(current_time_ms / 250.0) * 0.5 + 0.5) * 0.5f,
@@ -165,6 +167,8 @@ public:
         ProcessFrame();
       }
 
+      long time_ms = utils::GetTimeMs();
+
       main_view_->Activate(*pane_cam_);
       glEnable(GL_DEPTH_TEST);
       glColor3f(1.0f, 1.0f, 1.0f);
@@ -172,28 +176,6 @@ public:
       glDisable(GL_DEPTH_TEST);
       glDepthMask(false);
 
-      // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance,
-      // so you get dark, uncolored images.
-
-      // Some experimental code for getting the camera to move on its own.
-      timeval tp;
-      gettimeofday(&tp, nullptr);
-      double time_ms = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-      if (wiggle_mode_->Get()) {
-        double time_scale = 1500.0;
-        double r = 0.2;
-//          double cx = cos(time_ms / time_scale) * r;
-        double cy = sin(time_ms / time_scale) * r - r * 2;
-//          double cz = sin(time_ms / time_scale) * r;
-        pane_cam_->SetModelViewMatrix(
-            pangolin::ModelViewLookAt(
-                0, 0.0, 0.2,
-                0, 0.5 + cy, -1.0,
-                pangolin::AxisY)
-        );
-      }
-
-      //*
       if (dyn_slam_->GetCurrentFrameNo() > 1) {
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
         auto lidar_pointcloud = velodyne->GetLatestFrame();
@@ -203,12 +185,8 @@ public:
         Eigen::Matrix4f epose = dyn_slam_->GetPose().inverse();
         auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
-        const float *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastDepthPreview(
-            pango_pose
-//            pane_cam_->GetModelViewMatrix(),
-        );
+        const float *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastDepthPreview(pango_pose);
         const cv::Mat1s *input_depthmap = dyn_slam_->GetDepthPreview();
-
 
 //        uchar diff_buffer[width_ * height_ * 4];
 //        memset(diff_buffer, '\0', sizeof(uchar) * width_ * height_ * 4);
@@ -242,6 +220,7 @@ public:
 
           case kInputVsFusion:
             message = "Input depth vs. fusion";
+            need_lidar = true;
             // TODO(andrei): Implement this as a callback for the evaluation.
 //            DiffDepthmaps(input_depthmap_uc, synthesized_depthmap, width_, height_,
 //                          delta_max_visualization, diff_buffer);
@@ -265,9 +244,7 @@ public:
 
         if (need_lidar) {
           pane_texture_->RenderToViewport(true);
-
           bool visualize_input = (current_lidar_vis_ == kInputVsLidar);
-
           eval::ErrorVisualizationCallback vis_callback(
               delta_max_visualization, visualize_input, Eigen::Vector2f(
                   main_view_->GetBounds().w, main_view_->GetBounds().h), lidar_vis_colors_, lidar_vis_vertices_);
@@ -685,7 +662,6 @@ protected:
     /***************************************************************************
      * GUI Checkboxes
      **************************************************************************/
-    wiggle_mode_ = new pangolin::Var<bool>("ui.Wiggle mode", false, true);
     autoplay_ = new pangolin::Var<bool>("ui.[A]utoplay", false, true);
     pangolin::RegisterKeyPressCallback('a', [this]() {
       *(this->autoplay_) = ! *(this->autoplay_);
@@ -880,9 +856,6 @@ private:
   // from a different thread, but using atomics for this is generally a good practice anyway.
   atomic<int> active_object_count_;
 
-  /// \brief Whether the 3D scene view should be automatically moving around.
-  /// If this is off, then the user has control over the camera.
-  pangolin::Var<bool> *wiggle_mode_;
   /// \brief When this is on, the input gets processed as fast as possible, without requiring any
   /// user input.
   pangolin::Var<bool> *autoplay_;
@@ -892,9 +865,7 @@ private:
   /// \brief Whether to preview the sparse scene flow on the input and current instance RGP panes.
   pangolin::Var<bool> *preview_sf_;
 
-  // TODO(andrei): On-the-fly depth provider toggling.
   // TODO(andrei): Reset button.
-  // TODO(andrei): Dynamically set depth range.
 
   // Indicates which object is currently being visualized in the GUI.
   int visualized_object_idx_ = 0;
@@ -925,6 +896,8 @@ private:
     glPixelStorei(GL_UNPACK_ALIGNMENT, new_alignment);
     glPixelStorei(GL_UNPACK_ROW_LENGTH, new_row_length);
 
+    // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance,
+    // so you get dark, uncolored images.
     GLenum data_format = (color) ? GL_BGR : GL_GREEN;
     texture.Upload(mat.data, data_format, data_type);
 
@@ -997,37 +970,6 @@ Eigen::Vector2i GetFrameSize(const string &dataset_root, const Input::Config &co
       frame.cols,
       frame.rows
   );
-}
-
-// TODO(andrei): Move this to the ITM driver once it's done.
-ITMLib::Objects::ITMRGBDCalib* CreateItmCalib(
-    const Eigen::Matrix<double, 3, 4> &left_cam_proj,
-    const Eigen::Vector2i &frame_size
-) {
-  ITMRGBDCalib *calib = new ITMRGBDCalib;
-  float kMetersToMillimeters = 1.0f / 1000.0f;
-
-  ITMIntrinsics intrinsics;
-  float fx = static_cast<float>(left_cam_proj(0, 0));
-  float fy = static_cast<float>(left_cam_proj(1, 1));
-  float cx = static_cast<float>(left_cam_proj(0, 2));
-  float cy = static_cast<float>(left_cam_proj(1, 2));
-  float sizeX = frame_size(0);
-  float sizeY = frame_size(1);
-  intrinsics.SetFrom(fx, fy, cx, cy, sizeX, sizeY);
-
-  // Our intrinsics are always the same for RGB and depth since we compute depth from stereo.
-  calib->intrinsics_rgb = intrinsics;
-  calib->intrinsics_d = intrinsics;
-
-  // RGB and depth "sensors" are one and the same, so the relative pose is the identity matrix.
-  Matrix4f identity; identity.setIdentity();
-  calib->trafo_rgb_to_depth.SetFrom(identity);
-
-  // These parameters are used by ITM to convert from the input depth, expressed in millimeters, to
-  // the internal depth, which is expressed in meters.
-  calib->disparityCalib.SetFrom(kMetersToMillimeters, 0.0f, ITMDisparityCalib::TRAFO_AFFINE);
-  return calib;
 }
 
 /// \brief Constructs a DynSLAM instance to run on a KITTI Odometry dataset sequence, using liviso2
