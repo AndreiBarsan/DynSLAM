@@ -357,7 +357,7 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
   settings->sdfLocalBlockNum = static_cast<long>(4 * 4 * 10 / settings->sceneParams.voxelSize);
 
   // To be used in conjunction with coarse feature-based alignment.
-  settings->trackerType = ITMLibSettings::TrackerType::TRACKER_ICP;
+//  settings->trackerType = ITMLibSettings::TrackerType::TRACKER_ICP;
 
   track.GetReconstruction() = make_shared<InfiniTamDriver>(
           settings,
