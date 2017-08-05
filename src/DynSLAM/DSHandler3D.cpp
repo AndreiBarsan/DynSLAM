@@ -6,6 +6,7 @@
 namespace dynslam {
 namespace gui {
 
+using namespace pangolin;
 using namespace std;
 
 void DSHandler3D::UpdateModelViewMatrix() {
@@ -16,7 +17,6 @@ void DSHandler3D::UpdateModelViewMatrix() {
 }
 
 void DSHandler3D::MouseMotion(pangolin::View &view, int x, int y, int button_state) {
-  using namespace pangolin;
 
   const float delta[2] = {(float) x - last_pos_[0], (float) y - last_pos_[1]};
   const float mag = delta[0] * delta[0] + delta[1] * delta[1];
@@ -30,8 +30,8 @@ void DSHandler3D::MouseMotion(pangolin::View &view, int x, int y, int button_sta
       float dx = delta[0];
       float dy = -delta[1];
 
-      Eigen::Vector3d newMotionX = direction.cross(up_v).normalized() * dx * 0.05f;
-      Eigen::Vector3d newMotionY = direction.cross(up_v).cross(direction).normalized() * dy * 0.05f;
+      Eigen::Vector3d newMotionX = direction.cross(up_v).normalized() * dx * 0.05f * trans_rot_scale_;
+      Eigen::Vector3d newMotionY = direction.cross(up_v).cross(direction).normalized() * dy * 0.05f * trans_rot_scale_;
       eye += newMotionX;
       eye += newMotionY;
 
@@ -39,21 +39,21 @@ void DSHandler3D::MouseMotion(pangolin::View &view, int x, int y, int button_sta
 
     }
     else if (button_state == MouseButtonRight) {
-      GLprecision aboutx = -0.3 * delta[0];
-      GLprecision abouty = -0.3 * delta[1];
+      GLprecision aboutx = -0.3 * trans_rot_scale_ * delta[0];
+      GLprecision abouty = -0.3 * trans_rot_scale_ * delta[1];
 
-      yaw_accum -= aboutx;
-      pitch_accum -= abouty;
+      yaw_accum_ -= aboutx;
+      pitch_accum_ -= abouty;
 
-      while (yaw_accum < -360.0) { yaw_accum += 360.0f; }
-      while (yaw_accum > +360.0) { yaw_accum -= 360.0f; }
+      while (yaw_accum_ < -360.0) { yaw_accum_ += 360.0f; }
+      while (yaw_accum_ > +360.0) { yaw_accum_ -= 360.0f; }
 
       float pitch_lim = 88.9f;
-      if (pitch_accum > pitch_lim) {
-        pitch_accum = pitch_lim;
+      if (pitch_accum_ > pitch_lim) {
+        pitch_accum_ = pitch_lim;
       }
-      if (pitch_accum < -pitch_lim) {
-        pitch_accum = -pitch_lim;
+      if (pitch_accum_ < -pitch_lim) {
+        pitch_accum_ = -pitch_lim;
       }
 
       // Do NOT do a barrel roll. In fact, don't roll at all because it's not really useful when
@@ -62,10 +62,10 @@ void DSHandler3D::MouseMotion(pangolin::View &view, int x, int y, int button_sta
       double TO_RAD = M_PI / 180.0f;
       // The ordering of the rotation angles is specific to InfiniTAM's axis conventions.
       Eigen::Quaterniond rot_quat = Eigen::AngleAxisd(roll * TO_RAD, Eigen::Vector3d::UnitX())
-          * Eigen::AngleAxisd(yaw_accum * TO_RAD, Eigen::Vector3d::UnitY())
-          * Eigen::AngleAxisd(pitch_accum * TO_RAD, Eigen::Vector3d::UnitZ());
+          * Eigen::AngleAxisd(yaw_accum_ * TO_RAD, Eigen::Vector3d::UnitY())
+          * Eigen::AngleAxisd(pitch_accum_ * TO_RAD, Eigen::Vector3d::UnitZ());
 
-      direction = rot_quat * Eigen::Vector3d(1.0f, 0.0f, 0.0f);
+      direction = rot_quat * Eigen::Vector3d(0.0f, 0.0f, 1.0f);
 
       UpdateModelViewMatrix();
     }
@@ -81,25 +81,15 @@ void DSHandler3D::Mouse(pangolin::View &view,
                         int y,
                         bool pressed,
                         int button_state) {
-  // We flip the logic related to the right button being pressed: we want regular zoom when no
-  // button is pressed, and direction-sensitive zoom if the RMB is pressed.
-  if (button_state & pangolin::MouseButtonRight) {
-    button_state &= ~(pangolin::MouseButtonRight);
-  } else {
-    button_state |= pangolin::MouseButtonRight;
-  }
-
-  float scroll_factor = 0.5f;
-
   last_pos_[0] = static_cast<float>(x);
   last_pos_[1] = static_cast<float>(y);
 
   if (pressed) {
     if (button == pangolin::MouseWheelUp) {
-      eye += direction.normalized() * scroll_factor;
+      eye += direction.normalized() * zoom_scale_;
     }
     else if(button == pangolin::MouseWheelDown) {
-      eye -= direction.normalized() * scroll_factor;
+      eye -= direction.normalized() * zoom_scale_;
     }
 
     UpdateModelViewMatrix();
