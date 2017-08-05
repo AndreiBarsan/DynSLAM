@@ -156,6 +156,7 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
       float fdelta = velo_2d_left(1) - velo_2d_right(1);
 
       // Note that the LIDAR pointclouds aren't perfectly aligned, so this could occasionally happen.
+      // In particular, this can happen when the car passes large trucks very closely, it seems.
       if (abs(fdelta) > 1.2) {
         epi_errors++;
         cerr << "Warning: epipolar violation! Delta: " << delta << "; float: "

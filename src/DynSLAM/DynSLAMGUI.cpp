@@ -188,8 +188,9 @@ public:
         const float *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastDepthPreview(pango_pose);
         const cv::Mat1s *input_depthmap = dyn_slam_->GetDepthPreview();
 
-//        uchar diff_buffer[width_ * height_ * 4];
-//        memset(diff_buffer, '\0', sizeof(uchar) * width_ * height_ * 4);
+        /// Result of diffing our disparity maps (input and synthesized).
+        uchar diff_buffer[width_ * height_ * 4];
+        memset(diff_buffer, '\0', sizeof(uchar) * width_ * height_ * 4);
 
         bool need_lidar = false;
         const unsigned char *preview = nullptr;
@@ -219,13 +220,12 @@ public:
             break;
 
           case kInputVsFusion:
-            message = "Input depth vs. fusion";
-            need_lidar = true;
-            // TODO(andrei): Implement this as a callback for the evaluation.
-//            DiffDepthmaps(input_depthmap_uc, synthesized_depthmap, width_, height_,
-//                          delta_max_visualization, diff_buffer);
-//            pane_texture_->Upload(diff_buffer, GL_RGBA, GL_UNSIGNED_BYTE);
-//            pane_texture_->RenderToViewport(true);
+            message = "Input depth vs. fusion (green = OK, yellow = input disp > fused, cyan = input disp < fused";
+            DiffDepthmaps(*input_depthmap, synthesized_depthmap, width_, height_,
+                          delta_max_visualization, diff_buffer, dyn_slam_->GetStereoBaseline(),
+                          dyn_slam_->GetLeftRgbProjectionMatrix()(0, 0));
+            pane_texture_->Upload(diff_buffer, GL_RGBA, GL_UNSIGNED_BYTE);
+            pane_texture_->RenderToViewport(true);
             break;
 
           default:
@@ -433,40 +433,51 @@ public:
     glEnable(GL_DEPTH_TEST);
   }
 
-  // TODO(andrei): Diff disparity maps and adapt to new codebase!
   void DiffDepthmaps(
-      const uchar * input_depthmap,
-      const uchar * synthesized_depthmap,
+      const cv::Mat1s &input_depthmap,
+      const float* rendered_depth,
       int width,
       int height,
       int delta_max,
       uchar * out_image,
-      int stride = 4
+      float baseline_m,
+      float focal_length_px
   ) {
 
     for (int i = 0; i < height; ++i) {
       for (int j = 0; j < width; ++j) {
-        int idx = (i * width + j) * stride;
-        int input = input_depthmap[idx];
-        int synth = synthesized_depthmap[idx];
+        int in_idx = (i * width + j);
+        int out_idx = (i * width + j) * 4;
+        float input_depth_m = input_depthmap.at<short>(i, j) / 1000.0f;
+        float rendered_depth_m = rendered_depth[in_idx];
 
-        if (input == 0 || synth == 0) {
+        float input_disp = baseline_m * focal_length_px / input_depth_m;
+        float rendered_disp = baseline_m * focal_length_px / rendered_depth_m;
+
+        if (input_depth_m == 0 || fabs(rendered_depth_m < 1e-5)) {
           continue;
         }
 
-        int delta = input - synth;
-        int abs_delta = abs(delta);
+        float delta = input_disp - rendered_disp;
+        float abs_delta = fabs(delta);
         if (abs_delta > delta_max) {
-          out_image[idx + 0] = min(255, 100 + (abs_delta - delta) * 10);
-          out_image[idx + 1] = 0;
-          out_image[idx + 2] = 0;
-          out_image[idx + 3] = 255;
+          // Visualize SIGNED delta to highlight areas where a particular method tends to
+          // consistently over/underestimate.
+          if (delta > 0) {
+            out_image[out_idx + 0] = 0;
+            out_image[out_idx + 1] = min(255, static_cast<int>(150 + (abs_delta - delta) * 10));
+            out_image[out_idx + 2] = min(255, static_cast<int>(150 + (abs_delta - delta) * 10));
+          }
+          else {
+            out_image[out_idx + 0] = min(255, static_cast<int>(100 + (abs_delta - delta) * 10));
+            out_image[out_idx + 1] = min(255, static_cast<int>(100 + (abs_delta - delta) * 10));
+            out_image[out_idx + 2] = 0;
+          }
         }
         else {
-          out_image[idx + 0] = 20;
-          out_image[idx + 1] = 180;
-          out_image[idx + 2] = 20;
-          out_image[idx + 3] = 255;
+          out_image[out_idx + 0] = 0;
+          out_image[out_idx + 1] = 255;
+          out_image[out_idx + 2] = 0;
         }
       }
     }
