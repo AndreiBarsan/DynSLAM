@@ -8,25 +8,22 @@ namespace dynslam {
 namespace gui {
 
 /// \brief Customized 3D navigation handler for interactive 3D map visualizations.
-class DSHandler3D : public pangolin::Handler3D {
+/// Doesn't try to do the fancy object-aware rotations that Pangolin's builtin handler attempts to
+/// do, which is preferred when visualizing large reconstructions and mixed raycast-raster renders.
+class DSHandler3D : public pangolin::Handler {
  public:
-  explicit DSHandler3D(pangolin::OpenGlRenderState &cam_state)
-      : Handler3D(cam_state),
-        eye(-0.3, 0.4, 3.0),
-        direction(0, 0, -1)
-  {}
-
-  DSHandler3D(pangolin::OpenGlRenderState &cam_state,
+  DSHandler3D(pangolin::OpenGlRenderState *cam_state,
               pangolin::AxisDirection enforce_up,
               float trans_scale,
               float zoom_fraction)
-      : Handler3D(cam_state, enforce_up, trans_scale, zoom_fraction),
-        eye(-0.3, 0.4, 3.0),
-        direction(0, 0, -1)
-  {}
-
-  void Keyboard(pangolin::View &view, unsigned char key, int x, int y, bool pressed) override {
-    pangolin::Handler3D::Keyboard(view, key, x, y, pressed);
+    : pangolin::Handler(),
+      eye(-0.3, 0.4, 3.0),
+      direction(0, 0, -1),
+      enforce_up_(enforce_up),
+      cam_state_(cam_state),
+      last_pos_{0.0f, 0.0f}
+  {
+    UpdateModelViewMatrix();
   }
 
   void MouseMotion(pangolin::View &view, int x, int y, int button_state) override;
@@ -44,6 +41,13 @@ class DSHandler3D : public pangolin::Handler3D {
  private:
   Eigen::Vector3d eye;
   Eigen::Vector3d direction;
+
+  pangolin::AxisDirection enforce_up_;
+  pangolin::OpenGlRenderState *cam_state_;
+  float last_pos_[2];
+
+  float yaw_accum = 0.0f;
+  float pitch_accum = 0.0f;
 };
 
 } // namespace gui

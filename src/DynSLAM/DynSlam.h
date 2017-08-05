@@ -182,6 +182,11 @@ class DynSlam {
     return static_scene_->GetPose();
   }
 
+  const std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>>&
+  GetPoseHistory() const {
+    return pose_history_;
+  }
+
   // TODO(andrei): Similar stats also taking instances (and maybe views) into account. Take into
   // account the destroyed tracks (old ones) somehow.
   size_t GetStaticMapMemory() const {

@@ -155,8 +155,6 @@ public:
         float min_depth_meters = dyn_slam_input_->GetDepthProvider()->GetMinDepthMeters();
         float max_depth_meters = dyn_slam_input_->GetDepthProvider()->GetMaxDepthMeters();
 
-        // TODO(andrei): Pose history in dynslam; will be necessary in delayed evaluation, as well
-        // as if you wanna preview cute little frustums!
         Eigen::Matrix4f epose = dyn_slam_->GetPose().inverse();
         auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
@@ -197,18 +195,40 @@ public:
             pane_cam_->GetModelViewMatrix().Load();
 
             {
-              float cube_size = 0.5f;
-              for (int i = -25; i < 25; ++i) {
-                for (int j = -25; j < 25; ++j) {
-                  glPushMatrix();
-                  float cube_z = sin((time_ms + i * 100) / 500.0f) * 5.0;
-                  glTranslatef(
-                      i * 1.5f,
-                      j * 1.5f,
-                      cube_z);
-                  pangolin::glDrawColouredCube(-cube_size, cube_size);
-                  glPopMatrix();
-                }
+              // Cube grid for mixed rendering debugging
+//              float cube_size = 0.5f;
+//              for (int i = -25; i < 25; ++i) {
+//                for (int j = -25; j < 25; ++j) {
+//                  glPushMatrix();
+////                  float cube_z = sin((time_ms + i * 100) / 500.0f) * 5.0;
+//                  float cube_z = 5.0f;
+//                  glTranslatef(
+//                      i * 1.5f,
+//                      j * 1.5f,
+//                      cube_z);
+//                  pangolin::glDrawColouredCube(-cube_size, cube_size);
+//                  glPopMatrix();
+//                }
+//              }
+
+              auto phist = dyn_slam_->GetPoseHistory();
+              // Make the poses a little bit more visible.
+              float frustum_root_cube_scale = 0.01f;
+              for (int i = 2; i < phist.size() - 1; ++i) {
+                glPushMatrix();
+                Eigen::Matrix4f pose = phist[i].inverse();
+                glMultMatrixf( pose.data() );
+                pangolin::glDrawColouredCube(-frustum_root_cube_scale, frustum_root_cube_scale);
+                glPopMatrix();
+
+                Eigen::Matrix34f projection = dyn_slam_->GetLeftRgbProjectionMatrix();
+                const Eigen::Matrix3f Kinv = projection.block(0, 0, 3, 3).inverse();
+                glColor3f(1.0f, 1.0f, 1.0f);
+                pangolin::glDrawFrustrum(Kinv, width_, height_, pose, 1.0f);
+              }
+
+              if (phist.size() > 2) {
+                // Highlight the most recent pose.
               }
             }
 
@@ -681,53 +701,13 @@ protected:
     // though).
     const Eigen::Matrix34f real_cam_proj = dyn_slam_->GetLeftRgbProjectionMatrix();
     float cam_focal_length = real_cam_proj(0, 0);
-//    proj_ = pangolin::ProjectionMatrix(width_, height_,
-//                                       cam_focal_length, cam_focal_length,
-//                                       real_cam_proj(0, 2), real_cam_proj(1, 2),
-//                                       0.1, 10);
+    float near = 0.1;
+    float far = 100.0f;
+    // This constructs an OpenGL projection matrix from a calibrated camera pinhole projection
+    // matrix. They are quite different, and the conversion between them is nontrivial.
+    // See https://ksimek.github.io/2013/06/03/calibrated_cameras_in_opengl/ for more info.
     proj_ = pangolin::ProjectionMatrixRDF_TopLeft(width_, height_, cam_focal_length,
-    cam_focal_length, real_cam_proj(0, 2), real_cam_proj(1, 2), 0.01, 100);
-//
-//    // Credit: https://ksimek.github.io/2013/06/03/calibrated_cameras_in_opengl/
-//    float near = 0.1;
-//    float far = 100.0f;
-//    float alpha = real_cam_proj(0, 0);
-//    float beta = real_cam_proj(1, 1);
-//    float x0 = -real_cam_proj(0, 2);
-//    float y0 = -real_cam_proj(1, 2);
-//
-//    // TODO see if this actually makes sense..
-////    float left = 0.0;
-////    float right = width_;
-////    float bottom = height_;
-////    float top = 0.0;
-//    float left = -width_ / 2;
-//    float right =  width_ / 2;
-//    float bottom = -height_ / 2;
-//    float top = height_/2;
-//
-////    left -= x0;
-////    right -= x0;
-////    bottom -= y0;
-////    top -= y0;
-//
-//    float leftp = (near / alpha) * left;
-//    float rightp = (near / alpha) * right;
-//    float topp = (near / beta) * top;
-//    float bottomp = (near / beta) * bottom;
-//    float Ap = (rightp + leftp) / (rightp - leftp);
-//    float Bp = (topp + bottomp) / (topp - bottomp);
-//    float Cp = - (far + near) / (far - near);
-//    float Dp = - 2 * (far * near) / (far - near);
-//
-//    float col_major_data[16] = {
-//        2 * near / (rightp - leftp), 0, 0, 0,
-//        0, 2 * near / (topp - bottomp), 0, 0,
-//        Ap, Bp, Cp, -1,
-//        0, 0, Dp, 0
-//    };
-//    proj_ = pangolin::OpenGlMatrix::ColMajor4x4(col_major_data);
-    cout << "Pango proj: " << proj_  << endl;
+    cam_focal_length, real_cam_proj(0, 2), real_cam_proj(1, 2), near, far);
 
     pane_cam_ = new pangolin::OpenGlRenderState(
         proj_,
@@ -753,9 +733,8 @@ protected:
     float camera_zoom_scale = 1.0f; // This doesn't yet do anything when using our custom handler.
 
     object_reconstruction_view_ = pangolin::Display("object_3d").SetAspect(aspect_ratio)
-//        .SetHandler(new DSHandler3D(
-        .SetHandler(new pangolin::Handler3D(
-            *instance_cam_,
+        .SetHandler(new DSHandler3D(
+            instance_cam_,
             pangolin::AxisY,
             camera_translation_scale,
             camera_zoom_scale
@@ -765,8 +744,7 @@ protected:
     // current class.
     main_view_ = &(pangolin::Display("main").SetAspect(aspect_ratio));
     main_view_->SetHandler(
-        new pangolin::Handler3D(*pane_cam_,
-//        new DSHandler3D(*pane_cam_,
+        new DSHandler3D(pane_cam_,
                         pangolin::AxisY,
                         camera_translation_scale,
                         camera_zoom_scale));
