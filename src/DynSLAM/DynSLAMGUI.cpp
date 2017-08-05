@@ -714,8 +714,8 @@ protected:
 
     pane_cam_ = new pangolin::OpenGlRenderState(
         proj_,
-        pangolin::ModelViewLookAt(-0.3, 0.4, 3,
-                                  -0.3, 0.4, 2,
+        pangolin::ModelViewLookAt(-0.3, 0.4, 2,
+                                  -0.3, 0.4, 3,
                                   pangolin::AxisY));
     instance_cam_ = new pangolin::OpenGlRenderState(
         proj_,
@@ -732,8 +732,8 @@ protected:
 
     segment_view_ = pangolin::Display("segment").SetAspect(aspect_ratio);
     object_view_ = pangolin::Display("object").SetAspect(aspect_ratio);
-    float camera_translation_scale = 0.1f;
-    float camera_zoom_scale = 1.0f; // This doesn't yet do anything when using our custom handler.
+    float camera_translation_scale = 1.0f;
+    float camera_zoom_scale = 1.0f;
 
     object_reconstruction_view_ = pangolin::Display("object_3d").SetAspect(aspect_ratio)
         .SetHandler(new DSHandler3D(
