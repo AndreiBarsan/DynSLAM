@@ -45,13 +45,36 @@ ITMPose PoseFromPangolin(const pangolin::OpenGlMatrix &pangolin_matrix) {
   return itm_pose;
 }
 
-ITMLib::Objects::ITMRGBDCalib ReadITMCalibration(const string &fpath) {
-  ITMLib::Objects::ITMRGBDCalib out_calib;
-  if (! ITMLib::Objects::readRGBDCalib(fpath.c_str(), out_calib)) {
-    throw runtime_error(dynslam::utils::Format(
-        "Could not read calibration file: [%s]\n", fpath.c_str()));
-  }
-  return out_calib;
+ITMLib::Objects::ITMRGBDCalib *CreateItmCalib(const Eigen::Matrix<double, 3, 4> &left_cam_proj,
+                                              const Eigen::Vector2i &frame_size) {
+  ITMRGBDCalib *calib = new ITMRGBDCalib;
+  float kMetersToMillimeters = 1.0f / 1000.0f;
+
+  ITMIntrinsics intrinsics;
+  float fx = static_cast<float>(left_cam_proj(0, 0));
+  float fy = static_cast<float>(left_cam_proj(1, 1));
+  float cx = static_cast<float>(left_cam_proj(0, 2));
+  float cy = static_cast<float>(left_cam_proj(1, 2));
+  float sizeX = frame_size(0);
+  float sizeY = frame_size(1);
+  intrinsics.SetFrom(fx, fy, cx, cy, sizeX, sizeY);
+
+  // Our intrinsics are always the same for RGB and depth since we compute depth from stereo.
+  // TODO-LOW(andrei): But not if we compute the depth map from the gray camera frames, which have a
+  // subtle-but-non-negligible offset from the color ones. Note that for now we're simply computing
+  // all depth maps using the RGB inputs.
+  calib->intrinsics_rgb = intrinsics;
+  calib->intrinsics_d = intrinsics;
+
+  // RGB and depth "sensors" are one and the same, so the relative pose is the identity matrix.
+  // TODO-LOW(andrei): Not necessarily. See above.
+  Matrix4f identity; identity.setIdentity();
+  calib->trafo_rgb_to_depth.SetFrom(identity);
+
+  // These parameters are used by ITM to convert from the input depth, expressed in millimeters, to
+  // the internal depth, which is expressed in meters.
+  calib->disparityCalib.SetFrom(kMetersToMillimeters, 0.0f, ITMDisparityCalib::TRAFO_AFFINE);
+  return calib;
 }
 
 void CvToItm(const cv::Mat3b &mat, ITMUChar4Image *out_itm) {
