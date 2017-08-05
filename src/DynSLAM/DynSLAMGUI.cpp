@@ -53,13 +53,6 @@ DEFINE_int32(max_decay_weight, 2, "The maximum voxel weight for decay. Voxels wh
 // Handle SIGSEGV and its friends by printing sensible stack traces with code snippets.
 backward::SignalHandling sh;
 
-/// \brief Define these because OpenCV doesn't. Used in the `cv::flip` OpenCV function.
-enum {
-  kCvFlipVertical = 0,
-  kCvFlipHorizontal = 1,
-  kCvFlipBoth = -1
-};
-
 namespace dynslam {
 namespace gui {
 
@@ -73,7 +66,7 @@ using namespace dynslam::utils;
 
 static const int kUiWidth = 300;
 
-/// \brief What reconstruction error to visualize.
+/// \brief What reconstruction error to visualize (used for inspecting the evaluation).
 enum VisualizeError {
   kNone = 0,
   kInputVsLidar,
@@ -97,6 +90,11 @@ public:
     CreatePangolinDisplays();
   }
 
+  PangolinGui(const PangolinGui&) = delete;
+  PangolinGui(PangolinGui&&) = delete;
+  PangolinGui& operator=(const PangolinGui&) = delete;
+  PangolinGui& operator=(PangolinGui&&) = delete;
+
   virtual ~PangolinGui() {
     // No need to delete any view pointers; Pangolin deletes those itself on shutdown.
     delete pane_texture_;
@@ -119,7 +117,11 @@ public:
       }
 
       main_view_->Activate(*pane_cam_);
+      glEnable(GL_DEPTH_TEST);
       glColor3f(1.0f, 1.0f, 1.0f);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glDisable(GL_DEPTH_TEST);
+      glDepthMask(false);
 
       // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance,
       // so you get dark, uncolored images.
@@ -142,6 +144,7 @@ public:
         );
       }
 
+      //*
       if (dyn_slam_->GetCurrentFrameNo() > 1) {
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
         auto lidar_pointcloud = velodyne->GetLatestFrame();
@@ -175,7 +178,7 @@ public:
                 pane_cam_->GetModelViewMatrix(),
                 static_cast<PreviewType>(current_preview_type_));
             pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
-            pane_texture_->RenderToViewport(true);
+            pane_texture_->RenderToViewport(false);
             break;
           case kInputVsLidar:
             message = utils::Format("Input depth vs. LIDAR | delta_max = %d", delta_max_visualization);
@@ -240,14 +243,15 @@ public:
 
         font.Text(message).Draw(-0.90f, 0.80f);
       }
+      //*/
 
       font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.90f, 0.90f);
 
-      glDisable(GL_DEPTH_TEST);
+      // Experimental code for raster rendering atop existing raycast.
       main_view_->Activate(*pane_cam_);
-      pangolin::glDrawColouredCube();
       glEnable(GL_DEPTH_TEST);
-
+      glDepthMask(true);
+      pangolin::glDrawColouredCube();
 
       rgb_view_.Activate();
       glColor3f(1.0f, 1.0f, 1.0f);
@@ -259,7 +263,6 @@ public:
         }
         pane_texture_->RenderToViewport(true);
 
-        /*
         Tic("LIDAR render");
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
         if (velodyne->HasLatestFrame()) {
@@ -276,7 +279,6 @@ public:
         }
 
         Toc(true);
-        //*/
       }
 
       if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
@@ -285,8 +287,6 @@ public:
 
       depth_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
-      // TODO(andrei): Make these rendered buffers use the same color map (currently differs and
-      // looks bad when the staticdepthpreview is used).
       if (display_raw_previews_->Get()) {
         UploadCvTexture(*(dyn_slam_->GetDepthPreview()), *pane_texture_, false, GL_SHORT);
       }
@@ -307,7 +307,9 @@ public:
       glColor4f(1.0, 1.0, 1.0, 1.0f);
       pane_texture_->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
                             GL_RGBA, GL_UNSIGNED_BYTE);
-      // TODO(andrei): Make this gradual; currently it's shown as a single-colored blob
+
+      // TODO(andrei): Make this gradual; currently it's shown as a single-colored blob (would need
+      // custom shader or manual conversion.
 //      pane_texture_->Upload(dyn_slam_->GetObjectDepthPreview(visualized_object_idx_),
 //                            GL_RED, GL_FLOAT);
       pane_texture_->RenderToViewport(true);
@@ -373,7 +375,6 @@ public:
 
       stringstream info_label;
       info_label << latest_detection.GetClassName() << "#" << track.GetId()
-//                 << "@" << setprecision(2) << latest_detection.class_probability
                  << " [" << track.GetStateLabel().substr(0, 1) << "].";
       glColor3f(1.0f, 0.0f, 0.0f);
       font.Text(info_label.str()).Draw(gl_pos[0], gl_pos[1], 0);
@@ -384,7 +385,7 @@ public:
   void PreviewSparseSF(const vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &flow, const pangolin::View &view) {
     pangolin::GlFont &font = pangolin::GlFont::I();
     Eigen::Vector2f frame_size(width_, height_);
-    font.Text("libviso2 scene flow preview").Draw(-0.98f, 0.89f);
+    font.Text("libviso2 scene flow preview").Draw(-0.90f, 0.89f);
 
     // We don't need z-checks since we're rendering UI stuff.
     glDisable(GL_DEPTH_TEST);
@@ -651,10 +652,11 @@ protected:
     // impact the sensitivity of the free view camera. The smaller they are, the faster the camera
     // responds to input (ideally, you should use the translation and zoom scales to control this,
     // though).
-    float cam_focal_length = 250.0f;
+    const Eigen::Matrix34f real_cam_proj = dyn_slam_->GetLeftRgbProjectionMatrix();
+    float cam_focal_length = real_cam_proj(0, 0);
     proj_ = pangolin::ProjectionMatrix(width_, height_,
                                        cam_focal_length, cam_focal_length,
-                                       width_ / 2, height_ / 2,
+                                       real_cam_proj(0, 2), real_cam_proj(1, 2),
                                        0.1, 1000);
 
     pane_cam_ = new pangolin::OpenGlRenderState(
@@ -678,10 +680,11 @@ protected:
     segment_view_ = pangolin::Display("segment").SetAspect(aspect_ratio);
     object_view_ = pangolin::Display("object").SetAspect(aspect_ratio);
     float camera_translation_scale = 0.01f;
-    float camera_zoom_scale = 1.0f; // This doesn't seem to do anything.
+    float camera_zoom_scale = 0.1f; // This doesn't seem to do anything when using our custom handler.
 
     object_reconstruction_view_ = pangolin::Display("object_3d").SetAspect(aspect_ratio)
         .SetHandler(new DSHandler3D(
+//        .SetHandler(new pangolin::Handler3D(
             *instance_cam_,
             pangolin::AxisY,
             camera_translation_scale,
@@ -691,10 +694,12 @@ protected:
     // These objects remain under Pangolin's management, so they don't need to be deleted by the
     // current class.
     main_view_ = &(pangolin::Display("main").SetAspect(aspect_ratio));
-    main_view_->SetHandler(new DSHandler3D(*pane_cam_,
-                                           pangolin::AxisY,
-                                           camera_translation_scale,
-                                           camera_zoom_scale));
+    main_view_->SetHandler(
+//        new pangolin::Handler3D(*pane_cam_,
+        new DSHandler3D(*pane_cam_,
+                        pangolin::AxisY,
+                        camera_translation_scale,
+                        camera_zoom_scale));
 
     detail_views_ = &(pangolin::Display("detail"));
 
