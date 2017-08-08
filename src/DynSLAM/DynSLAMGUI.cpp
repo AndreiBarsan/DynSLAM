@@ -37,9 +37,9 @@ DEFINE_string(dataset_root, "", "The root folder of the dataset sequence to use.
 DEFINE_int32(frame_offset, 0, "The frame index from which to start reading the dataset sequence.");
 DEFINE_bool(voxel_decay, true, "Whether to enable map regularization via voxel decay (a.k.a. voxel "
                                "garbage collection).");
-DEFINE_int32(min_decay_age, 60, "The minimum voxel *block* age for voxels within it to be eligible "
+DEFINE_int32(min_decay_age, 30, "The minimum voxel *block* age for voxels within it to be eligible "
                                 "for deletion (garbage collection).");
-DEFINE_int32(max_decay_weight, 2, "The maximum voxel weight for decay. Voxels which have "
+DEFINE_int32(max_decay_weight, 1, "The maximum voxel weight for decay. Voxels which have "
                                   "accumulated more than this many measurements will not be "
                                   "removed.");
 
@@ -194,7 +194,7 @@ public:
 
         bool need_lidar = false;
         const unsigned char *preview = nullptr;
-        const uint delta_max_visualization = 0;
+        const uint delta_max_visualization = 1;
         string message;
         switch(current_lidar_vis_) {
           case kNone:
@@ -304,7 +304,6 @@ public:
                        velodyne->velodyne_to_rgb.cast<float>(),
                        rgb_view_);
         }
-
         Toc(true);
       }
 
@@ -433,6 +432,8 @@ public:
     glEnable(GL_DEPTH_TEST);
   }
 
+
+  /// \brief Produces a visual pixelwise diff image of the supplied depth maps, into out_image.
   void DiffDepthmaps(
       const cv::Mat1s &input_depthmap,
       const float* rendered_depth,
@@ -465,12 +466,12 @@ public:
           // consistently over/underestimate.
           if (delta > 0) {
             out_image[out_idx + 0] = 0;
-            out_image[out_idx + 1] = min(255, static_cast<int>(150 + (abs_delta - delta) * 10));
-            out_image[out_idx + 2] = min(255, static_cast<int>(150 + (abs_delta - delta) * 10));
+            out_image[out_idx + 1] = min(255, static_cast<int>(50 + (abs_delta - delta) * 10));
+            out_image[out_idx + 2] = min(255, static_cast<int>(50 + (abs_delta - delta) * 10));
           }
           else {
-            out_image[out_idx + 0] = min(255, static_cast<int>(100 + (abs_delta - delta) * 10));
-            out_image[out_idx + 1] = min(255, static_cast<int>(100 + (abs_delta - delta) * 10));
+            out_image[out_idx + 0] = min(255, static_cast<int>(50 + (abs_delta - delta) * 10));
+            out_image[out_idx + 1] = min(255, static_cast<int>(50 + (abs_delta - delta) * 10));
             out_image[out_idx + 2] = 0;
           }
         }
@@ -503,12 +504,8 @@ public:
     if (lidar_points.rows() == 0) {
       return;
     }
-//    static GLfloat verts[2000000];
-//    static GLubyte colors[2000000];
-
     size_t idx_v = 0;
     size_t idx_c = 0;
-
     glDisable(GL_DEPTH_TEST);
     for (int i = 0; i < lidar_points.rows(); ++i) {
       Eigen::Vector4f point = lidar_points.row(i);
@@ -519,24 +516,6 @@ public:
       p3d /= p3d(3);
       float Z = p3d(2);
 
-      // This part is VERY slow and should be performed in hardware...
-//      Eigen::VectorXf p2d = P * p3d;
-//      p2d /= p2d(2);
-
-//      if (p2d(0) < 0 || p2d(0) >= width_ || p2d(1) < 0 || p2d(1) >= height_) {
-//        continue;
-//      }
-
-//      Eigen::Vector2f frame_size(width_, height_);
-//      cv::Vec2f gl_pos = PixelsToGl(Eigen::Vector2f(p2d(0), p2d(1)), frame_size, view);
-//
-//      GLfloat x = gl_pos(0);
-//      GLfloat y = gl_pos(1);
-//      GLfloat x = p2d(0);
-//      GLfloat y = p2d(1);
-
-//      verts[idx_v++] = x;
-//      verts[idx_v++] = y;
       lidar_vis_vertices_[idx_v++] = p3d(0);
       lidar_vis_vertices_[idx_v++] = p3d(1);
       lidar_vis_vertices_[idx_v++] = p3d(2);
@@ -553,8 +532,6 @@ public:
     float cy = P(1, 2);
     auto proj = pangolin::ProjectionMatrix(width_, height_, fx, fy, cx, cy, 0.01, 1000);
 
-//    auto milliseconds_since_epoch = (
-//        std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1) - 1501147873988);
     pangolin::OpenGlRenderState state(
         proj, pangolin::IdentityMatrix().RotateX(M_PI)
     );
@@ -883,7 +860,7 @@ private:
 
   int current_preview_type_ = kColor;
 
-  int current_lidar_vis_ = VisualizeError::kFusionVsLidar;
+  int current_lidar_vis_ = VisualizeError::kNone;
 
   cv::Mat1s depth_preview_buffer_;
 
@@ -909,7 +886,7 @@ private:
 
     // [RIP] If left unspecified, Pangolin assumes your texture type is single-channel luminance,
     // so you get dark, uncolored images.
-    GLenum data_format = (color) ? GL_BGR : GL_GREEN;
+    GLenum data_format = (color) ? GL_BGR : GL_LUMINANCE;
     texture.Upload(mat.data, data_format, data_type);
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, old_alignment);

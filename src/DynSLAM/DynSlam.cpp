@@ -74,7 +74,7 @@ void DynSlam::ProcessFrame(Input *input) {
   utils::Toc();
 
   // TODO make field
-  bool enable_dynamic_ = true;
+  bool enable_dynamic_ = false;
   // Perform semantic segmentation, dense depth computation, and dense fusion every K frames.
   // TODO(andrei): Support instance tracking in this framework: we would need SSF between t and t-k,
   //               so we DEFINITELY need separate VO to run in, say, 50ms at every frame, and then
