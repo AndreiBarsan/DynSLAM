@@ -98,6 +98,8 @@ include_directories(${Sophus_INCLUDE_DIRS})
 add_subdirectory(src/InfiniTAM/InfiniTAM)
 add_subdirectory(src/DynSLAM/InstRecLib)
 
+# Typically you don't have to add headers as sources, since they get included and compiled
+# anyway, but CLion's static analysis works better on them if they're listed as sources.
 set(DYNSLAM_SOURCES
     # A tiny library for working with portable float map (PFM) files.
     src/pfmLib/ImageIOpfm.cpp
@@ -120,6 +122,9 @@ set(DYNSLAM_SOURCES
     src/DynSLAM/DynSlam.cpp
     src/DynSLAM/Evaluation/Evaluation.cpp
     src/DynSLAM/Evaluation/Velodyne.cpp
+    src/DynSLAM/Evaluation/ILidarEvalCallback.h
+    src/DynSLAM/Evaluation/ErrorVisualizationCallback.h
+    src/DynSLAM/Evaluation/ErrorVisualizationCallback.cpp
     src/DynSLAM/InfiniTamDriver.cpp
     src/DynSLAM/Input.cpp
     src/DynSLAM/DepthProvider.h
@@ -131,7 +136,7 @@ set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
     src/DynSLAM/DynSLAMGUI.cpp)
 
-add_library(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} src/DynSLAM/Evaluation/ILidarEvalCallback.h src/DynSLAM/Evaluation/ErrorVisualizationCallback.h)
+add_library(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} )
 # TODO(andrei): Rename this to ITMEngine or something for clarity.
 target_link_libraries(DynSLAM Engine)
 # TODO(andrei): Ditto. These are the InfiniTAM utilities!
