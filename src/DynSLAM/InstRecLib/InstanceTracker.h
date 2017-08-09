@@ -22,11 +22,9 @@ namespace reconstruction {
 const float kTrackScoreThreshold = 0.15f;
 
 // TODO(andrei): Adapt this to allow bigger gaps in longer track, maybe.
-/// \brief Default age of the last frame in an object track after which we
-/// discard it.
-/// The smaller this is, the less memory the system uses, but the likelier it is
-/// to fragment
-/// object reconstructions into multiple volumes.
+/// \brief Default age of the last frame in an object track after which we discard it.
+/// The smaller this is, the less memory the system uses, but the likelier it is to fragment object
+/// reconstructions into multiple volumes.
 const int kDefaultInactiveFrameThreshold = 3;
 
 /// \brief Tracks instances over time by associating multiple isolated detections.
