@@ -203,7 +203,7 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
       if (fabs(input_depth_m) < 1e-5) {
         missing_input++;
       } else {
-//        if (input_disp_delta > delta_max && (input_disp_delta > 0.03 * lidar_disp)) {
+//        if (input_disp_delta > delta_max && (input_disp_delta > 0.05 * lidar_disp)) {
         if (input_disp_delta > delta_max) {
           errors_input++;
         } else {
@@ -214,7 +214,7 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
       if (rendered_depth_m < 1e-5) {
         missing_rendered++;
       } else {
-//        if (rendered_disp_delta > delta_max && (rendered_disp_delta > 0.03 * lidar_disp)) {
+//        if (rendered_disp_delta > delta_max && (rendered_disp_delta > 0.05 * lidar_disp)) {
         if (rendered_disp_delta > delta_max) {
           errors_rendered++;
         } else {
