@@ -92,6 +92,11 @@ void Input::GetCvStereoGray(cv::Mat1b **left, cv::Mat1b **right) {
   *right = &right_frame_gray_buf_;
 }
 
+void Input::GetCvStereoColor(cv::Mat3b **left_rgb, cv::Mat3b **right_rgb) {
+  *left_rgb = &left_frame_color_buf_;
+  *right_rgb = &right_frame_color_buf_;
+}
+
 void Input::ReadLeftGray(int frame_idx, cv::Mat1b &out) const {
   out = cv::imread(GetFrameName(dataset_folder_,
                                 config_.left_gray_folder,
@@ -122,6 +127,5 @@ void Input::ReadRightColor(int frame_idx, cv::Mat3b &out) const {
                                 config_.fname_format,
                                 frame_idx));
 }
-
 
 } // namespace dynslam

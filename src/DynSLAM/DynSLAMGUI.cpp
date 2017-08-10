@@ -21,6 +21,7 @@
 #include "Evaluation/ErrorVisualizationCallback.h"
 
 const std::string kKittiOdometry = "kitti-odometry";
+const std::string kKittiTracking = "kitti-tracking";
 const std::string kKitti         = "kitti";
 
 // TODO(andrei): If you're depending on OpenCV anyway, try cv::puttext for more flexibility than
@@ -30,17 +31,18 @@ const std::string kKitti         = "kitti";
 // Commandline arguments using gflags.
 DEFINE_string(dataset_type,
               kKittiOdometry,
-              "The type of the input dataset at which 'dataset_root'is pointing. Currently "
-              "only 'kitti-odometry' is supported.");
-DEFINE_string(dataset_root, "", "The root folder of the dataset sequence to use.");
+              "The type of the input dataset at which 'dataset_root'is pointing. Supported are "
+              "'kitti-odometry' and 'kitti-tracking'.");
+DEFINE_string(dataset_root, "", "The root folder of the dataset or dataset sequence to use.");
 DEFINE_int32(frame_offset, 0, "The frame index from which to start reading the dataset sequence.");
 DEFINE_bool(voxel_decay, true, "Whether to enable map regularization via voxel decay (a.k.a. voxel "
                                "garbage collection).");
-DEFINE_int32(min_decay_age, 30, "The minimum voxel *block* age for voxels within it to be eligible "
+DEFINE_int32(min_decay_age, 60, "The minimum voxel *block* age for voxels within it to be eligible "
                                 "for deletion (garbage collection).");
 DEFINE_int32(max_decay_weight, 1, "The maximum voxel weight for decay. Voxels which have "
                                   "accumulated more than this many measurements will not be "
                                   "removed.");
+DEFINE_int32(kitti_tracking_sequence_id, -1, "Used in conjunction with --dataset_type kitti-tracking.");
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
 // issue.
@@ -923,6 +925,9 @@ void ReadKittiOdometryCalibration(const string &fpath,
   static const string kLeftColor = "P2:";
   static const string kRightColor = "P3:";
   ifstream in(fpath);
+  if (! in.is_open()) {
+    throw runtime_error(utils::Format("Could not open calibration file: [%s]", fpath.c_str()));
+  }
 
   left_gray_proj = ReadProjection(kLeftGray, in);
   right_gray_proj = ReadProjection(kRightGray, in);
@@ -931,7 +936,14 @@ void ReadKittiOdometryCalibration(const string &fpath,
 
   string dummy;
   in >> dummy;
-  assert(dummy == "Tr:");
+  if (dummy != "Tr:") {
+    // Looks like a kitti-tracking sequence
+    std::getline(in, dummy); // skip to the end of current line
+
+    in >> dummy;
+    assert(dummy == "Tr_velo_cam");
+  }
+
   for (int row = 0; row < 3; ++row) {
     for (int col = 0; col < 4; ++col) {
       in >> velo_to_left_cam(row, col);
@@ -964,9 +976,22 @@ Eigen::Vector2i GetFrameSize(const string &dataset_root, const Input::Config &co
 void BuildDynSlamKittiOdometry(const string &dataset_root,
                                DynSlam **dyn_slam_out,
                                Input **input_out) {
+  Input::Config input_config;
+  if (FLAGS_dataset_type == kKittiOdometry) {
+    input_config = Input::KittiOdometryConfig();
+//    input_config = Input::KittiOdometryDispnetConfig();
+  }
+  else if (FLAGS_dataset_type == kKittiTracking){
+    int t_seq_id = FLAGS_kitti_tracking_sequence_id;
+    if (t_seq_id < 0) {
+      throw runtime_error("Please specify a KITTI tracking sequence ID.");
+    }
 
-//  Input::Config input_config = Input::KittiOdometryConfig();
-  Input::Config input_config = Input::KittiOdometryDispnetConfig();
+    input_config = Input::KittiTrackingConfig(t_seq_id);
+  }
+  else {
+    throw runtime_error(utils::Format("Unknown dataset type: [%s]", FLAGS_dataset_type.c_str()));
+  }
 
   Eigen::Matrix34d left_gray_proj;
   Eigen::Matrix34d right_gray_proj;
@@ -975,8 +1000,7 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
   Eigen::Matrix4d velo_to_left_gray_cam;
 
   // Read all the calibration info we need.
-  // HERE BE DRAGONS (for noobs like myself): Make sure you're using the correct matrix for the
-  // grayscale and/or color cameras!
+  // HERE BE DRAGONS Make sure you're using the correct matrix for the grayscale and/or color cameras!
   ReadKittiOdometryCalibration(dataset_root + "/" + input_config.calibration_fname,
                                left_gray_proj, right_gray_proj, left_color_proj, right_color_proj,
                                velo_to_left_gray_cam);
@@ -1096,16 +1120,8 @@ int main(int argc, char **argv) {
 
   const string dataset_root = FLAGS_dataset_root;
   if (dataset_root.empty()) {
-    cerr << "Please specify a dataset to work with. The --dataset_root=<path> flag must be set."
-         << endl;
-
+    cerr << "The --dataset_root=<path> flag must be set." << endl;
     return -1;
-  }
-
-  if (FLAGS_dataset_type != kKittiOdometry) {
-    throw runtime_error(dynslam::utils::Format(
-        "Unsupported dataset type: %s", FLAGS_dataset_type.c_str()
-    ));
   }
 
   dynslam::DynSlam *dyn_slam;

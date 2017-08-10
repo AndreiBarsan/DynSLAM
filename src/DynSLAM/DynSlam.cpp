@@ -36,8 +36,27 @@ void DynSlam::ProcessFrame(Input *input) {
 
   future<void> tracking_and_ssf = async(launch::async, [this, &input, &first_frame] {
     utils::Tic("Sparse Scene Flow");
+
+    // Whether to use input from the original cameras. Unavailable with the tracking dataset.
+    // When original gray images are not used, the color ones are converted to grayscale and passed
+    // to the visual odometry instead.
+    bool original_gray = false;
+
+    // TODO-LOW(andrei): Reuse these buffers for performance.
     cv::Mat1b *left_gray, *right_gray;
-    input->GetCvStereoGray(&left_gray, &right_gray);
+    if (original_gray) {
+      input->GetCvStereoGray(&left_gray, &right_gray);
+    }
+    else {
+      cv::Mat3b *left_col, *right_col;
+      input->GetCvStereoColor(&left_col, &right_col);
+
+      left_gray = new cv::Mat1b(left_col->rows, left_col->cols);
+      right_gray = new cv::Mat1b(right_col->rows, right_col->cols);
+
+      cv::cvtColor(*left_col, *left_gray, cv::COLOR_RGB2GRAY);
+      cv::cvtColor(*right_col, *right_gray, cv::COLOR_RGB2GRAY);
+    }
 
     // TODO(andrei): Compute only matches here, the make the instance reconstructor process the
     // frame and remove clearly-dynamic SF vectors (e.g., from tracks which are clearly dynamic,
@@ -59,14 +78,19 @@ void DynSlam::ProcessFrame(Input *input) {
     static_scene_->SetPose(new_pose.inverse());
     pose_history_.push_back(new_pose);
 
+    if (! original_gray) {
+      delete left_gray;
+      delete right_gray;
+    }
+
     // Used when we're *not* computing VO as part of the SF estimation process.
 //    static_scene_->Track();
     utils::Toc("Visual Odometry", false);
-
   });
 
   seg_result_future.wait();
-  tracking_and_ssf.wait();
+  // 'get' ensures any exceptions are propagated.
+  tracking_and_ssf.get();
 
   utils::Tic("Input preprocessing");
   input->GetCvImages(&input_rgb_image_, &input_raw_depth_image_);
@@ -74,7 +98,7 @@ void DynSlam::ProcessFrame(Input *input) {
   utils::Toc();
 
   // TODO make field
-  bool enable_dynamic_ = false;
+  bool enable_dynamic_ = true;
   // Perform semantic segmentation, dense depth computation, and dense fusion every K frames.
   // TODO(andrei): Support instance tracking in this framework: we would need SSF between t and t-k,
   //               so we DEFINITELY need separate VO to run in, say, 50ms at every frame, and then
