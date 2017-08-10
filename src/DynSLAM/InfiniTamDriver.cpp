@@ -2,6 +2,7 @@
 
 #include "InfiniTamDriver.h"
 
+// TODO(andrei): Why not move to DynSLAM.cpp?
 DEFINE_bool(enable_evaluation, true, "Whether to enable evaluation mode for DynSLAM. This means "
     "the system will load in LIDAR ground truth and compare its maps with it, dumping the results "
     "in CSV format.");
