@@ -84,26 +84,25 @@ class Input {
 
   /// The structure of the tracking dataset is a bit different, and there's no one folder per, so we
   /// must explicitly specify the sequence number (ID).
+  // WARNING: no gray data available for the tracking benchmark sequences.
   /// Details and downloads: http://www.cvlibs.net/datasets/kitti/eval_tracking.php
   static Config KittiTrackingConfig(int sequence_id) {
     Config config;
-    config.dataset_name           = "kitti-tracking";
+    config.dataset_name           = utils::Format("kitti-tracking-sequence-%04d", sequence_id);
 
-    // WARNING: no gray data available for the tracking benchmark sequences.
-    // TODO(andrei): Ensure the VO code is robust to this, and converts to intensity if need be.
     config.left_gray_folder       = utils::Format("training/image_02/%04d/", sequence_id);
-    config.right_gray_folder       = utils::Format("training/image_03/%04d/", sequence_id);
-    config.left_color_folder       = utils::Format("training/image_02/%04d/", sequence_id);
-    config.right_color_folder       = utils::Format("training/image_03/%04d/", sequence_id);
-    config.fname_format = "%06d.png";
-    config.calibration_fname = utils::Format("training/calib/%04d.txt", sequence_id);
+    config.right_gray_folder      = utils::Format("training/image_03/%04d/", sequence_id);
+    config.left_color_folder      = utils::Format("training/image_02/%04d/", sequence_id);
+    config.right_color_folder     = utils::Format("training/image_03/%04d/", sequence_id);
+    config.fname_format           = "%06d.png";
+    config.calibration_fname      = utils::Format("training/calib/%04d.txt", sequence_id);
 
     config.min_depth_m = 0.5f;
     config.max_depth_m = 20.0f;
     config.depth_folder = utils::Format("training/precomputed-depth/%04d/Frames", sequence_id);
     config.depth_fname_format = "%04d.xml";
     config.read_depth = true;
-    config.segmentation_folder = "seg_image_2/mnc";
+    config.segmentation_folder = utils::Format("training/seg_image_02/%04d/mnc", sequence_id);
 
     config.odometry_oxts  = false;
     config.odometry_fname = "";
@@ -144,7 +143,6 @@ class Input {
   Input(const std::string &dataset_folder,
         const Config &config,
         DepthProvider *depth_provider,
-//        const ITMLib::Objects::ITMRGBDCalib &calibration,
         const Eigen::Vector2i &frame_size,
         const StereoCalibration &stereo_calibration,
         int frame_offset = 0)
@@ -170,6 +168,9 @@ class Input {
 
   /// \brief Returns pointers to the latest grayscale input frames.
   void GetCvStereoGray(cv::Mat1b **left, cv::Mat1b **right);
+
+  /// \brief Returns pointers to the latest color input frames.
+  void GetCvStereoColor(cv::Mat3b **left_rgb, cv::Mat3b **right_rgb);
 
   cv::Size2i GetRgbSize() const {
     return cv::Size2i(frame_width_, frame_height_);

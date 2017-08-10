@@ -149,13 +149,13 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
   if (last_seg_preview_ == nullptr) {
     last_seg_preview_ = new cv::Mat3b(rgb.rows, rgb.cols);
   }
-
+  cout << "Reading segmentation preview from " << img_fpath << endl;
   *last_seg_preview_ = cv::imread(img_fpath);
 
-  if (! last_seg_preview_->data) {
-    throw std::runtime_error(Format(
+  if (! last_seg_preview_->data || last_seg_preview_->cols == 0 || last_seg_preview_->rows == 0) {
+    throw runtime_error(Format(
         "Could not read segmentation preview image from file [%s].",
-        img_fpath));
+        img_fpath.c_str()));
   }
 
   stringstream meta_img_ss;

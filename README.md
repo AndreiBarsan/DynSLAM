@@ -59,6 +59,10 @@ course of the next few months.
 
 ### (Currently not Working) Steps
 
+Important: if you're interested in this project and it's after September 1st
+2017, please email me! My email is on my GitHub profile page. I will update the
+instructions accordingly. Reproducibility is VERY important to me.
+
 Note that the system is under *heavy* development at the moment, so that these
 instructions could quickly go out of date. Generally speaking, this project is
 built using CMake, and it depends on several submodules. As such, make sure you
