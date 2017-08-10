@@ -118,6 +118,8 @@ set(DYNSLAM_SOURCES
     src/DynSLAM/Direct/image_alignment/device/cpu/dirImgAlignCPU.cpp
     # End experimental parts
 
+    src/DynSLAM/Evaluation/Tracklets.cpp
+    src/DynSLAM/Evaluation/Tracklets.h
     src/DynSLAM/DSHandler3D.cpp
     src/DynSLAM/DynSlam.cpp
     src/DynSLAM/Evaluation/Evaluation.cpp
@@ -136,7 +138,7 @@ set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
     src/DynSLAM/DynSLAMGUI.cpp)
 
-add_library(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} )
+add_library(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
 # TODO(andrei): Rename this to ITMEngine or something for clarity.
 target_link_libraries(DynSLAM Engine)
 # TODO(andrei): Ditto. These are the InfiniTAM utilities!

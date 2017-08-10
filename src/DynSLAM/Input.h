@@ -51,6 +51,10 @@ class Input {
     /// \brief The Velodyne LIDAR data (used only for evaluation).
     std::string velodyne_folder = "";
     std::string velodyne_fname_format = "";
+
+    /// \brief Tracklet ground truth, only available in the KITTI-tracking benchmark in the format
+    ///        that we support.
+    std::string tracklet_folder = "";
   };
 
   /// We don't define the configs as constants here in order to make the code easier to read.
@@ -84,7 +88,7 @@ class Input {
 
   /// The structure of the tracking dataset is a bit different, and there's no one folder per, so we
   /// must explicitly specify the sequence number (ID).
-  // WARNING: no gray data available for the tracking benchmark sequences.
+  /// WARNING: no gray data available for the tracking benchmark sequences.
   /// Details and downloads: http://www.cvlibs.net/datasets/kitti/eval_tracking.php
   static Config KittiTrackingConfig(int sequence_id) {
     Config config;
@@ -99,17 +103,18 @@ class Input {
 
     config.min_depth_m = 0.5f;
     config.max_depth_m = 20.0f;
-    config.depth_folder = utils::Format("training/precomputed-depth/%04d/Frames", sequence_id);
-    config.depth_fname_format = "%04d.xml";
+    config.depth_folder           = utils::Format("training/precomputed-depth/%04d/Frames", sequence_id);
+    config.depth_fname_format     = "%04d.xml";
     config.read_depth = true;
-    config.segmentation_folder = utils::Format("training/seg_image_02/%04d/mnc", sequence_id);
+    config.segmentation_folder    = utils::Format("training/seg_image_02/%04d/mnc", sequence_id);
 
-    config.odometry_oxts  = false;
-    config.odometry_fname = "";
+    config.odometry_oxts          = false;
+    config.odometry_fname         = "";
 
-    config.velodyne_folder = utils::Format("training/velodyne/%04d/", sequence_id);
-    config.velodyne_fname_format = "%06d.bin";
+    config.velodyne_folder        = utils::Format("training/velodyne/%04d/", sequence_id);
+    config.velodyne_fname_format  = "%06d.bin";
 
+    config.tracklet_folder        = utils::Format("training/label_02/%04d.txt", sequence_id);
     return config;
   }
 
