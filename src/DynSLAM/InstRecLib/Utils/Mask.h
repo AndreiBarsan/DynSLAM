@@ -18,11 +18,9 @@ namespace utils {
 // TODO(andrei): CUDA+CPU methods for computing mask intersection and the
 // overlap area.
 //
-/// \brief An image mask consisting of a bounding box and a detailed boolean
-/// mask array.
+/// \brief An image mask consisting of a bounding box and a detailed boolean mask array.
 /// Used to model semantic segmentation results.
-/// A bounding box's (0, 0) is the top-left, in accordance with the rest of
-/// InfiniTAM.
+/// A bounding box's (0, 0) is the top-left, in accordance with the rest of InfiniTAM.
 class Mask {
  public:
   /// \brief Initializes this object, taking ownership of the given mask*.

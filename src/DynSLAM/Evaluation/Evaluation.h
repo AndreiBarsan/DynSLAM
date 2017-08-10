@@ -218,6 +218,10 @@ class Evaluation {
                                 bool compare_on_intersection,
                                 ILidarEvalCallback *callback) const;
 
+  /// \brief Simplistic evaluation of tracking performance, mostly meant to asses whether using the
+  ///        direct refinement steps leads to any improvement.
+  void EvaluateTracking(Input *input, DynSlam *dyn_slam);
+
   Velodyne *GetVelodyne() {
     return velodyne_;
   }
