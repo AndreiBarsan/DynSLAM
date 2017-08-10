@@ -583,7 +583,7 @@ protected:
       }
       else {
         cout << "Saving static map..." << endl;
-        dyn_slam_->SaveStaticMap(dyn_slam_input_->GetSequenceName(),
+        dyn_slam_->SaveStaticMap(dyn_slam_input_->GetDatasetIdentifier(),
                                  dyn_slam_input_->GetDepthProvider()->GetName());
         cout << "Mesh generated OK. Writing asynchronously to the disk..." << endl;
         Toc();
@@ -608,7 +608,7 @@ protected:
     });
     pangolin::RegisterKeyPressCallback('x', [this]() { SelectNextVisualizedObject(); });
     auto save_object = [this]() {
-      dyn_slam_->SaveDynamicObject(dyn_slam_input_->GetSequenceName(),
+      dyn_slam_->SaveDynamicObject(dyn_slam_input_->GetDatasetIdentifier(),
                                      dyn_slam_input_->GetDepthProvider()->GetName(),
                                      visualized_object_idx_);
     };

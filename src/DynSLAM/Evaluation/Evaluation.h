@@ -6,6 +6,7 @@
 #include "../Input.h"
 #include "Velodyne.h"
 #include "ILidarEvalCallback.h"
+#include "Tracklets.h"
 
 namespace dynslam {
 class DynSlam;
@@ -156,8 +157,16 @@ class Evaluation {
                                              input->GetConfig().velodyne_folder.c_str()),
                                 input->GetConfig().velodyne_fname_format,
                                 velodyne_to_rgb)),
-        csv_dump_(new std::ofstream(GetCsvName(dataset_root, input, voxel_size_meters)))
-  {}
+        csv_dump_(new std::ofstream(GetCsvName(dataset_root, input, voxel_size_meters))),
+        eval_tracklets_(! input->GetConfig().tracklet_folder.empty())
+  {
+    if (this->eval_tracklets_) {
+      cout << "Found tracklet GT data. Enabling track evaluation!" << endl;
+      std::string tracklet_fpath = utils::Format("%s/%s", dataset_root.c_str(),
+                                                 input->GetConfig().tracklet_folder.c_str());
+      frame_to_tracklets_ = ReadGroupedTracklets(tracklet_fpath);
+    }
+  }
 
   Evaluation(const Evaluation&) = delete;
   Evaluation(const Evaluation&&) = delete;
@@ -225,6 +234,9 @@ class Evaluation {
 
   // Used in CSV data dumping.
   bool wrote_header_ = false;
+
+  const bool eval_tracklets_;
+  std::map<int, std::vector<TrackletFrame, Eigen::aligned_allocator<TrackletFrame>>> frame_to_tracklets_;
 };
 
 }

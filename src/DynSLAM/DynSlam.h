@@ -11,6 +11,9 @@
 #include "InstRecLib/SparseSFProvider.h"
 #include "Input.h"
 
+DECLARE_bool(dynamic_weights);
+DECLARE_bool(dynamic);
+
 namespace dynslam {
 namespace eval {
 class Evaluation;
