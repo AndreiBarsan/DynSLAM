@@ -54,6 +54,7 @@ class Input {
   };
 
   /// We don't define the configs as constants here in order to make the code easier to read.
+  /// Details and downloads: http://www.cvlibs.net/datasets/kitti/eval_odometry.php
   static Config KittiOdometryConfig() {
     Config config;
     config.dataset_name           = "kitti-odometry";
@@ -80,6 +81,38 @@ class Input {
 
     return config;
   };
+
+  /// The structure of the tracking dataset is a bit different, and there's no one folder per, so we
+  /// must explicitly specify the sequence number (ID).
+  /// Details and downloads: http://www.cvlibs.net/datasets/kitti/eval_tracking.php
+  static Config KittiTrackingConfig(int sequence_id) {
+    Config config;
+    config.dataset_name           = "kitti-tracking";
+
+    // WARNING: no gray data available for the tracking benchmark sequences.
+    // TODO(andrei): Ensure the VO code is robust to this, and converts to intensity if need be.
+    config.left_gray_folder       = utils::Format("training/image_02/%04d/", sequence_id);
+    config.right_gray_folder       = utils::Format("training/image_03/%04d/", sequence_id);
+    config.left_color_folder       = utils::Format("training/image_02/%04d/", sequence_id);
+    config.right_color_folder       = utils::Format("training/image_03/%04d/", sequence_id);
+    config.fname_format = "%06d.png";
+    config.calibration_fname = utils::Format("training/calib/%04d.txt", sequence_id);
+
+    config.min_depth_m = 0.5f;
+    config.max_depth_m = 20.0f;
+    config.depth_folder = utils::Format("training/precomputed-depth/%04d/Frames", sequence_id);
+    config.depth_fname_format = "%04d.xml";
+    config.read_depth = true;
+    config.segmentation_folder = "seg_image_2/mnc";
+
+    config.odometry_oxts  = false;
+    config.odometry_fname = "";
+
+    config.velodyne_folder = utils::Format("training/velodyne/%04d/", sequence_id);
+    config.velodyne_fname_format = "%06d.bin";
+
+    return config;
+  }
 
   // TODO(andrei): Use this for lowres experiments.
   static Config KittiOdometryLowresConfig(float factor) {

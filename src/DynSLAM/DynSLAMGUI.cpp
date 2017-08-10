@@ -12,7 +12,6 @@
 #include <pangolin/pangolin.h>
 
 #include "DynSlam.h"
-#include "Utils.h"
 
 #include "../pfmLib/ImageIOpfm.h"
 #include "PrecomputedDepthProvider.h"
