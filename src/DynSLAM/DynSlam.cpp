@@ -6,6 +6,9 @@
 #include "DynSlam.h"
 #include "Evaluation/Evaluation.h"
 
+DEFINE_bool(dynamic_weights, false, "Whether to use depth-based weighting when performing fusion.");
+DEFINE_bool(dynamic, true, "Whether to run in dynamic mode and reconstruct other cars.");
+
 namespace dynslam {
 
 using namespace instreclib::reconstruction;
@@ -97,8 +100,7 @@ void DynSlam::ProcessFrame(Input *input) {
   static_scene_->UpdateView(*input_rgb_image_, *input_raw_depth_image_);
   utils::Toc();
 
-  // TODO make field
-  bool enable_dynamic_ = true;
+  bool enable_dynamic_ = FLAGS_dynamic;
   // Perform semantic segmentation, dense depth computation, and dense fusion every K frames.
   // TODO(andrei): Support instance tracking in this framework: we would need SSF between t and t-k,
   //               so we DEFINITELY need separate VO to run in, say, 50ms at every frame, and then
