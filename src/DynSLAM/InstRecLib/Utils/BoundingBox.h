@@ -4,14 +4,14 @@
 #define INSTRECLIB_BOUNDINGBOX_H
 
 #include <iostream>
+#include <cmath>
 
 namespace instreclib {
 namespace utils {
 
 /// \brief A rectangular bounding box, with <b>inclusive coordinates</b>.
 struct BoundingBox {
-  // Allow addressing the points both together, as an int array, as well as
-  // individually.
+  // Allow addressing the points both together, as an int array, as well as individually.
   union {
     struct {
       int x0;
@@ -21,6 +21,16 @@ struct BoundingBox {
     } r;
     int points[4];
   };
+
+  /// \brief Form a bounding box from double coordinates by rounding each component independently.
+  static BoundingBox RoundCoords(const double * const coords) {
+    return BoundingBox(
+        static_cast<int>(std::round(coords[0])),
+        static_cast<int>(std::round(coords[1])),
+        static_cast<int>(std::round(coords[2])),
+        static_cast<int>(std::round(coords[3]))
+    );
+  }
 
   int GetWidth() const { return r.x1 - r.x0 + 1; }
 

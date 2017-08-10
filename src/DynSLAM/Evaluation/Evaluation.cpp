@@ -7,16 +7,16 @@ namespace eval {
 
 void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
 
-  // TODO(andrei): Raycast of static-only raycast vs. no-dynamic-mapping vs. lidar vs. depth map.
-  // TODO(andrei): Raycast of static+dynamic raycast vs. no-dynamic-mapping vs. lidar vs. depth map
-  // No-dynamic-mapping == our system but with no semantics, object tracking, etc., so just ITM on
-  // stereo.
+  // TODO(andrei): Fused depth maps!
 
   if (dyn_slam->GetCurrentFrameNo() > 0) {
     cout << "Starting evaluation of current frame..." << endl;
-    // TODO wrap this vector into its own class (also CSV-serializable)
-    DepthFrameEvaluation evals = EvaluateFrame(input->GetCurrentFrame() - 1, input, dyn_slam);
 
+    if (this->eval_tracklets_) {
+      EvaluateTracking(input, dyn_slam);
+    }
+
+    DepthFrameEvaluation evals = EvaluateFrame(input->GetCurrentFrame() - 1, input, dyn_slam);
     if (! wrote_header_) {
       *csv_dump_ << evals.GetHeader() << endl;
       wrote_header_ = true;
@@ -269,6 +269,135 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
   return DepthEvaluation(delta_max,
                          std::move(rendered_result),
                          std::move(input_result));
+}
+
+
+
+// Track = ours, tracklet = ground truth
+int GetBestOverlapping(
+    const vector<TrackletFrame, Eigen::aligned_allocator<TrackletFrame>> candidates,
+    const TrackFrame &frame
+) {
+  using namespace instreclib::utils;
+
+  // TODO(andrei): render the pose est. error(s) on the segmentation preview, if available, like
+  // next to the [D] labels, for instance.
+  int best_overlap = -1;
+  int best_idx = -1;
+
+  // Convention: (0, 0) is top-left.
+  auto our_box = frame.instance_view.GetInstanceDetection().conservative_mask->GetBoundingBox();
+
+  // Minimum overlap that we care about is 30x30 pixels.
+  const int kMinOverlap = 30 * 30;
+  for(int i = 0; i < candidates.size(); ++i){
+    BoundingBox theirs = BoundingBox::RoundCoords(candidates[i].bbox_2d);
+    int overlap = theirs.IntersectWith(our_box).GetArea();
+
+//    cout << "Candidate overlap: " << overlap << "." << endl;
+    if(overlap > best_overlap && overlap > kMinOverlap) {
+      best_overlap = overlap;
+      best_idx = i;
+    }
+  }
+
+  return best_idx;
+}
+
+// Computes the relative pose between the two tracklet frames
+Eigen::Matrix4d GetRelativeGTPose(const TrackletFrame &first, const TrackletFrame &second) {
+  assert(first.track_id == second.track_id && "Must compute relative pose between frames from the "
+      "same ground truth track.");
+
+  double angle_delta = second.rotation_y - first.rotation_y;
+
+  Eigen::Matrix3d rot;
+  rot << cos(angle_delta),  0, sin(angle_delta),
+                        0,  1,                0,
+         -sin(angle_delta), 0, cos(angle_delta);
+
+  // Note: the location is always the middle of the bbox, so this should be accurate even if the
+  // bbox dimensions vary.
+  Eigen::Vector3d trans = second.location_cam_m - first.location_cam_m;
+
+  Eigen::Matrix4d transform;
+  transform.block(0, 0, 3, 3) = rot;
+  transform.block(0, 3, 3, 1) = trans;
+  transform(3, 3) = 1.0;
+
+  return transform;
+}
+
+void Evaluation::EvaluateTracking(Input *input, DynSlam *dyn_slam) {
+  int cur_input_frame = input->GetCurrentFrame();
+  int cur_time = dyn_slam->GetCurrentFrameNo();
+
+  // Need both since otherwise we couldn't compute GT.
+  if(frame_to_tracklets_.cend() == frame_to_tracklets_.find(cur_input_frame) &&
+     frame_to_tracklets_.cend() == frame_to_tracklets_.find(cur_input_frame - 1)
+   ) {
+    cout << "No GT tracklets for frame [" << cur_input_frame << "] and its predecessor." << endl;
+    return;
+  }
+
+  // Note: the KITTI benchmark, despite proving 3D GT, only evaluates 2D bounding box performance,
+  // so there seems to be no de facto standard for evaluating 3D pose estimation performances.
+  // "We evaluate 2D 0-based bounding boxes in each image."
+  cout << "[Tracklets] Frame [" << cur_input_frame << "] from the input sequence has some data!" << endl;
+  auto current_gt = frame_to_tracklets_[cur_input_frame];
+  auto prev_gt = frame_to_tracklets_[cur_input_frame - 1];
+
+  InstanceTracker &instance_tracker = dyn_slam->GetInstanceReconstructor()->GetInstanceTracker();
+  for (auto &pair : instance_tracker.GetActiveTracks()) {
+    const Track &track = pair.second;
+    if (track.GetState() == TrackState::kDynamic && track.GetLastFrame().frame_idx == cur_time-1) {
+      const TrackFrame &latest_frame = track.GetLastFrame();
+
+      // This is not at all ideal, but should work for a coarse evaluation.
+      int best_overlap_id = GetBestOverlapping(current_gt, latest_frame);
+
+      if (best_overlap_id > 0) {
+        int current_gt_tid = current_gt[best_overlap_id].track_id;
+        cout << "[Tracklets] Found a good GT for track " << track.GetId() << " (GT track ID "
+             << current_gt_tid << ")." << endl;
+
+        // Find in previous frame and compute the relative pose for comparing.
+        for(auto &dude : prev_gt) {
+          if (dude.track_id == current_gt_tid) {
+            Eigen::Matrix4d rel = GetRelativeGTPose(dude, current_gt[best_overlap_id]);
+            cout << "current z-angle (deg): " << current_gt[best_overlap_id].rotation_y * 180/M_PI << endl;
+            cout << "Relative transform computed:" << endl << rel << endl << endl;
+
+            Eigen::Matrix4d ego = dyn_slam->GetLastEgomotion().cast<double>();
+//            Eigen::Matrix4d result = ego * rel;
+
+//            cout << "Ego-compensated: " << endl << result << endl << endl;
+            cout << "Egomotion is:" << endl << ego << endl << endl;
+
+            const Eigen::Matrix4d &computed_rel_pose = latest_frame.relative_pose->Get().matrix_form;
+            cout << "And the computed internal relative pose: " << endl << computed_rel_pose
+                 << endl << endl;
+
+            Eigen::Matrix4f delta = (computed_rel_pose.inverse() * rel).cast<float>();
+            cout << "Delta: " << endl << delta << endl << endl;
+            float te = utils::TranslationError(delta);
+            float re = utils::RotationError(delta);
+
+            cout << "Translation error: " << te << "| Rotation error: " << re << endl;
+          }
+        }
+      }
+      else {
+        cout << "[Tracklets] No GT match for track #" << track.GetId() << "." << endl;
+      }
+    }
+  }
+
+  // for every active track labeled as dynamic:
+  //    use 2D bbox matching to find corresponding GT track
+  //    compute most recent GT motion in the camera frame (default)
+  //    compute most recent track motion in the camera frame (independent motion with egomotion removed)
+  //    compute rotational and translational errors
 }
 
 }
