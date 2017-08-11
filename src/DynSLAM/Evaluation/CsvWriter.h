@@ -1,6 +1,7 @@
 #ifndef DYNSLAM_CSVWRITER_H
 #define DYNSLAM_CSVWRITER_H
 
+#include <fstream>
 #include <string>
 
 namespace dynslam {
@@ -30,14 +31,7 @@ class CsvWriter {
   CsvWriter& operator=(const CsvWriter &) = delete;
   CsvWriter& operator=(CsvWriter &&) = delete;
 
-  void Write(const ICsvSerializable &data) {
-    if (! wrote_header_) {
-      *output_ << data.GetHeader() << endl;
-      wrote_header_ = true;
-    }
-
-    *output_ << data.GetData() << endl;
-  }
+  void Write(const ICsvSerializable &data);
 
   virtual ~CsvWriter() {
     delete output_;
@@ -45,7 +39,7 @@ class CsvWriter {
 
  private:
   bool wrote_header_;
-  ostream *output_;
+  std::ostream *output_;
 };
 
 }

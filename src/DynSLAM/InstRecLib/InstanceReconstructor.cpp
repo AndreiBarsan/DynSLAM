@@ -514,11 +514,12 @@ bool ExperimentalDirectRefine(Track &track,
 
   // TODO(andrei): If refinement fails because, e.g., the top of the pyramid is already too tiny,
   // then simply drop the process, and only use the RANSAC estimate, or disable fusion completely.
-  float huber_delta = 5.0f;
+  // smaller -> penalize outlier harder
+  float huber_delta = 1.0f;
   int nMaxIterations = 50;
   float epsilon = 1e-7;
   float robust_loss_param = huber_delta;
-  float min_gradient_magnitude = 5.0f;
+  float min_gradient_magnitude = 2.0f;
 
   DirImgAlignCPU dir_img_align(nMaxPyramidLevels, nMaxIterations, epsilon,
                                ROBUST_LOSS_TYPE::PSEUDO_HUBER, robust_loss_param,
@@ -574,13 +575,11 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
     cout << "Fusing frame " << frame_idx << "/ #" << track.GetId() << "." << endl << rel_dyn_pose_f << endl;
     instance_driver.SetPose(rel_dyn_pose_f.inverse());
 
-    bool enable_direct_refinement = false;
-
-    if (enable_direct_refinement && enable_itm_refinement_) {
+    if (enable_direct_refinement_ && enable_itm_refinement_) {
       throw std::runtime_error("Cannot use both direct image alignment AND the ITM-specific tracker(s)!");
     }
 
-    if (enable_direct_refinement && frame_idx > 0 && frame.relative_pose->IsPresent()) {
+    if (enable_direct_refinement_ && frame_idx > 0 && frame.relative_pose->IsPresent()) {
       vector<double> unrefined_se3 = frame.relative_pose->Get().se3_form;
 
       // Ensure we have a previous frame to align to, and do the direct alignment.

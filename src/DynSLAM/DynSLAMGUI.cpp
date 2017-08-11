@@ -28,7 +28,6 @@ const std::string kKitti         = "kitti";
 // pangolin's tools. Note the ORB_SLAM2 example, where they use it to draw outlined text in a ghetto
 // but effective way.
 
-// Commandline arguments using gflags.
 DEFINE_string(dataset_type,
               kKittiOdometry,
               "The type of the input dataset at which 'dataset_root'is pointing. Supported are "
@@ -43,6 +42,9 @@ DEFINE_int32(max_decay_weight, 1, "The maximum voxel weight for decay. Voxels wh
                                   "accumulated more than this many measurements will not be "
                                   "removed.");
 DEFINE_int32(kitti_tracking_sequence_id, -1, "Used in conjunction with --dataset_type kitti-tracking.");
+DEFINE_bool(direct_refinement, true, "Whether to refine motion estimates for other cars computed "
+                                     "sparsely with RANSAC using a semidense direct image "
+                                     "alignment method.");
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
 // issue.
@@ -545,7 +547,7 @@ public:
     glEnable(GL_DEPTH_TEST);
   }
 
-protected:
+ protected:
   /// \brief Creates the GUI layout and widgets.
   /// \note The layout is biased towards very wide images (~2:1 aspect ratio or more), which is very
   /// common in autonomous driving datasets.
@@ -813,7 +815,16 @@ protected:
          << endl;
   }
 
-private:
+  static void DrawOutlinedText(cv::Mat &target, const string &text, int x, int y, float scale = 1.5f) {
+   int thickness = static_cast<int>(round(1.1 * scale));
+   int outline_factor = 3;
+   cv::putText(target, text, cv::Point_<int>(x, y),
+               cv::FONT_HERSHEY_DUPLEX, scale, cv::Scalar(0, 0, 0), outline_factor * thickness, CV_AA);
+   cv::putText(target, text, cv::Point_<int>(x, y),
+               cv::FONT_HERSHEY_DUPLEX, scale, cv::Scalar(230, 230, 230), thickness, CV_AA);
+ }
+
+ private:
   DynSlam *dyn_slam_;
   Input *dyn_slam_input_;
 
@@ -987,7 +998,8 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
       throw runtime_error("Please specify a KITTI tracking sequence ID.");
     }
 
-    input_config = Input::KittiTrackingConfig(t_seq_id);
+//    input_config = Input::KittiTrackingConfig(t_seq_id);
+    input_config = Input::KittiTrackingDispnetConfig(t_seq_id);
   }
   else {
     throw runtime_error(utils::Format("Unknown dataset type: [%s]", FLAGS_dataset_type.c_str()));
@@ -1088,7 +1100,8 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
 
   auto evaluation = new dynslam::eval::Evaluation(dataset_root, *input_out,
                                                   velo_to_left_gray_cam,
-                                                  driver_settings->sceneParams.voxelSize);
+                                                  driver_settings->sceneParams.voxelSize,
+                                                  FLAGS_direct_refinement);
 
   Vector2i input_shape((*input_out)->GetRgbSize().width, (*input_out)->GetRgbSize().height);
   *dyn_slam_out = new gui::DynSlam(
@@ -1100,8 +1113,8 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
       input_config.max_depth_m,
       left_color_proj.cast<float>(),
       right_color_proj.cast<float>(),
-      baseline_m
-  );
+      baseline_m,
+      FLAGS_direct_refinement);
 }
 
 } // namespace dynslam

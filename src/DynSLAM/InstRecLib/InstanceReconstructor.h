@@ -43,11 +43,12 @@ class InstanceReconstructor {
         class_name) != kPossiblyDynamicClassesVoc2012.cend());
   }
 
-  explicit InstanceReconstructor(InfiniTamDriver *driver, bool use_decay = true)
+  explicit InstanceReconstructor(InfiniTamDriver *driver, bool use_decay, bool enable_direct_refinement)
       : instance_tracker_(new InstanceTracker()),
         frame_idx_(0),
         driver_(driver),
-        use_decay_(use_decay) {}
+        use_decay_(use_decay),
+        enable_direct_refinement_(enable_direct_refinement) {}
 
   /// \brief Uses the segmentation result to remove dynamic objects from the main view and save
   ///        them to separate buffers, which are then used for individual object reconstruction.
@@ -97,6 +98,10 @@ class InstanceReconstructor {
 
   void SaveObjectToMesh(int object_id, const string &fpath);
 
+  bool IsDirectRefinementEnabled() const {
+    return enable_direct_refinement_;
+  }
+
  private:
   std::shared_ptr<InstanceTracker> instance_tracker_;
 
@@ -118,6 +123,9 @@ class InstanceReconstructor {
   /// \brief Experimental relative pose refinement using ITM's built-in trackers.
   /// Doesn't really work as of July 23, 2017.
   bool enable_itm_refinement_ = false;
+
+  /// \brief Alternative approach based on semidense direct image alignment.
+  bool enable_direct_refinement_;
 
   /// \brief Updates the reconstruction associated with the object tracks, where applicable.
   void ProcessReconstructions(bool always_separate);

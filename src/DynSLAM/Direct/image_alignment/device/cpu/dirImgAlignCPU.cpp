@@ -244,7 +244,6 @@ float DirImgAlignCPU::gaussNewtonUpdateStep(const T_FramePtr &refFrame,
     // project it to current image
     Eigen::Vector2f pixel_cur;
     if (!pCurCamera->project(P3D_curF, pixel_cur)) {
-      // XXX: see if this is an actual problem
 //      cout << "pCurCamera->project failed to project point." << endl;
 //      cout << "Ray: " << ray << " | Ref. frame 3D point: " << P3D_refF << " | Curr. frame 3D point: " << P3D_curF << endl;
 //      cout << "Ray depth was: " << pixelDepth.rayDepth << endl;

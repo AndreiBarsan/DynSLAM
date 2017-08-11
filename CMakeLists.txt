@@ -118,27 +118,29 @@ set(DYNSLAM_SOURCES
     src/DynSLAM/Direct/image_alignment/device/cpu/dirImgAlignCPU.cpp
     # End experimental parts
 
-    src/DynSLAM/Evaluation/Tracklets.cpp
-    src/DynSLAM/Evaluation/Tracklets.h
+    src/DynSLAM/DepthProvider.h
     src/DynSLAM/DSHandler3D.cpp
     src/DynSLAM/DynSlam.cpp
-    src/DynSLAM/Evaluation/Evaluation.cpp
-    src/DynSLAM/Evaluation/Velodyne.cpp
-    src/DynSLAM/Evaluation/ILidarEvalCallback.h
-    src/DynSLAM/Evaluation/ErrorVisualizationCallback.h
+    src/DynSLAM/Evaluation/CsvWriter.cpp
+    src/DynSLAM/Evaluation/CsvWriter.h
     src/DynSLAM/Evaluation/ErrorVisualizationCallback.cpp
+    src/DynSLAM/Evaluation/ErrorVisualizationCallback.h
+    src/DynSLAM/Evaluation/Evaluation.cpp
+    src/DynSLAM/Evaluation/ILidarEvalCallback.h
+    src/DynSLAM/Evaluation/Tracklets.cpp
+    src/DynSLAM/Evaluation/Tracklets.h
+    src/DynSLAM/Evaluation/Velodyne.cpp
     src/DynSLAM/InfiniTamDriver.cpp
     src/DynSLAM/Input.cpp
-    src/DynSLAM/DepthProvider.h
-    src/DynSLAM/PrecomputedDepthProvider.h
     src/DynSLAM/PrecomputedDepthProvider.cpp
+    src/DynSLAM/PrecomputedDepthProvider.h
     src/DynSLAM/Utils.cpp)
 
 set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
     src/DynSLAM/DynSLAMGUI.cpp)
 
-add_library(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} src/DynSLAM/Evaluation/CsvWriter.cpp src/DynSLAM/Evaluation/CsvWriter.h)
+add_library(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
 # TODO(andrei): Rename this to ITMEngine or something for clarity.
 target_link_libraries(DynSLAM Engine)
 # TODO(andrei): Ditto. These are the InfiniTAM utilities!
