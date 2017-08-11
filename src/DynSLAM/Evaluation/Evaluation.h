@@ -4,9 +4,11 @@
 
 #include "../DynSlam.h"
 #include "../Input.h"
-#include "Velodyne.h"
+
+#include "CsvWriter.h"
 #include "ILidarEvalCallback.h"
 #include "Tracklets.h"
+#include "Velodyne.h"
 
 namespace dynslam {
 class DynSlam;
@@ -14,16 +16,6 @@ class DynSlam;
 
 namespace dynslam {
 namespace eval {
-
-/// \brief Interface for poor man's serialization.
-class ICsvSerializable {
- public:
-  virtual ~ICsvSerializable() = default;
-
-  /// \brief Should return the field names in the same order as GetData, without a newline.
-  virtual std::string GetHeader() const = 0;
-  virtual std::string GetData() const = 0;
-};
 
 struct DepthResult : public ICsvSerializable {
   const long measurement_count;
@@ -133,18 +125,51 @@ struct DepthFrameEvaluation : public ICsvSerializable {
   }
 };
 
+/// \brief The evaluation of a single pose at a single time.
+struct TrackletEvaluation : public ICsvSerializable {
+  int frame_id;
+  int track_id;
+  double trans_error;
+  double rot_error;
+
+  string GetHeader() const override {
+    return "frame_id,track_id,trans_error,rot_error";
+  }
+
+  string GetData() const override {
+    return utils::Format("%d,%d,%lf,%lf", frame_id, track_id, trans_error, rot_error);
+  }
+};
+
 /// \brief Main class handling the quantitative evaluation of the DynSLAM system.
 class Evaluation {
  public:
-  static std::string GetCsvName(const std::string &dataset_root,
-                                const Input *input,
-                                float voxel_size_meters) {
-    return utils::Format("%s-offset-%d-depth-%s-voxelsize-%.4f-max-depth-m-%.2f-results.csv",
+
+  static std::string GetBaseCsvName(
+      const std::string &dataset_root,
+      const Input *input,
+      float voxel_size_meters
+  ) {
+    return utils::Format("%s-offset-%d-depth-%s-voxelsize-%.4f-max-depth-m-%.2f",
                          input->GetDatasetIdentifier().c_str(),
                          input->GetCurrentFrame(),
                          input->GetDepthProvider()->GetName().c_str(),
                          voxel_size_meters,
                          input->GetDepthProvider()->GetMaxDepthMeters());
+  }
+
+  static std::string GetDepthCsvName(const std::string &dataset_root,
+                                     const Input *input,
+                                     float voxel_size_meters) {
+    return utils::Format("%s-depth-result.csv",
+                         GetBaseCsvName(dataset_root, input, voxel_size_meters).c_str());
+  }
+
+  static std::string GetTrackingCsvName(const std::string &dataset_root,
+                                     const Input *input,
+                                     float voxel_size_meters) {
+    return utils::Format("%s-3d-tracking-result.csv",
+                         GetBaseCsvName(dataset_root, input, voxel_size_meters).c_str());
   }
 
  public:
@@ -157,7 +182,9 @@ class Evaluation {
                                              input->GetConfig().velodyne_folder.c_str()),
                                 input->GetConfig().velodyne_fname_format,
                                 velodyne_to_rgb)),
-        csv_dump_(new std::ofstream(GetCsvName(dataset_root, input, voxel_size_meters))),
+      // TODO XXX proper name with dense-or-not
+        csv_depth_dump_(GetDepthCsvName(dataset_root, input, voxel_size_meters)),
+        csv_tracking_dump_(GetTrackingCsvName(dataset_root, input, voxel_size_meters)),
         eval_tracklets_(! input->GetConfig().tracklet_folder.empty())
   {
     if (this->eval_tracklets_) {
@@ -174,7 +201,6 @@ class Evaluation {
   Evaluation& operator=(const Evaluation&&) = delete;
 
   virtual ~Evaluation() {
-    delete csv_dump_;
     delete velodyne_;
   }
 
@@ -234,10 +260,8 @@ class Evaluation {
 
  private:
   Velodyne *velodyne_;
-  ostream *csv_dump_;
-
-  // Used in CSV data dumping.
-  bool wrote_header_ = false;
+  CsvWriter csv_depth_dump_;
+  CsvWriter csv_tracking_dump_;
 
   const bool eval_tracklets_;
   std::map<int, std::vector<TrackletFrame, Eigen::aligned_allocator<TrackletFrame>>> frame_to_tracklets_;

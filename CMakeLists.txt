@@ -138,7 +138,7 @@ set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}
     src/DynSLAM/DynSLAMGUI.cpp)
 
-add_library(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS})
+add_library(DynSLAM ${DYNSLAM_SOURCES} ${EXTRA_EXECUTABLE_FLAGS} src/DynSLAM/Evaluation/CsvWriter.cpp src/DynSLAM/Evaluation/CsvWriter.h)
 # TODO(andrei): Rename this to ITMEngine or something for clarity.
 target_link_libraries(DynSLAM Engine)
 # TODO(andrei): Ditto. These are the InfiniTAM utilities!
