@@ -17,13 +17,7 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
     }
 
     DepthFrameEvaluation evals = EvaluateFrame(input->GetCurrentFrame() - 1, input, dyn_slam);
-    if (! wrote_header_) {
-      *csv_dump_ << evals.GetHeader() << endl;
-      wrote_header_ = true;
-    }
-
-    // Append each measurement from this frame into the CSV file
-    *csv_dump_ << evals.GetData() << endl;
+    csv_depth_dump_.Write(evals);
 
     // ...and print some quick info in real time as well.
     cout << "Evaluation complete:" << endl;
@@ -223,25 +217,6 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
       }
     }
 
-
-    /*
-    if (fabs(rendered_depth_m) < 1e-5) {
-      missing_rendered++;
-    } else if (rendered_delta > delta_max) {
-      errors_rendered++;
-    } else {
-      correct_rendered++;
-    }
-
-    if (input_depth_val == 0) {
-      missing_input++;
-    } else if (input_delta > delta_max) {
-      errors_input++;
-    } else {
-      correct_input++;
-    }
-     */
-
     measurements++;
 
     if (nullptr != callback) {
@@ -294,8 +269,9 @@ int GetBestOverlapping(
     BoundingBox theirs = BoundingBox::RoundCoords(candidates[i].bbox_2d);
     int overlap = theirs.IntersectWith(our_box).GetArea();
 
-//    cout << "Candidate overlap: " << overlap << "." << endl;
+    cout << "Candidate [" << candidates[i].track_id << "] overlap: " << overlap << "." << endl;
     if(overlap > best_overlap && overlap > kMinOverlap) {
+      cout << "Best overlap updated." << endl;
       best_overlap = overlap;
       best_idx = i;
     }
@@ -356,7 +332,7 @@ void Evaluation::EvaluateTracking(Input *input, DynSlam *dyn_slam) {
       // This is not at all ideal, but should work for a coarse evaluation.
       int best_overlap_id = GetBestOverlapping(current_gt, latest_frame);
 
-      if (best_overlap_id > 0) {
+      if (best_overlap_id >= 0) {
         int current_gt_tid = current_gt[best_overlap_id].track_id;
         cout << "[Tracklets] Found a good GT for track " << track.GetId() << " (GT track ID "
              << current_gt_tid << ")." << endl;
@@ -367,6 +343,10 @@ void Evaluation::EvaluateTracking(Input *input, DynSlam *dyn_slam) {
             Eigen::Matrix4d rel = GetRelativeGTPose(dude, current_gt[best_overlap_id]);
             cout << "current z-angle (deg): " << current_gt[best_overlap_id].rotation_y * 180/M_PI << endl;
             cout << "Relative transform computed:" << endl << rel << endl << endl;
+
+            // TODO(andrei): Think about this in detail: when you're doing the reconstruction, the
+            // egomotion compensation you're doing basically brings them into the car's coordinate
+            // frame, right?
 
             Eigen::Matrix4d ego = dyn_slam->GetLastEgomotion().cast<double>();
 //            Eigen::Matrix4d result = ego * rel;
