@@ -154,7 +154,7 @@ class Track {
   ///        this track's frames is good enough for a 3D reconstruction.
   bool EligibleForReconstruction() const {
     // For now, use this simple heuristic: at least k frames in track.
-    return GetSize() >= 6;
+    return GetSize() >= 3;
   }
 
   /// \brief Returns the relative pose of the specified frame w.r.t. the first one.

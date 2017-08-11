@@ -299,6 +299,9 @@ ITMFloatImage *InstanceReconstructor::GetInstancePreviewDepth(size_t track_idx) 
 void InstanceReconstructor::ProcessReconstructions(bool always_separate) {
   for (const auto &pair : instance_tracker_->GetActiveTracks()) {
     Track& track = instance_tracker_->GetTrack(pair.first);
+    if (! ShouldReconstruct(track.GetClassName())) {
+      continue;
+    }
 
     // If we don't have any new information in this track, there's nothing to fuse.
     if(track.GetLastFrame().frame_idx != frame_idx_) {
