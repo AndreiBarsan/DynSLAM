@@ -132,6 +132,12 @@ struct TrackletEvaluation : public ICsvSerializable {
   double trans_error;
   double rot_error;
 
+  TrackletEvaluation(int frame_id, int track_id, double trans_error, double rot_error)
+      : frame_id(frame_id),
+        track_id(track_id),
+        trans_error(trans_error),
+        rot_error(rot_error) {}
+
   string GetHeader() const override {
     return "frame_id,track_id,trans_error,rot_error";
   }
@@ -148,43 +154,51 @@ class Evaluation {
   static std::string GetBaseCsvName(
       const std::string &dataset_root,
       const Input *input,
-      float voxel_size_meters
+      float voxel_size_meters,
+      bool direct_refinement
   ) {
-    return utils::Format("%s-offset-%d-depth-%s-voxelsize-%.4f-max-depth-m-%.2f",
+    return utils::Format("%s-offset-%d-depth-%s-voxelsize-%.4f-max-depth-m-%.2f-%s",
                          input->GetDatasetIdentifier().c_str(),
                          input->GetCurrentFrame(),
                          input->GetDepthProvider()->GetName().c_str(),
                          voxel_size_meters,
-                         input->GetDepthProvider()->GetMaxDepthMeters());
+                         input->GetDepthProvider()->GetMaxDepthMeters(),
+                         direct_refinement ?
+                            "with-direct-ref" : "NO-direct-ref");
   }
 
   static std::string GetDepthCsvName(const std::string &dataset_root,
                                      const Input *input,
-                                     float voxel_size_meters) {
+                                     float voxel_size_meters,
+                                     bool direct_refinement
+  ) {
     return utils::Format("%s-depth-result.csv",
-                         GetBaseCsvName(dataset_root, input, voxel_size_meters).c_str());
+                         GetBaseCsvName(dataset_root, input, voxel_size_meters, direct_refinement).c_str());
   }
 
   static std::string GetTrackingCsvName(const std::string &dataset_root,
-                                     const Input *input,
-                                     float voxel_size_meters) {
+                                        const Input *input,
+                                        float voxel_size_meters,
+                                        bool direct_refinement
+  ) {
     return utils::Format("%s-3d-tracking-result.csv",
-                         GetBaseCsvName(dataset_root, input, voxel_size_meters).c_str());
+                         GetBaseCsvName(dataset_root, input, voxel_size_meters, direct_refinement).c_str());
   }
 
  public:
   Evaluation(const std::string &dataset_root,
              const Input *input,
              const Eigen::Matrix4d &velodyne_to_rgb,
-             float voxel_size_meters)
+             float voxel_size_meters,
+             bool direct_refinement)
       : velodyne_(new Velodyne(utils::Format("%s/%s",
                                              dataset_root.c_str(),
                                              input->GetConfig().velodyne_folder.c_str()),
                                 input->GetConfig().velodyne_fname_format,
                                 velodyne_to_rgb)),
       // TODO XXX proper name with dense-or-not
-        csv_depth_dump_(GetDepthCsvName(dataset_root, input, voxel_size_meters)),
-        csv_tracking_dump_(GetTrackingCsvName(dataset_root, input, voxel_size_meters)),
+        csv_depth_dump_(GetDepthCsvName(dataset_root, input, voxel_size_meters, direct_refinement)),
+        csv_tracking_dump_(GetTrackingCsvName(dataset_root, input, voxel_size_meters, direct_refinement)),
         eval_tracklets_(! input->GetConfig().tracklet_folder.empty())
   {
     if (this->eval_tracklets_) {
@@ -246,7 +260,7 @@ class Evaluation {
 
   /// \brief Simplistic evaluation of tracking performance, mostly meant to asses whether using the
   ///        direct refinement steps leads to any improvement.
-  void EvaluateTracking(Input *input, DynSlam *dyn_slam);
+  vector<TrackletEvaluation> EvaluateTracking(Input *input, DynSlam *dyn_slam);
 
   Velodyne *GetVelodyne() {
     return velodyne_;

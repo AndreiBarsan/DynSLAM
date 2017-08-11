@@ -41,10 +41,15 @@ class DynSlam {
           float max_depth_meters,
           const Eigen::Matrix34f& proj_left_rgb,
           const Eigen::Matrix34f& proj_right_rgb,
-          float stereo_baseline_m)
+          float stereo_baseline_m,
+          bool enable_direct_refinement)
     : static_scene_(itm_static_scene_engine),
       segmentation_provider_(segmentation_provider),
-      instance_reconstructor_(new InstanceReconstructor(itm_static_scene_engine)),
+      instance_reconstructor_(new InstanceReconstructor(
+          itm_static_scene_engine,
+          itm_static_scene_engine->IsDecayEnabled(),
+          enable_direct_refinement
+      )),
       sparse_sf_provider_(sparse_sf_provider),
       evaluation_(evaluation),
       // Allocate the ITM buffers on the CPU and on the GPU (true, true).
@@ -135,6 +140,10 @@ class DynSlam {
     }
 
     return out_image_float_->GetData(MemoryDeviceType::MEMORYDEVICE_CPU);
+  }
+
+  const InstanceReconstructor* GetInstanceReconstructor() const {
+    return instance_reconstructor_;
   }
 
   InstanceReconstructor* GetInstanceReconstructor() {

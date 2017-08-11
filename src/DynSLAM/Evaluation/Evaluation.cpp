@@ -6,14 +6,17 @@ namespace dynslam {
 namespace eval {
 
 void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
-
-  // TODO(andrei): Fused depth maps!
+  // TODO(andrei): Fused depth maps!!
 
   if (dyn_slam->GetCurrentFrameNo() > 0) {
     cout << "Starting evaluation of current frame..." << endl;
 
     if (this->eval_tracklets_) {
-      EvaluateTracking(input, dyn_slam);
+      vector<TrackletEvaluation> tracklet_evals = EvaluateTracking(input, dyn_slam);
+
+      for(const TrackletEvaluation &eval : tracklet_evals) {
+        csv_tracking_dump_.Write(eval);
+      }
     }
 
     DepthFrameEvaluation evals = EvaluateFrame(input->GetCurrentFrame() - 1, input, dyn_slam);
@@ -246,8 +249,6 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                          std::move(input_result));
 }
 
-
-
 // Track = ours, tracklet = ground truth
 int GetBestOverlapping(
     const vector<TrackletFrame, Eigen::aligned_allocator<TrackletFrame>> candidates,
@@ -304,7 +305,7 @@ Eigen::Matrix4d GetRelativeGTPose(const TrackletFrame &first, const TrackletFram
   return transform;
 }
 
-void Evaluation::EvaluateTracking(Input *input, DynSlam *dyn_slam) {
+vector<TrackletEvaluation> Evaluation::EvaluateTracking(Input *input, DynSlam *dyn_slam) {
   int cur_input_frame = input->GetCurrentFrame();
   int cur_time = dyn_slam->GetCurrentFrameNo();
 
@@ -313,12 +314,14 @@ void Evaluation::EvaluateTracking(Input *input, DynSlam *dyn_slam) {
      frame_to_tracklets_.cend() == frame_to_tracklets_.find(cur_input_frame - 1)
    ) {
     cout << "No GT tracklets for frame [" << cur_input_frame << "] and its predecessor." << endl;
-    return;
+    return vector<TrackletEvaluation>();
   }
 
-  // Note: the KITTI benchmark, despite proving 3D GT, only evaluates 2D bounding box performance,
-  // so there seems to be no de facto standard for evaluating 3D pose estimation performances.
-  // "We evaluate 2D 0-based bounding boxes in each image."
+  vector<TrackletEvaluation> evaluations;
+
+  // Note: the KITTI benchmark checks tracking accuracy in 2D, and evaluates the angular error of a
+  // detection. No 3D box intersections are performed. The 3D object detection benchmark is
+  // single-frame.
   cout << "[Tracklets] Frame [" << cur_input_frame << "] from the input sequence has some data!" << endl;
   auto current_gt = frame_to_tracklets_[cur_input_frame];
   auto prev_gt = frame_to_tracklets_[cur_input_frame - 1];
@@ -326,7 +329,7 @@ void Evaluation::EvaluateTracking(Input *input, DynSlam *dyn_slam) {
   InstanceTracker &instance_tracker = dyn_slam->GetInstanceReconstructor()->GetInstanceTracker();
   for (auto &pair : instance_tracker.GetActiveTracks()) {
     const Track &track = pair.second;
-    if (track.GetState() == TrackState::kDynamic && track.GetLastFrame().frame_idx == cur_time-1) {
+    if (track.GetState() == TrackState::kDynamic && track.GetLastFrame().frame_idx == cur_time - 1) {
       const TrackFrame &latest_frame = track.GetLastFrame();
 
       // This is not at all ideal, but should work for a coarse evaluation.
@@ -360,10 +363,13 @@ void Evaluation::EvaluateTracking(Input *input, DynSlam *dyn_slam) {
 
             Eigen::Matrix4f delta = (computed_rel_pose.inverse() * rel).cast<float>();
             cout << "Delta: " << endl << delta << endl << endl;
-            float te = utils::TranslationError(delta);
-            float re = utils::RotationError(delta);
+            float trans_error = utils::TranslationError(delta);
+            float rot_error = utils::RotationError(delta);
 
-            cout << "Translation error: " << te << "| Rotation error: " << re << endl;
+            cout << "Translation error: " << trans_error << "| Rotation error: " << rot_error << endl;
+
+            evaluations.push_back(
+                TrackletEvaluation(cur_input_frame, current_gt_tid, trans_error, rot_error));
           }
         }
       }
@@ -373,11 +379,7 @@ void Evaluation::EvaluateTracking(Input *input, DynSlam *dyn_slam) {
     }
   }
 
-  // for every active track labeled as dynamic:
-  //    use 2D bbox matching to find corresponding GT track
-  //    compute most recent GT motion in the camera frame (default)
-  //    compute most recent track motion in the camera frame (independent motion with egomotion removed)
-  //    compute rotational and translational errors
+  return evaluations;
 }
 
 }
