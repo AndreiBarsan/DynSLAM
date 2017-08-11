@@ -235,6 +235,10 @@ public:
     return voxel_decay_params_;
   }
 
+  bool IsDecayEnabled() {
+    return voxel_decay_params_.enabled;
+  }
+
   const VoxelDecayParams& GetVoxelDecayParams() const {
     return voxel_decay_params_;
   }

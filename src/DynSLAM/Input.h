@@ -118,6 +118,14 @@ class Input {
     return config;
   }
 
+  static Config KittiTrackingDispnetConfig(int sequence_id) {
+    Config config                 = KittiTrackingConfig(sequence_id);
+    config.depth_folder           = utils::Format("training/precomputed-depth-dispnet/%04d", sequence_id);
+    config.depth_fname_format     = "%06d.pfm";
+    config.read_depth             = false;
+    return config;
+  }
+
   // TODO(andrei): Use this for lowres experiments.
   static Config KittiOdometryLowresConfig(float factor) {
     Config config = KittiOdometryConfig();
