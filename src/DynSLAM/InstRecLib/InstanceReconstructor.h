@@ -1,5 +1,3 @@
-
-
 #ifndef INSTRECLIB_INSTANCERECONSTRUCTOR_H
 #define INSTRECLIB_INSTANCERECONSTRUCTOR_H
 
@@ -48,7 +46,9 @@ class InstanceReconstructor {
         frame_idx_(0),
         driver_(driver),
         use_decay_(use_decay),
-        enable_direct_refinement_(enable_direct_refinement) {}
+        enable_direct_refinement_(enable_direct_refinement),
+        instance_depth_buffer_(driver->GetImageSize(), true, true)
+  {}
 
   /// \brief Uses the segmentation result to remove dynamic objects from the main view and save
   ///        them to separate buffers, which are then used for individual object reconstruction.
@@ -102,6 +102,21 @@ class InstanceReconstructor {
     return enable_direct_refinement_;
   }
 
+  /// \brief Renders all available object depthmaps onto the given depthmap, obeying depth ordering.
+  /// TODO(andrei): Improve performance.
+  void CompositeInstanceDepthMaps(ITMFloatImage *out, const pangolin::OpenGlMatrix &model_view) {
+    for(auto &entry : instance_tracker_->GetActiveTracks()) {
+      Track &t = instance_tracker_->GetTrack(entry.first);
+      if(t.HasReconstruction()) {
+        t.GetReconstruction()->GetFloatImage(&instance_depth_buffer_,
+                                             dynslam::PreviewType::kDepth,
+                                             model_view);
+
+        // XXX TODO(andrei) Perform compositing here.
+      }
+    }
+  }
+
  private:
   std::shared_ptr<InstanceTracker> instance_tracker_;
 
@@ -126,6 +141,9 @@ class InstanceReconstructor {
 
   /// \brief Alternative approach based on semidense direct image alignment.
   bool enable_direct_refinement_;
+
+  /// \brief Used for rendering instance-specific depth maps.
+  ITMFloatImage instance_depth_buffer_;
 
   /// \brief Updates the reconstruction associated with the object tracks, where applicable.
   void ProcessReconstructions(bool always_separate);
