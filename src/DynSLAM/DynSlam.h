@@ -12,7 +12,6 @@
 #include "Input.h"
 
 DECLARE_bool(dynamic_weights);
-DECLARE_bool(dynamic);
 
 namespace dynslam {
 namespace eval {
@@ -38,11 +37,11 @@ class DynSlam {
           SparseSFProvider *sparse_sf_provider,
           dynslam::eval::Evaluation *evaluation,
           const Vector2i &input_shape,
-          float max_depth_meters,
           const Eigen::Matrix34f& proj_left_rgb,
           const Eigen::Matrix34f& proj_right_rgb,
           float stereo_baseline_m,
-          bool enable_direct_refinement)
+          bool enable_direct_refinement,
+          bool dynamic_mode)
     : static_scene_(itm_static_scene_engine),
       segmentation_provider_(segmentation_provider),
       instance_reconstructor_(new InstanceReconstructor(
@@ -60,7 +59,7 @@ class DynSlam {
       current_frame_no_(0),
       input_width_(input_shape.x),
       input_height_(input_shape.y),
-      max_depth_meters_(max_depth_meters),
+      dynamic_mode_(dynamic_mode),
       pose_history_({ Eigen::Matrix4f::Identity() }),
       projection_left_rgb_(proj_left_rgb),
       projection_right_rgb_(proj_right_rgb),
@@ -106,7 +105,6 @@ class DynSlam {
       const pangolin::OpenGlMatrix &model_view,
       PreviewType preview
   ) {
-    static_scene_->GetVisualizationEngine()->SetMaxDepthMeters(max_depth_meters_);
     static_scene_->GetImage(out_image_, preview, model_view);
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
@@ -243,10 +241,13 @@ private:
   int input_width_;
   int input_height_;
 
-  /// Whether to force instance reconstruction even for non-dynamic objects, like parked cars.
-  bool always_reconstruct_objects_ = true;
+  /// \brief Enables object-awareness, object reconstruction, etc. Without this, the system is
+  ///        basically just outdoor InfiniTAM.
+  bool dynamic_mode_;
 
-  float max_depth_meters_;
+  /// If dynamic mode is on, whether to force instance reconstruction even for non-dynamic objects,
+  /// like parked cars.
+  bool always_reconstruct_objects_ = true;
 
   std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> pose_history_;
 
@@ -259,7 +260,6 @@ private:
   /// \brief Returns a path to the folder where the dataset's meshes should be dumped, creating it
   ///        using a naive system call if it does not exist.
   std::string EnsureDumpFolderExists(const string& dataset_name) const;
-
 };
 
 }

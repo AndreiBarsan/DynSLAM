@@ -7,7 +7,6 @@
 #include "Evaluation/Evaluation.h"
 
 DEFINE_bool(dynamic_weights, false, "Whether to use depth-based weighting when performing fusion.");
-DEFINE_bool(dynamic, true, "Whether to run in dynamic mode and reconstruct other cars.");
 
 namespace dynslam {
 
@@ -30,11 +29,17 @@ void DynSlam::ProcessFrame(Input *input) {
   utils::Toc();
 
   future<shared_ptr<InstanceSegmentationResult>> seg_result_future = async(launch::async, [this] {
-    utils::Timer timer("Semantic segmentation"); timer.Start();
-    auto segmentation_result = segmentation_provider_->SegmentFrame(*input_rgb_image_);
-    timer.Stop();
-    cout << timer.GetName() << " took " << timer.GetDuration() / 1000 << "ms" << endl;
-    return segmentation_result;
+    if (dynamic_mode_) {
+      utils::Timer timer("Semantic segmentation");
+      timer.Start();
+      auto segmentation_result = segmentation_provider_->SegmentFrame(*input_rgb_image_);
+      timer.Stop();
+      cout << timer.GetName() << " took " << timer.GetDuration() / 1000 << "ms" << endl;
+      return segmentation_result;
+    }
+    else {
+      return shared_ptr<InstanceSegmentationResult>(nullptr);
+    }
   });
 
   future<void> tracking_and_ssf = async(launch::async, [this, &input, &first_frame] {
@@ -61,8 +66,8 @@ void DynSlam::ProcessFrame(Input *input) {
       cv::cvtColor(*right_col, *right_gray, cv::COLOR_RGB2GRAY);
     }
 
-    // TODO(andrei): Compute only matches here, the make the instance reconstructor process the
-    // frame and remove clearly-dynamic SF vectors (e.g., from tracks which are clearly dynamic,
+    // TODO(andrei): Idea: compute only matches here, the make the instance reconstructor process
+    // the frame and remove clearly-dynamic SF vectors (e.g., from tracks which are clearly dynamic,
     // as marked from a prev frame), before computing the egomotion, and then processing the
     // reconstructions. This may improve VO accuracy, and it could give us an excuse to also
     // evaluate ATE and compare it with the results from e.g., StereoScan, woo!
@@ -100,7 +105,6 @@ void DynSlam::ProcessFrame(Input *input) {
   static_scene_->UpdateView(*input_rgb_image_, *input_raw_depth_image_);
   utils::Toc();
 
-  bool enable_dynamic_ = FLAGS_dynamic;
   // Perform semantic segmentation, dense depth computation, and dense fusion every K frames.
   // TODO(andrei): Support instance tracking in this framework: we would need SSF between t and t-k,
   //               so we DEFINITELY need separate VO to run in, say, 50ms at every frame, and then
@@ -116,7 +120,7 @@ void DynSlam::ProcessFrame(Input *input) {
     // We need flow information in order to correctly determine which objects are moving, so we
     // can't do this when no scene flow is available (i.e., in the first frame, unless an error
     // occurs).
-    if (enable_dynamic_ && current_frame_no_ % experimental_fusion_every_ == 0) {
+    if (dynamic_mode_ && current_frame_no_ % experimental_fusion_every_ == 0) {
       instance_reconstructor_->ProcessFrame(
           this,
           static_scene_->GetView(),
