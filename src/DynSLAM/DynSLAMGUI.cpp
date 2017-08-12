@@ -13,7 +13,6 @@
 
 #include "DynSlam.h"
 
-#include "../pfmLib/ImageIOpfm.h"
 #include "PrecomputedDepthProvider.h"
 #include "InstRecLib/VisoSparseSFProvider.h"
 #include "DSHandler3D.h"
@@ -24,15 +23,14 @@ const std::string kKittiOdometry = "kitti-odometry";
 const std::string kKittiTracking = "kitti-tracking";
 const std::string kKitti         = "kitti";
 
-// TODO(andrei): If you're depending on OpenCV anyway, try cv::puttext for more flexibility than
-// pangolin's tools. Note the ORB_SLAM2 example, where they use it to draw outlined text in a ghetto
-// but effective way.
-
 DEFINE_string(dataset_type,
               kKittiOdometry,
               "The type of the input dataset at which 'dataset_root'is pointing. Supported are "
               "'kitti-odometry' and 'kitti-tracking'.");
 DEFINE_string(dataset_root, "", "The root folder of the dataset or dataset sequence to use.");
+DEFINE_bool(dynamic_mode, true, "Whether DynSLAM should be aware of dynamic objects and attempt to "
+                                "reconstruct them. Disabling this makes the system behave like a "
+                                "vanilla outdoor InfiniTAM.");
 DEFINE_int32(frame_offset, 0, "The frame index from which to start reading the dataset sequence.");
 DEFINE_bool(voxel_decay, true, "Whether to enable map regularization via voxel decay (a.k.a. voxel "
                                "garbage collection).");
@@ -42,7 +40,7 @@ DEFINE_int32(max_decay_weight, 1, "The maximum voxel weight for decay. Voxels wh
                                   "accumulated more than this many measurements will not be "
                                   "removed.");
 DEFINE_int32(kitti_tracking_sequence_id, -1, "Used in conjunction with --dataset_type kitti-tracking.");
-DEFINE_bool(direct_refinement, true, "Whether to refine motion estimates for other cars computed "
+DEFINE_bool(direct_refinement, false, "Whether to refine motion estimates for other cars computed "
                                      "sparsely with RANSAC using a semidense direct image "
                                      "alignment method.");
 
@@ -974,8 +972,7 @@ Eigen::Vector2i GetFrameSize(const string &dataset_root, const Input::Config &co
   stringstream lc_fpath_ss;
   lc_fpath_ss << lc_folder << "/" << utils::Format(config.fname_format, 1);
 
-  cv::Mat frame = imread(lc_fpath_ss.str());
-
+  cv::Mat frame = cv::imread(lc_fpath_ss.str());
   return Eigen::Vector2i(
       frame.cols,
       frame.rows
@@ -1110,11 +1107,11 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
       sparse_sf_provider,
       evaluation,
       input_shape,
-      input_config.max_depth_m,
       left_color_proj.cast<float>(),
       right_color_proj.cast<float>(),
       baseline_m,
-      FLAGS_direct_refinement);
+      FLAGS_direct_refinement,
+      FLAGS_dynamic_mode);
 }
 
 } // namespace dynslam
