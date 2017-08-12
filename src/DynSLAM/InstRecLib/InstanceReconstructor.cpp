@@ -830,5 +830,49 @@ void InstanceReconstructor::ExtractSceneFlow(const SparseSceneFlow &scene_flow,
   }
 }
 
+void CompositeDepth(ITMFloatImage *target, const ITMFloatImage *source) {
+  assert(target->noDims == source->noDims);
+
+  // todo do this in a sane way!
+
+  target->UpdateHostFromDevice();
+  source->UpdateHostFromDevice();
+
+  float* t_data = target->GetData(MEMORYDEVICE_CPU);
+  const float *s_data = source->GetData(MEMORYDEVICE_CPU);
+
+  for(int i = 0; i < target->noDims[0]; i++) {
+    for(int j = 0; j < target->noDims[1]; j++) {
+      int idx = i * target->noDims[1] + j;
+//      if (t_data[idx] == 0) {
+//        t_data[idx] = s_data[idx];
+//      }
+//      else {
+//        if (s_data[idx] != 0) {
+//          t_data[idx] = min(t_data[idx], s_data[idx]);
+//        }
+//      }
+//      t_data[idx] = s_data[idx];
+    }
+  }
+}
+
+void InstanceReconstructor::CompositeInstanceDepthMaps(ITMFloatImage *out,
+                                                       const pangolin::OpenGlMatrix &model_view) {
+  for(auto &entry : instance_tracker_->GetActiveTracks()) {
+    Track &t = instance_tracker_->GetTrack(entry.first);
+    if(t.HasReconstruction()) {
+      cout << "Fusing fusing fusing..." << endl;
+
+      // I think this should be in the cframe of the "first sight"
+
+      t.GetReconstruction()->GetFloatImage(&instance_depth_buffer_,
+                                           dynslam::PreviewType::kDepth,
+                                           pangolin::IdentityMatrix());
+//      CompositeDepth(out, &instance_depth_buffer_);
+    }
+  }
+}
+
 }  // namespace reconstruction
 }  // namespace instreclib
