@@ -104,18 +104,7 @@ class InstanceReconstructor {
 
   /// \brief Renders all available object depthmaps onto the given depthmap, obeying depth ordering.
   /// TODO(andrei): Improve performance.
-  void CompositeInstanceDepthMaps(ITMFloatImage *out, const pangolin::OpenGlMatrix &model_view) {
-    for(auto &entry : instance_tracker_->GetActiveTracks()) {
-      Track &t = instance_tracker_->GetTrack(entry.first);
-      if(t.HasReconstruction()) {
-        t.GetReconstruction()->GetFloatImage(&instance_depth_buffer_,
-                                             dynslam::PreviewType::kDepth,
-                                             model_view);
-
-        // XXX TODO(andrei) Perform compositing here.
-      }
-    }
-  }
+  void CompositeInstanceDepthMaps(ITMFloatImage *out, const pangolin::OpenGlMatrix &model_view);
 
  private:
   std::shared_ptr<InstanceTracker> instance_tracker_;
