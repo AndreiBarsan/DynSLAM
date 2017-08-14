@@ -42,7 +42,7 @@ void DynSlam::ProcessFrame(Input *input) {
     }
   });
 
-  future<void> tracking_and_ssf = async(launch::async, [this, &input, &first_frame] {
+  future<void> ssf_and_vo = async(launch::async, [this, &input, &first_frame] {
     utils::Tic("Sparse Scene Flow");
 
     // Whether to use input from the original cameras. Unavailable with the tracking dataset.
@@ -98,7 +98,7 @@ void DynSlam::ProcessFrame(Input *input) {
 
   seg_result_future.wait();
   // 'get' ensures any exceptions are propagated.
-  tracking_and_ssf.get();
+  ssf_and_vo.get();
 
   utils::Tic("Input preprocessing");
   input->GetCvImages(&input_rgb_image_, &input_raw_depth_image_);
@@ -118,8 +118,7 @@ void DynSlam::ProcessFrame(Input *input) {
   utils::Tic("Instance tracking and reconstruction");
   if (sparse_sf_provider_->FlowAvailable()) {
     // We need flow information in order to correctly determine which objects are moving, so we
-    // can't do this when no scene flow is available (i.e., in the first frame, unless an error
-    // occurs).
+    // can't do this when no scene flow is available (i.e., in the first frame).
     if (dynamic_mode_ && current_frame_no_ % experimental_fusion_every_ == 0) {
       instance_reconstructor_->ProcessFrame(
           this,

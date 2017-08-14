@@ -86,7 +86,8 @@ public:
       const ITMRGBDCalib *calib,
       const Vector2i &img_size_rgb,
       const Vector2i &img_size_d,
-      const VoxelDecayParams &voxel_decay_params)
+      const VoxelDecayParams &voxel_decay_params,
+      bool use_depth_weighting)
       : ITMMainEngine(settings, calib, img_size_rgb, img_size_d),
         rgb_itm_(new ITMUChar4Image(img_size_rgb, true, true)),
         raw_depth_itm_(new ITMShortImage(img_size_d, true, true)),
@@ -96,6 +97,7 @@ public:
         voxel_decay_params_(voxel_decay_params)
   {
     last_egomotion_->setIdentity();
+    fusion_weight_params_.depthWeighting = use_depth_weighting;
   }
 
   virtual ~InfiniTamDriver() {
@@ -133,6 +135,8 @@ public:
   }
 
   void Integrate() {
+    this->denseMapper->SetFusionWeightParams(fusion_weight_params_);
+
     this->denseMapper->ProcessFrame(
       // We already generate our new view when splitting the input based on the segmentation.
       // The tracking state is kept up-to-date by the tracker.
@@ -251,11 +255,16 @@ public:
     return visualisationEngine;
   }
 
+  bool IsUsingDepthWeights() const {
+    return fusion_weight_params_.depthWeighting;
+  }
+
   SUPPORT_EIGEN_FIELDS;
 
  private:
   ITMUChar4Image *rgb_itm_;
   ITMShortImage  *raw_depth_itm_;
+  ITMLib::Engine::WeightParams fusion_weight_params_;
 
   cv::Mat3b *rgb_cv_;
   cv::Mat1s *raw_depth_cv_;

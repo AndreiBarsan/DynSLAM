@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <string>
+#include "../Utils.h"
 
 namespace dynslam {
 namespace eval {
@@ -21,10 +22,17 @@ class ICsvSerializable {
 
 class CsvWriter {
  public:
+  const std::string output_fpath_;
+
   explicit CsvWriter(const std::string &output_fpath)
-    : wrote_header_(false),
+    : output_fpath_(output_fpath),
+      wrote_header_(false),
       output_(new std::ofstream(output_fpath))
-  {}
+  {
+    if(! utils::FileExists(output_fpath)) {
+      throw std::runtime_error("Could not open CSV file. Does the folder it should be in exist?");
+    }
+  }
 
   CsvWriter(const CsvWriter &) = delete;
   CsvWriter(CsvWriter &&) = delete;
