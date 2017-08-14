@@ -12,3 +12,5 @@ doxygen-html/
 .idea/
 cmake-build-debug/
 media/
+csv/
+fig/
