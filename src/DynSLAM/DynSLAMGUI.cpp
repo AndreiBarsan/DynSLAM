@@ -34,7 +34,7 @@ DEFINE_bool(dynamic_mode, true, "Whether DynSLAM should be aware of dynamic obje
 DEFINE_int32(frame_offset, 0, "The frame index from which to start reading the dataset sequence.");
 DEFINE_bool(voxel_decay, true, "Whether to enable map regularization via voxel decay (a.k.a. voxel "
                                "garbage collection).");
-DEFINE_int32(min_decay_age, 60, "The minimum voxel *block* age for voxels within it to be eligible "
+DEFINE_int32(min_decay_age, 100, "The minimum voxel *block* age for voxels within it to be eligible "
                                 "for deletion (garbage collection).");
 DEFINE_int32(max_decay_weight, 1, "The maximum voxel weight for decay. Voxels which have "
                                   "accumulated more than this many measurements will not be "
@@ -43,9 +43,13 @@ DEFINE_int32(kitti_tracking_sequence_id, -1, "Used in conjunction with --dataset
 DEFINE_bool(direct_refinement, false, "Whether to refine motion estimates for other cars computed "
                                      "sparsely with RANSAC using a semidense direct image "
                                      "alignment method.");
+// TODO-LOW(andrei): Adjust voxel decay params when depth weighting is enabled.
+DEFINE_bool(use_depth_weighting, false, "Whether to adaptively set fusion weights as a function of "
+                                        "the inverse depth. If disabled, all new measurements have "
+                                        "a fixed weight of 1.");
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
-// issue.
+// issue, which could easily be avoided in the future.
 
 // TODO(andrei): Consider making the libviso module implement two interfaces
 // with the same underlying engine: visual odometry and sparse scene flow. You
@@ -251,22 +255,23 @@ public:
                   main_view_->GetBounds().w, main_view_->GetBounds().h), lidar_vis_colors_, lidar_vis_vertices_);
 
           bool compare_on_intersection = true;
-          DepthEvaluation result = dyn_slam_->GetEvaluation()->EvaluateDepth(
-              lidar_pointcloud,
-              synthesized_depthmap,
-              *input_depthmap,
-              velodyne->velodyne_to_rgb,
-              dyn_slam_->GetLeftRgbProjectionMatrix().cast<double>(),
-              dyn_slam_->GetRightRgbProjectionMatrix().cast<double>(),
-              dyn_slam_->GetStereoBaseline(),
-              width_,
-              height_,
-              min_depth_meters,
-              max_depth_meters,
-              delta_max_visualization,
-              compare_on_intersection,
-              &vis_callback
-          );
+          DepthEvaluation result = dyn_slam_->GetEvaluation()->EvaluateDepth(lidar_pointcloud,
+                                                                             synthesized_depthmap,
+                                                                             *input_depthmap,
+                                                                             velodyne->velodyne_to_rgb,
+                                                                             dyn_slam_->GetLeftRgbProjectionMatrix().cast<
+                                                                                 double>(),
+                                                                             dyn_slam_->GetRightRgbProjectionMatrix().cast<
+                                                                                 double>(),
+                                                                             dyn_slam_->GetStereoBaseline(),
+                                                                             width_,
+                                                                             height_,
+                                                                             min_depth_meters,
+                                                                             max_depth_meters,
+                                                                             delta_max_visualization,
+                                                                             compare_on_intersection,
+                                                                             false,
+                                                                             &vis_callback);
           DepthResult depth_result = current_lidar_vis_ == kFusionVsLidar ? result.fused_result
                                                                           : result.input_result;
           message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
@@ -656,7 +661,7 @@ public:
       *(this->autoplay_) = ! *(this->autoplay_);
     });
     display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", false, true);
-    preview_sf_ = new pangolin::Var<bool>("ui.Show Scene Flow", false, true);
+    preview_sf_ = new pangolin::Var<bool>("ui.Show Scene Flow", true, true);
 
     pangolin::RegisterKeyPressCallback('r', [&]() {
       *display_raw_previews_ = !display_raw_previews_->Get();
@@ -986,8 +991,8 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
                                Input **input_out) {
   Input::Config input_config;
   if (FLAGS_dataset_type == kKittiOdometry) {
-    input_config = Input::KittiOdometryConfig();
-//    input_config = Input::KittiOdometryDispnetConfig();
+//    input_config = Input::KittiOdometryConfig();
+    input_config = Input::KittiOdometryDispnetConfig();
   }
   else if (FLAGS_dataset_type == kKittiTracking){
     int t_seq_id = FLAGS_kitti_tracking_sequence_id;
@@ -1063,13 +1068,17 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
   ITMLibSettings *driver_settings = new ITMLibSettings();
   driver_settings->groundTruthPoseFpath = dataset_root + "/" + input_config.odometry_fname;
   driver_settings->groundTruthPoseOffset = frame_offset;
+  if (FLAGS_dynamic_weights) {
+    driver_settings->sceneParams.maxW = driver_settings->maxWDynamic;
+  }
 
   drivers::InfiniTamDriver *driver = new InfiniTamDriver(
       driver_settings,
       CreateItmCalib(left_color_proj, frame_size),
       ToItmVec((*input_out)->GetRgbSize()),
       ToItmVec((*input_out)->GetDepthSize()),
-      voxel_decay_params);
+      voxel_decay_params,
+      FLAGS_use_depth_weighting);
 
   const string seg_folder = dataset_root + "/" + input_config.segmentation_folder;
   auto segmentation_provider =
@@ -1085,20 +1094,28 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
   sf_params.match.multi_stage = 1;    // Default = 1 (= 0 => much slower)
   sf_params.match.refinement = 1;     // Default = 1 (per-pixel); 2 = sub-pixel, slower
   sf_params.ransac_iters = 500;       // Default = 200; added more to see if it helps instance reconstruction
-  sf_params.inlier_threshold = 3.0;   // Default = 2.0 => we attempt to be coarser for the sake of reconstructing
-                                      // object instances
-  sf_params.bucket.max_features = 10;    // Default = 2
-  // VO is computed using the grayscale frames.
-  sf_params.calib.cu = left_gray_proj(0, 2);
-  sf_params.calib.cv = left_gray_proj(1, 2);
-  sf_params.calib.f  = left_gray_proj(0, 0);
+  sf_params.inlier_threshold = 3.0;   // Default = 2.0
+  sf_params.bucket.max_features = 15;    // Default = 2
+  // VO is computed using the color frames.
+  sf_params.calib.cu = left_color_proj(0, 2);
+  sf_params.calib.cv = left_color_proj(1, 2);
+  sf_params.calib.f  = left_color_proj(0, 0);
+
+  // For fast VO (does not support instance reconstruction!)
+  sf_params.ransac_iters = 100;
+  sf_params.inlier_threshold = 2.0;
+  sf_params.bucket.max_features = 2;
 
   auto sparse_sf_provider = new instreclib::VisoSparseSFProvider(sf_params);
+
+  assert((FLAGS_dynamic_mode || !FLAGS_direct_refinement) && "Cannot use direct refinement in non-dynamic mode.");
 
   auto evaluation = new dynslam::eval::Evaluation(dataset_root, *input_out,
                                                   velo_to_left_gray_cam,
                                                   driver_settings->sceneParams.voxelSize,
-                                                  FLAGS_direct_refinement);
+                                                  FLAGS_direct_refinement,
+                                                  FLAGS_dynamic_mode,
+                                                  FLAGS_use_depth_weighting);
 
   Vector2i input_shape((*input_out)->GetRgbSize().width, (*input_out)->GetRgbSize().height);
   *dyn_slam_out = new gui::DynSlam(

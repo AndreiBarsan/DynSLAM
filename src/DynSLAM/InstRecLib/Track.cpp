@@ -23,7 +23,9 @@ float Track::ScoreMatch(const TrackFrame& new_frame) const {
 
   // We don't want to accidentally add multiple segments from the same frame to the same track.
   // This is not 100% elegant, but it works.
-  if (new_frame.frame_idx == this->GetEndTime()) {
+  int delta_time = new_frame.frame_idx - this->GetEndTime();
+
+  if (delta_time == 0) {
     return 0.0f;
   }
 
@@ -39,19 +41,11 @@ float Track::ScoreMatch(const TrackFrame& new_frame) const {
 
   const BoundingBox& new_bbox = new_detection.GetCopyBoundingBox();
   const BoundingBox& last_bbox = latest_detection.GetCopyBoundingBox();
-  // Using the max makes sure we prefer matching to previous tracks with larger areas if the new
-  // detection is also large. This increases robustness to small spurious detections, preventing
-  // them from latching onto good tracks.
-  int max_area = std::max(new_bbox.GetArea(), last_bbox.GetArea());
-  int overlap_area = last_bbox.IntersectWith(new_bbox).GetArea();
 
-  // TODO(andrei): Compute union of areas, so you can score based on IoU, i.e., Jaccard similarity,
-  // which would make this sound much less arbitrary.
-
-  // If the overlap completely covers one of the frames, then it's considered perfect.
-  // Otherwise, frames which only partially intersect get smaller scores, and frames which don't
-  // intersect at all get a score of 0.0.
-  float area_score = static_cast<float>(overlap_area) / max_area;
+  // Score the overlap using the standard intersection-over-union (IoU) measure.
+  int intersection = last_bbox.IntersectWith(new_bbox).GetArea();
+  int union_area = new_bbox.GetArea() + last_bbox.GetArea() - intersection;
+  float area_score = static_cast<float>(intersection) / union_area;
 
   // Modulate the score by the detection probability. If we see a good overlap but it's a dodgy
   // detection, we may not want to add it to the track. For instance, when using MNC for
@@ -62,7 +56,16 @@ float Track::ScoreMatch(const TrackFrame& new_frame) const {
   // the track with the most confident detections.
   float score = area_score * new_detection.class_probability * latest_detection.class_probability;
 
-  return score;
+  float time_discount = 1.0f;
+  // 1 = no gap in the track
+  if (delta_time == 2) {
+    time_discount = 0.5f;
+  }
+  else if (delta_time > 2) {
+    time_discount = 0.25;
+  }
+
+  return score * time_discount;
 }
 
 string Track::GetAsciiArt() const {
@@ -112,6 +115,44 @@ Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
   return Option<Eigen::Matrix4d>(pose);
 }
 
+dynslam::utils::Option<Eigen::Matrix4d> Track::GetFrameWorldPose(size_t frame_idx) const {
+  assert(frame_idx < GetFrames().size() && "Cannot get the relative pose of a non-existent frame.");
+
+  bool found_good_pose = false;
+  Eigen::Matrix4d *pose = new Eigen::Matrix4d;
+  pose->setIdentity();
+
+  Eigen::Matrix4d first_cam_pose;
+
+  first_cam_pose = frames_[0].camera_pose.cast<double>();
+  for (size_t i = 1; i <= frame_idx; ++i) {
+    if (frames_[i].relative_pose->IsPresent()) {
+      if (! found_good_pose) {
+        found_good_pose = true;
+//        first_cam_pose = frames_[i-1].camera_pose.cast<double>();
+      }
+
+      const Eigen::Matrix4d &rel_pose = frames_[i].relative_pose->Get().matrix_form;
+      *pose = rel_pose * (*pose);
+    }
+    else {
+      if (found_good_pose) {
+        // Do not tolerate gaps in the pose estimation
+        return dynslam::utils::Option<Eigen::Matrix4d>::Empty();
+      }
+    }
+  }
+
+  if (found_good_pose) {
+//    cout << "Found pose for track frame, with first camera pose being: " << endl << first_cam_pose
+//         << endl << endl;
+//    *pose = first_cam_pose * (*pose);
+    return dynslam::utils::Option<Eigen::Matrix4d>(pose);
+  }
+  else {
+    return dynslam::utils::Option<Eigen::Matrix4d>::Empty();
+  }
+}
 
 Option<Pose>* EstimateInstanceMotion(
     const vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &instance_raw_flow,
@@ -124,7 +165,7 @@ Option<Pose>* EstimateInstanceMotion(
   // Note: 25 => OK results in most cases, but where cars are advancing from opposite direction
   //             in the hill sequence, this no longer works.
 //  uint32_t kMinFlowVectorsForPoseEst = 25;
-  uint32_t kMinFlowVectorsForPoseEst = 23;
+  uint32_t kMinFlowVectorsForPoseEst = 15;
   // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
   // we're being a little paranoid).
   size_t flow_count = instance_raw_flow.size();

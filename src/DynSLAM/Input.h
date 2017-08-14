@@ -70,7 +70,7 @@ class Input {
     config.calibration_fname      = "calib.txt";
 
     config.min_depth_m            =  0.5f;
-    config.max_depth_m            = 20.0f;
+    config.max_depth_m            = 25.0f;    /// XXX: change me!!
     config.depth_folder           = "precomputed-depth/Frames";
     config.depth_fname_format     = "%04d.xml";
     config.read_depth             = true;

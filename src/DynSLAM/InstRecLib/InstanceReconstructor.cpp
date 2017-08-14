@@ -198,7 +198,7 @@ void InstanceReconstructor::UpdateTracks(const dynslam::DynSlam *dyn_slam,
 {
   for (const auto &pair : instance_tracker_->GetActiveTracks()) {
     Track &track = instance_tracker_->GetTrack(pair.first);
-    bool verbose = true;
+    bool verbose = false;
     track.Update(dyn_slam->GetLastEgomotion(), ssf_provider, verbose);
     if (track.GetLastFrame().frame_idx == dyn_slam->GetCurrentFrameNo() - 1) {
       ProcessSilhouette(track, main_view, frame_size, scene_flow, always_separate);
@@ -326,7 +326,7 @@ void InstanceReconstructor::ProcessReconstructions(bool always_separate) {
 
     if (! track.HasReconstruction()) {
       bool eligible = track.EligibleForReconstruction() &&
-          (track.GetState() == TrackState::kDynamic || always_separate);
+          (track.GetState() == TrackState::kDynamic || (track.GetState() == TrackState::kStatic && always_separate));
 
       if (eligible) {
         // No reconstruction allocated yet; let's initialize one.
@@ -354,26 +354,25 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
   settings->createMeshingEngine = false;
 
   settings->sceneParams.mu = 0.5f;
-  settings->sceneParams.voxelSize = 0.035f;
-  // Set the volume to roughly represent 4m x 4m x 8m, which should be more than enough for most
-  // common vehicles.
-  settings->sdfLocalBlockNum = static_cast<long>(4 * 4 * 10 / settings->sceneParams.voxelSize);
-
-  // To be used in conjunction with coarse feature-based alignment.
-//  settings->trackerType = ITMLibSettings::TrackerType::TRACKER_ICP;
+  settings->sceneParams.voxelSize = 0.040f;
+  // Volume approximated in meters.
+  settings->sdfLocalBlockNum = static_cast<long>(5 * 5 * 10 / settings->sceneParams.voxelSize);
 
   track.GetReconstruction() = make_shared<InfiniTamDriver>(
           settings,
           driver_->GetView()->calib,
           driver_->GetView()->rgb->noDims,
           driver_->GetView()->rgb->noDims,
-          driver_->GetVoxelDecayParams());
+          driver_->GetVoxelDecayParams(),
+          driver_->IsUsingDepthWeights()
+  );
 
   // TODO(andrei): This may not work for the (Stat/dyn) -> Unc -> (stat/dyn) situation!
   // If we already have some frames, integrate them into the new volume.
   int first_idx = track.GetFirstFusableFrameIndex();
   if (first_idx > -1) {
     cout << "Starting reconstruction from index " << first_idx << endl;
+    cout << "Camera pose for that index:" << endl << track.GetFrame(first_idx).camera_pose << endl << endl;
     for (size_t i = first_idx; i < track.GetSize(); ++i) {
       FuseFrame(track, i);
     }
@@ -432,7 +431,7 @@ shared_ptr<uchar> RgbToGrayscaleImage(const Vector4u *rgb_image, int rows, int c
 }
 
 /// \brief Refines an existing pose using a direct method.
-/// The actual pose we're starting from is hidden in the latest frame of the track. TODO make this better.
+/// The actual pose we're starting from is hidden in the latest frame of the track.
 /// \return Whether the refinement succeeded.
 bool ExperimentalDirectRefine(Track &track,
                               int first_idx,
@@ -546,12 +545,6 @@ bool ExperimentalDirectRefine(Track &track,
 }
 
 
-// TODO-LOW(andrei): IDEA: in poor man KF mode, of if using proper KF, can use the inverse
-// (magnitude of?) the variance as an update weight. That is, if we, say, are unable to estimate
-// relative motion for a particular vehicle over 1-2 frames, we can reduce the weight of subsequent
-// updates.
-// Similarly, we could even adjust it based on the final residual from the pose estimation/dense
-// alignment.
 void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
   if (track.GetState() == TrackState::kUncertain) {
     // We can't deal with tracks of uncertain state, because there's no available relative
@@ -833,26 +826,21 @@ void InstanceReconstructor::ExtractSceneFlow(const SparseSceneFlow &scene_flow,
 void CompositeDepth(ITMFloatImage *target, const ITMFloatImage *source) {
   assert(target->noDims == source->noDims);
 
-  // todo do this in a sane way!
-
-  target->UpdateHostFromDevice();
-  source->UpdateHostFromDevice();
-
   float* t_data = target->GetData(MEMORYDEVICE_CPU);
   const float *s_data = source->GetData(MEMORYDEVICE_CPU);
 
   for(int i = 0; i < target->noDims[0]; i++) {
     for(int j = 0; j < target->noDims[1]; j++) {
       int idx = i * target->noDims[1] + j;
-//      if (t_data[idx] == 0) {
-//        t_data[idx] = s_data[idx];
-//      }
-//      else {
-//        if (s_data[idx] != 0) {
-//          t_data[idx] = min(t_data[idx], s_data[idx]);
-//        }
-//      }
-//      t_data[idx] = s_data[idx];
+
+      if (t_data[idx] == 0) {
+        t_data[idx] = s_data[idx];
+      }
+      else {
+        if (s_data[idx] != 0) {
+          t_data[idx] = min(t_data[idx], s_data[idx]);
+        }
+      }
     }
   }
 }
@@ -861,15 +849,22 @@ void InstanceReconstructor::CompositeInstanceDepthMaps(ITMFloatImage *out,
                                                        const pangolin::OpenGlMatrix &model_view) {
   for(auto &entry : instance_tracker_->GetActiveTracks()) {
     Track &t = instance_tracker_->GetTrack(entry.first);
-    if(t.HasReconstruction()) {
-      cout << "Fusing fusing fusing..." << endl;
+    int current_frame_idx = this->frame_idx_;
 
-      // I think this should be in the cframe of the "first sight"
+    if (t.GetLastFrame().frame_idx == current_frame_idx - 1 && t.HasReconstruction()) {
+//      cout << "Fusing track [" << t.GetId() << "]..." << endl;
+//      cout << "Frame: " << current_frame_idx << " | Track last active @: " << t.GetLastFrame().frame_idx << "." << endl;
 
-      t.GetReconstruction()->GetFloatImage(&instance_depth_buffer_,
-                                           dynslam::PreviewType::kDepth,
-                                           pangolin::IdentityMatrix());
-//      CompositeDepth(out, &instance_depth_buffer_);
+      Option<Eigen::Matrix4d> pose = t.GetFrameWorldPose(t.GetSize() - 1);
+      if (pose.IsPresent()) {
+        Eigen::Matrix4d pose_mat = pose.Get();
+        auto pango_object_pose = pangolin::OpenGlMatrix::ColMajor4x4(pose_mat.data());
+        t.GetReconstruction()->GetFloatImage(&instance_depth_buffer_,
+                                             dynslam::PreviewType::kDepth,
+                                             pango_object_pose);
+//                                             pangolin::IdentityMatrix());
+        CompositeDepth(out, &instance_depth_buffer_);
+      }
     }
   }
 }
