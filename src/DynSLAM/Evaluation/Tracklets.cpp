@@ -84,7 +84,7 @@ ReadTracklets(const std::string &fpath, bool cars_only)
 
   TrackletFrame result;
   while (input >> result) {
-    cout << "Read: " << result << endl;
+//    cout << "Read: " << result << endl;
     if (!cars_only || result.type == kCar) {
       sequence_tracklets.push_back(result);
     }

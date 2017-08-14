@@ -51,8 +51,6 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
 ) {
   auto lidar_pointcloud = velodyne_->ReadFrame(frame_idx);
 
-  // TODO(andrei): Pose history in dynslam; will be necessary in delayed evaluation, as well
-  // as if you wanna preview cute little frustums!
   if (frame_idx != input->GetCurrentFrame() - 1) {
     throw runtime_error("Cannot yet access old poses for evaluation.");
   }
@@ -69,11 +67,29 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
   float min_depth_meters = input->GetDepthProvider()->GetMinDepthMeters();
   float max_depth_meters = input->GetDepthProvider()->GetMaxDepthMeters();
 
-  // TODO(andrei): Once you get this working, wrap images in OpenCV objects for readability and flexibility.
   std::vector<DepthEvaluation> evals;
   const int kLargestMaxDelta = 12;
   bool compare_on_intersection = true;
-  for(uint delta_max = 1; delta_max <= kLargestMaxDelta; ++delta_max) {
+
+  // Also eval with max disparity of 0.5px, in the spirit of middlebury, even though this level is
+  // susceptible to noise.
+  evals.push_back(EvaluateDepth(lidar_pointcloud,
+                                rendered_depthmap,
+                                *input_depthmap,
+                                velodyne_->velodyne_to_rgb,
+                                dyn_slam->GetLeftRgbProjectionMatrix().cast<double>(),
+                                dyn_slam->GetRightRgbProjectionMatrix().cast<double>(),
+                                dyn_slam->GetStereoBaseline(),
+                                width,
+                                height,
+                                min_depth_meters,
+                                max_depth_meters,
+                                0.5,
+                                compare_on_intersection,
+                                false,  // NOT kitti-style
+                                nullptr));
+
+  for(int delta_max = 1; delta_max <= kLargestMaxDelta; ++delta_max) {
     evals.push_back(EvaluateDepth(lidar_pointcloud,
                                   rendered_depthmap,
                                   *input_depthmap,
@@ -87,8 +103,28 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
                                   max_depth_meters,
                                   delta_max,
                                   compare_on_intersection,
+                                  false,  // NOT kitti-style
                                   nullptr));
   }
+
+  // Finally, perform the KITTI-style depth evaluation.
+  float kKittiDeltaMax = 3.0f;
+  evals.push_back(EvaluateDepth(
+      lidar_pointcloud,
+      rendered_depthmap,
+      *input_depthmap,
+      velodyne_->velodyne_to_rgb,
+      dyn_slam->GetLeftRgbProjectionMatrix().cast<double>(),
+      dyn_slam->GetRightRgbProjectionMatrix().cast<double>(),
+      dyn_slam->GetStereoBaseline(),
+      width,
+      height,
+      min_depth_meters,
+      max_depth_meters,
+      kKittiDeltaMax,
+      compare_on_intersection,
+      true,  // kitti-style
+      nullptr));
 
   DepthEvaluationMeta meta(frame_idx, input->GetDatasetIdentifier());
   return DepthFrameEvaluation(std::move(meta), max_depth_meters, std::move(evals));
@@ -105,8 +141,9 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                           const int frame_height,
                                           const float min_depth_meters,
                                           const float max_depth_meters,
-                                          const uint delta_max,
+                                          const float delta_max,
                                           const bool compare_on_intersection,
+                                          bool kitti_style,
                                           ILidarEvalCallback *callback) const {
   const float left_focal_length_px = static_cast<float>(proj_left_color(0, 0));
   long missing_rendered = 0;
@@ -200,8 +237,10 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
       if (fabs(input_depth_m) < 1e-5) {
         missing_input++;
       } else {
-//        if (input_disp_delta > delta_max && (input_disp_delta > 0.05 * lidar_disp)) {
-        if (input_disp_delta > delta_max) {
+        bool is_error = (kitti_style) ?
+                        (input_disp_delta > delta_max && (input_disp_delta > 0.05 * lidar_disp)) :
+                        (input_disp_delta > delta_max);
+        if (is_error) {
           errors_input++;
         } else {
           correct_input++;
@@ -211,8 +250,10 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
       if (rendered_depth_m < 1e-5) {
         missing_rendered++;
       } else {
-//        if (rendered_disp_delta > delta_max && (rendered_disp_delta > 0.05 * lidar_disp)) {
-        if (rendered_disp_delta > delta_max) {
+        bool is_error = (kitti_style) ?
+                        (rendered_disp_delta > delta_max && (rendered_disp_delta > 0.05 * lidar_disp)) :
+                        (rendered_disp_delta > delta_max);
+        if (is_error) {
           errors_rendered++;
         } else {
           correct_rendered++;
@@ -246,7 +287,9 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
 
   return DepthEvaluation(delta_max,
                          std::move(rendered_result),
-                         std::move(input_result));
+                         std::move(input_result),
+                         kitti_style);
+
 }
 
 // Track = ours, tracklet = ground truth

@@ -18,8 +18,8 @@ using namespace instreclib::utils;
 using namespace dynslam::utils;
 
 /// Rescale factors used for RGB and depth masking of object instances.
-float kCopyMaskRescaleFactor = 1.05f;
-float kDeleteMaskRescaleFactor = 1.10f;
+float kCopyMaskRescaleFactor = 1.03f;
+float kDeleteMaskRescaleFactor = 1.15f;
 
 /// \brief Rescale factor used for scene flow masking of instances.
 /// Smaller => fewer sparse scene flow vectors from, e.g., the background behind the object.
@@ -72,7 +72,8 @@ uint8_t *ReadMask(std::istream &np_txt_in, const int width, const int height) {
 }
 
 vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
-    const std::string &base_img_fpath) {
+    const std::string &base_img_fpath
+) {
   // Loop through all possible instance detection dumps for this frame.
   //
   // They are saved by the pre-segmentation tool as:
@@ -83,6 +84,10 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
   //
   // The mask file is a numpy text file containing the saved (boolean) mask created by the neural
   // network. Its size is exactly the size of the bounding box.
+
+  // We ignore detections smaller than this since they are not in any way useful in 3D object
+  // reconstruction.
+  int min_area = 55 * 50;
 
   int instance_idx = 0;
   vector<InstanceDetection> detections;
@@ -111,29 +116,31 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
     sscanf(result.c_str(), "[%d %d %d %d %*d], %f, %d", &bounding_box.r.x0, &bounding_box.r.y0,
            &bounding_box.r.x1, &bounding_box.r.y1, &class_probability, &class_id);
 
-    // Process the mask file. The mask area covers the edges of the bounding box, too.
-//    dynslam::utils::Tic("Read mask and convert");
-//    dynslam::utils::Tic("Read mask");
-    uint8_t *mask_pixels = ReadMask(mask_in, bounding_box.GetWidth(), bounding_box.GetHeight());
-//    dynslam::utils::Toc();
-    cv::Mat *mask_cv_mat = new cv::Mat(
-        bounding_box.GetHeight(),
-        bounding_box.GetWidth(),
-        CV_8UC1,
-        (void*) mask_pixels
-    );
+    if (bounding_box.GetArea() > min_area) {
+      // Process the mask file. The mask area covers the edges of the bounding box, too.
+  //    dynslam::utils::Tic("Read mask and convert");
+  //    dynslam::utils::Tic("Read mask");
+      uint8_t *mask_pixels = ReadMask(mask_in, bounding_box.GetWidth(), bounding_box.GetHeight());
+  //    dynslam::utils::Toc();
+      cv::Mat *mask_cv_mat = new cv::Mat(
+          bounding_box.GetHeight(),
+          bounding_box.GetWidth(),
+          CV_8UC1,
+          (void*) mask_pixels
+      );
 
-    auto copy_mask = make_shared<Mask>(bounding_box, mask_cv_mat);
-    auto delete_mask = make_shared<Mask>(*copy_mask);
-    auto conservative_mask = make_shared<Mask>(*copy_mask);
-//    dynslam::utils::Toc();
+      auto copy_mask = make_shared<Mask>(bounding_box, mask_cv_mat);
+      auto delete_mask = make_shared<Mask>(*copy_mask);
+      auto conservative_mask = make_shared<Mask>(*copy_mask);
+  //    dynslam::utils::Toc();
 
-    copy_mask->Rescale(kCopyMaskRescaleFactor);
-    delete_mask->Rescale(kDeleteMaskRescaleFactor);
-    conservative_mask->Rescale(kConservativeMaskRescaleFactor);
+      copy_mask->Rescale(kCopyMaskRescaleFactor);
+      delete_mask->Rescale(kDeleteMaskRescaleFactor);
+      conservative_mask->Rescale(kConservativeMaskRescaleFactor);
 
-    detections.emplace_back(class_probability, class_id, copy_mask, delete_mask, conservative_mask,
-                            this->dataset_used);
+      detections.emplace_back(class_probability, class_id, copy_mask, delete_mask, conservative_mask,
+                              this->dataset_used);
+    }
     instance_idx++;
   }
 
@@ -149,7 +156,6 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
   if (last_seg_preview_ == nullptr) {
     last_seg_preview_ = new cv::Mat3b(rgb.rows, rgb.cols);
   }
-  cout << "Reading segmentation preview from " << img_fpath << endl;
   *last_seg_preview_ = cv::imread(img_fpath);
 
   if (! last_seg_preview_->data || last_seg_preview_->cols == 0 || last_seg_preview_->rows == 0) {
