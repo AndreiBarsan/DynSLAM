@@ -53,16 +53,17 @@ void AddPoint(
   color_data[idx_c++] = color(2);
 }
 
-
-void ErrorVisualizationCallback::LidarPoint(int idx,
-                                            const Eigen::Vector3d &velo_2d_homo,
-                                            int rendered_disp,
-                                            float rendered_depth,
-                                            int input_disp,
-                                            float input_depth,
-                                            int velodyne_disp,
-                                            int width,
-                                            int height) {
+void ErrorVisualizationCallback::ProcessLidarPoint(
+    int idx,
+    const Eigen::Vector3d &velo_2d_homo,
+    float rendered_disp,
+    float rendered_depth,
+    float input_disp,
+    float input_depth,
+    float velodyne_disp,
+    int frame_width,
+    int frame_height
+) {
   Eigen::Vector3b color;
 
   uint target_disp_delta = static_cast<uint>(
@@ -99,7 +100,7 @@ void ErrorVisualizationCallback::LidarPoint(int idx,
     color(2) = 0;
   }
 
-  Eigen::Vector2f frame_size(width, height);
+  Eigen::Vector2f frame_size(frame_width, frame_height);
   Eigen::Vector2f gl_pos = utils::PixelsToGl(Eigen::Vector2f(velo_2d_homo(0), velo_2d_homo(1)),
                                              frame_size, output_pane_bounds_);
 

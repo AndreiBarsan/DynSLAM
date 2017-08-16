@@ -1,16 +1,10 @@
 
 #include "Evaluation.h"
 #include "ILidarEvalCallback.h"
+#include "EvaluationCallback.h"
 
 namespace dynslam {
 namespace eval {
-
-// Used internally.
-struct Stats {
-  long missing = 0;
-  long error = 0;
-  long correct = 0;
-};
 
 void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
   // TODO(andrei): Fused depth maps!!
@@ -69,101 +63,69 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
   auto input_rgb = shared_ptr<cv::Mat3b>(nullptr);
   input->GetFrameCvImages(frame_idx, input_rgb, input_depthmap);
 
-  int width = dyn_slam->GetInputWidth();
-  int height = dyn_slam->GetInputHeight();
-  float min_depth_meters = input->GetDepthProvider()->GetMinDepthMeters();
-  float max_depth_meters = input->GetDepthProvider()->GetMaxDepthMeters();
-
-  std::vector<DepthEvaluation> evals;
   const int kLargestMaxDelta = 12;
   bool compare_on_intersection = true;
 
+  // Mini hack for readability. Used to select between KITTI-style and non-KITTI style evaluation,
+  // whereby the former also needs a disparity error to be >5% GT disp, in addition to >=delta_max,
+  // for it to count as inaccurate.
+  const bool kKittiStyle = true;
+  const bool kNonKittiStyle = false;
+  float kKittiDeltaMax = 3.0f;
+
+  // TODO(andrei): Pass evaluation callbacks, one for every configuration, and the gather their
+  // DepthEvaluation objects.
+
+  std::vector<ILidarEvalCallback *> callbacks;
   // Also eval with max disparity of 0.5px, in the spirit of middlebury, even though this level is
-  // susceptible to noise.
-  evals.push_back(EvaluateDepth(lidar_pointcloud,
-                                rendered_depthmap,
-                                *input_depthmap,
-                                velodyne_->velodyne_to_rgb,
-                                dyn_slam->GetLeftRgbProjectionMatrix().cast<double>(),
-                                dyn_slam->GetRightRgbProjectionMatrix().cast<double>(),
-                                dyn_slam->GetStereoBaseline(),
-                                width,
-                                height,
-                                min_depth_meters,
-                                max_depth_meters,
-                                0.5,
-                                compare_on_intersection,
-                                false,  // NOT kitti-style
-                                nullptr));
+  // susceptible to noise. (Just in case!)
+  callbacks.push_back(new EvaluationCallback(0.5f, compare_on_intersection, kNonKittiStyle));
 
   for(int delta_max = 1; delta_max <= kLargestMaxDelta; ++delta_max) {
-    evals.push_back(EvaluateDepth(lidar_pointcloud,
-                                  rendered_depthmap,
-                                  *input_depthmap,
-                                  velodyne_->velodyne_to_rgb,
-                                  dyn_slam->GetLeftRgbProjectionMatrix().cast<double>(),
-                                  dyn_slam->GetRightRgbProjectionMatrix().cast<double>(),
-                                  dyn_slam->GetStereoBaseline(),
-                                  width,
-                                  height,
-                                  min_depth_meters,
-                                  max_depth_meters,
-                                  delta_max,
-                                  compare_on_intersection,
-                                  false,  // NOT kitti-style
-                                  nullptr));
+    callbacks.push_back(new EvaluationCallback(delta_max, compare_on_intersection, kNonKittiStyle));
   }
 
   // Finally, perform the KITTI-style depth evaluation.
-  float kKittiDeltaMax = 3.0f;
-  evals.push_back(EvaluateDepth(
-      lidar_pointcloud,
-      rendered_depthmap,
-      *input_depthmap,
-      velodyne_->velodyne_to_rgb,
-      dyn_slam->GetLeftRgbProjectionMatrix().cast<double>(),
-      dyn_slam->GetRightRgbProjectionMatrix().cast<double>(),
-      dyn_slam->GetStereoBaseline(),
-      width,
-      height,
-      min_depth_meters,
-      max_depth_meters,
-      kKittiDeltaMax,
-      compare_on_intersection,
-      true,  // kitti-style
-      nullptr));
+  callbacks.push_back(new EvaluationCallback(kKittiDeltaMax, compare_on_intersection, kKittiStyle));
+
+  // XXX: get rid of these params...
+  EvaluateDepth(lidar_pointcloud, rendered_depthmap, *input_depthmap, callbacks);
+
+  std::vector<DepthEvaluation> evals;
+  // Forced dynamic casts because std::vector is not covariant, grumble, grumble...
+  for(ILidarEvalCallback *callback : callbacks) {
+    auto *eval_callback = dynamic_cast<EvaluationCallback *>(callback);
+    assert(nullptr != eval_callback && "Only evaluation callbacks are supported at this point.");
+
+    evals.push_back(std::move(eval_callback->GetEvaluation()));
+    delete callback;
+  }
 
   DepthEvaluationMeta meta(frame_idx, input->GetDatasetIdentifier());
-  return DepthFrameEvaluation(std::move(meta), max_depth_meters, std::move(evals));
+  return DepthFrameEvaluation(std::move(meta), max_depth_m_, std::move(evals));
 }
 
 
 /// \return Whether the reading is valid and should be processed further.
-bool ProjectLidar(const Eigen::Vector4f &velodyne_reading,
-                  const Eigen::Matrix4d &velo_to_left_gray_cam,
-                  const Eigen::Matrix34d &proj_left_color,
-                  const Eigen::Matrix34d &proj_right_color,
-                  float min_depth_meters,
-                  float max_depth_meters,
-                  Eigen::Vector3d& out_velo_2d_left,
-                  Eigen::Vector3d& out_velo_2d_right
-) {
-
+bool Evaluation::ProjectLidar(const Eigen::Vector4f &velodyne_reading,
+                              Eigen::Vector3d& out_velo_2d_left,
+                              Eigen::Vector3d& out_velo_2d_right
+) const {
   Eigen::Vector4d velo_point = velodyne_reading.cast<double>();
 
   // Ignore the reflectance; we only care about 3D homogeneous coordinates.
   velo_point(3) = 1.0f;
-  Eigen::Vector4d cam_point = velo_to_left_gray_cam * velo_point;
+  Eigen::Vector4d cam_point = velo_to_left_gray_cam_ * velo_point;
   cam_point /= cam_point(3);
 
   double velo_z = cam_point(2);
 
-  if (velo_z < min_depth_meters || velo_z > max_depth_meters) {
+  if (velo_z < min_depth_m_ || velo_z > max_depth_m_) {
     return false;
   }
 
-  out_velo_2d_left = proj_left_color * cam_point;
-  out_velo_2d_right = proj_right_color * cam_point;
+  out_velo_2d_left = proj_left_color_ * cam_point;
+  out_velo_2d_right = proj_right_color_ * cam_point;
   out_velo_2d_left /= out_velo_2d_left(2);
   out_velo_2d_right /= out_velo_2d_right(2);
 
@@ -174,47 +136,21 @@ bool ProjectLidar(const Eigen::Vector4f &velodyne_reading,
 DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                           const float *const rendered_depth,
                                           const cv::Mat1s &input_depth_mm,
-                                          const Eigen::Matrix4d &velo_to_left_gray_cam,
-                                          const Eigen::Matrix34d &proj_left_color,
-                                          const Eigen::Matrix34d &proj_right_color,
-                                          const float baseline_m,
-                                          const int frame_width,
-                                          const int frame_height,
-                                          const float min_depth_meters,
-                                          const float max_depth_meters,
-                                          const float delta_max,
-                                          const bool compare_on_intersection,
-                                          bool kitti_style,
-                                          ILidarEvalCallback *callback) const {
-  const float left_focal_length_px = static_cast<float>(proj_left_color(0, 0));
-  Stats rendered;
-  Stats input;
-  long measurement_count = 0;
-
+                                          const std::vector<ILidarEvalCallback *> &callbacks) const {
+  int valid_lidar_points = 0;
   int epi_errors = 0;
-
   for (int i = 0; i < lidar_points.rows(); ++i) {
     Eigen::Vector3d velo_2d_left, velo_2d_right;
-    bool valid = ProjectLidar(lidar_points.row(i),
-                              velo_to_left_gray_cam,
-                              proj_left_color,
-                              proj_right_color,
-                              min_depth_meters,
-                              max_depth_meters,
-                              velo_2d_left,
-                              velo_2d_right);
-    if (! valid) {
+    if (! ProjectLidar(lidar_points.row(i), velo_2d_left, velo_2d_right)) {
       continue;
     }
 
     int row_left = static_cast<int>(round(velo_2d_left(1)));
     int col_left = static_cast<int>(round(velo_2d_left(0)));
     int row_right = static_cast<int>(round(velo_2d_right(1)));
-//    int col_right = static_cast<int>(round(velo_2d_right(0)));
-
-    // We ignore LIDAR points which fall outside the left camera's retina.
-    if (col_left < 0 || col_left >= frame_width ||
-        row_left < 0 || row_left >= frame_height) {
+    if (col_left < 0 || col_left >= frame_width_ ||
+        row_left < 0 || row_left >= frame_height_) {
+      // We ignore LIDAR points which fall outside the left camera's frame.
       continue;
     }
 
@@ -226,10 +162,6 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
       // In particular, this can happen when the car passes large trucks very closely, it seems.
       if (abs(fdelta) > 1.2) {
         epi_errors++;
-        cerr << "Warning: epipolar violation! Delta: " << delta << "; float: "
-             << fdelta << endl;
-        cerr << "Whereby left float row was: " << velo_2d_left(1) << " and right float row was: "
-             << velo_2d_right(1) << endl;
       }
     }
 
@@ -237,95 +169,39 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
     if (lidar_disp < 0.0f) {
       throw std::runtime_error("Negative disparity in ground truth.");
     }
+    valid_lidar_points++;
 
-    int idx_in_rendered = row_left * frame_width + col_left;
+    int idx_in_rendered = row_left * frame_width_ + col_left;
     const float rendered_depth_m = rendered_depth[idx_in_rendered];
     const float input_depth_m = input_depth_mm.at<short>(row_left, col_left) / 1000.0f;
-    if (input_depth_mm.at<short>(row_left, col_left) < 0) {
-      cerr << "WARNING: Input depth negative value of " << input_depth_mm.at<short>(row_left, col_left)
-           << " at "  << row_left << ", " << col_left << "." << endl;
-    }
-
-    // Old code which rounded before computing the disparity; slightly less accurate. We don't ever
-    // have to round, actually!
-//    const int rendered_disp = static_cast<int>(round((baseline_m * left_focal_length_px) / rendered_depth_m));
-//    const uint rendered_disp_delta = static_cast<uint>(std::abs(rendered_disp - lidar_disp));
-//    const int input_disp = static_cast<int>(round((baseline_m * left_focal_length_px) / input_depth_val));
-//    const uint input_disp_delta = static_cast<uint>(std::abs(input_disp - lidar_disp));
+    assert(input_depth_mm.at<short>(row_left, col_left) >= 0 && "Negative depth found in input.");
 
     // Units of measurement: px = (m * px) / m;
-    const float rendered_disp = baseline_m * left_focal_length_px / rendered_depth_m;
-    const float rendered_disp_delta = fabs(rendered_disp - lidar_disp);
-    const float input_disp = baseline_m * left_focal_length_px / input_depth_m;
-    const float input_disp_delta = fabs(input_disp - lidar_disp);
+    const float rendered_disp = baseline_m_ * left_focal_length_px_ / rendered_depth_m;
+    const float input_disp = baseline_m_ * left_focal_length_px_ / input_depth_m;
 
-    /// We want to compare the fusion and the input map only where they're both present, since
-    /// otherwise the fusion covers a much larger area, so its evaluation is tougher.
-    // experimental metric
-    if (compare_on_intersection && (fabs(input_depth_m) < 1e-5 || fabs(rendered_depth_m) < 1e-5)) {
-      input.missing++;
-      rendered.missing++;
-    }
-    else {
-      if (fabs(input_depth_m) < 1e-5) {
-        input.missing++;
-      } else {
-        bool is_error = (kitti_style) ?
-                        (input_disp_delta > delta_max && (input_disp_delta > 0.05 * lidar_disp)) :
-                        (input_disp_delta > delta_max);
-        if (is_error) {
-          input.error++;
-        } else {
-          input.correct++;
-        }
-      }
-
-      if (rendered_depth_m < 1e-5) {
-        rendered.missing++;
-      } else {
-        bool is_error = (kitti_style) ?
-                        (rendered_disp_delta > delta_max && (rendered_disp_delta > 0.05 * lidar_disp)) :
-                        (rendered_disp_delta > delta_max);
-        if (is_error) {
-          rendered.error++;
-        } else {
-          rendered.correct++;
-        }
-      }
-    }
-
-    measurement_count++;
-
-    if (nullptr != callback) {
-      callback->LidarPoint(i,
-                           velo_2d_left,
-                           rendered_disp,
-                           rendered_depth_m,
-                           input_disp,
-                           input_depth_m,
-                           lidar_disp,
-                           frame_width,
-                           frame_height);
+    for (ILidarEvalCallback *callback : callbacks) {
+      callback->ProcessLidarPoint(i,
+                                  velo_2d_left,
+                                  rendered_disp,
+                                  rendered_depth_m,
+                                  input_disp,
+                                  input_depth_m,
+                                  lidar_disp,
+                                  frame_width_,
+                                  frame_height_);
     }
   }
 
   if (epi_errors > 5) {
     cerr << "WARNING: Found " << epi_errors << " possible epipolar violations in the ground truth, "
-         << "out of " << measurement_count << "." << endl;
+         << "out of " << valid_lidar_points << "valid LIDAR points." << endl;
   }
-
-  DepthResult rendered_result(measurement_count, rendered.error, rendered.missing, rendered.correct);
-  DepthResult input_result(measurement_count, input.error, input.missing, input.correct);
-
-  return DepthEvaluation(delta_max,
-                         std::move(rendered_result),
-                         std::move(input_result),
-                         kitti_style);
 }
 
 // Track = ours, tracklet = ground truth
 int GetBestOverlapping(
-    const vector<TrackletFrame, Eigen::aligned_allocator<TrackletFrame>> candidates,
+    const vector<TrackletFrame, Eigen::aligned_allocator<TrackletFrame>> &candidates,
     const TrackFrame &frame
 ) {
   using namespace instreclib::utils;
@@ -338,7 +214,6 @@ int GetBestOverlapping(
   // Convention: (0, 0) is top-left.
   auto our_box = frame.instance_view.GetInstanceDetection().conservative_mask->GetBoundingBox();
 
-  // Minimum overlap that we care about is 30x30 pixels.
   const int kMinOverlap = 30 * 30;
   for(int i = 0; i < candidates.size(); ++i){
     BoundingBox theirs = BoundingBox::RoundCoords(candidates[i].bbox_2d);
