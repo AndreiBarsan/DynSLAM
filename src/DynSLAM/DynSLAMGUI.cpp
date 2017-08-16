@@ -1093,18 +1093,20 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
   sf_params.match.half_resolution = 0;
   sf_params.match.multi_stage = 1;    // Default = 1 (= 0 => much slower)
   sf_params.match.refinement = 1;     // Default = 1 (per-pixel); 2 = sub-pixel, slower
-  sf_params.ransac_iters = 500;       // Default = 200; added more to see if it helps instance reconstruction
-  sf_params.inlier_threshold = 3.0;   // Default = 2.0
+  sf_params.ransac_iters = 200;       // Default = 200
+  sf_params.inlier_threshold = 2.0;   // Default = 2.0 (insufficient for e.g., hill sequence)
+//  sf_params.inlier_threshold = 2.7;   // Required for the hill sequence
   sf_params.bucket.max_features = 15;    // Default = 2
   // VO is computed using the color frames.
   sf_params.calib.cu = left_color_proj(0, 2);
   sf_params.calib.cv = left_color_proj(1, 2);
   sf_params.calib.f  = left_color_proj(0, 0);
 
-  // For fast VO (does not support instance reconstruction!)
-  sf_params.ransac_iters = 100;
-  sf_params.inlier_threshold = 2.0;
-  sf_params.bucket.max_features = 2;
+  // For fast VO (does not support instance reconstruction!), but can save time when evaluating
+  // DynSLAM in static mode!
+//  sf_params.ransac_iters = 100;
+//  sf_params.inlier_threshold = 2.0;
+//  sf_params.bucket.max_features = 2;
 
   auto sparse_sf_provider = new instreclib::VisoSparseSFProvider(sf_params);
 
