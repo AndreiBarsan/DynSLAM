@@ -87,7 +87,8 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
 
   // We ignore detections smaller than this since they are not in any way useful in 3D object
   // reconstruction.
-  int min_area = 55 * 50;
+  // (bigger than this messes up e.g., the hill sequence @ 25m range)
+  int min_area = 50 * 50;
 
   int instance_idx = 0;
   vector<InstanceDetection> detections;
@@ -122,11 +123,10 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
   //    dynslam::utils::Tic("Read mask");
       uint8_t *mask_pixels = ReadMask(mask_in, bounding_box.GetWidth(), bounding_box.GetHeight());
   //    dynslam::utils::Toc();
-      cv::Mat *mask_cv_mat = new cv::Mat(
+      cv::Mat1b *mask_cv_mat = new cv::Mat1b(
           bounding_box.GetHeight(),
           bounding_box.GetWidth(),
-          CV_8UC1,
-          (void*) mask_pixels
+          mask_pixels
       );
 
       auto copy_mask = make_shared<Mask>(bounding_box, mask_cv_mat);

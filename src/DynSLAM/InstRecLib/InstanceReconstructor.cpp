@@ -779,24 +779,30 @@ void InstanceReconstructor::ExtractSceneFlow(const SparseSceneFlow &scene_flow,
                                              const InstanceDetection &detection,
                                              const Eigen::Vector2i &frame_size,
                                              bool check_sf_start) {
-  const BoundingBox &flow_bbox = detection.conservative_mask->GetBoundingBox();
+//  auto flow_mask = detection.conservative_mask;
+  // Performs better now that we're actually using the detailed mask, not just the bbox, to mask the
+  // sparse scene flow.
+  auto flow_mask = detection.delete_mask;
+  const BoundingBox &flow_bbox = flow_mask->GetBoundingBox();
   map<pair<int, int>, RawFlow> coord_to_flow;
   int frame_width = frame_size(0);
   int frame_height = frame_size(1);
+
+  /// XXX: Update this method's docs if you make it more sensitive.
 
   // Instead of expensively doing a per-pixel for every SF vector (ouch!), we just use the bounding
   // boxes, since we'll be using those vectors for RANSAC anyway. In the future, we could maybe
   // use some sort of hashing/sparse matrix for the scene flow and support per-pixel stuff.
   for(const auto &match : scene_flow.matches) {
-    // TODO(andrei): Store old motion of car in track and use to initialize RANSAC under a constant
-    // motion assumption (poor man's Kalman filtering).
     int fx = static_cast<int>(match.curr_left(0));
     int fy = static_cast<int>(match.curr_left(1));
     int fx_prev = static_cast<int>(match.prev_left(0));
     int fy_prev = static_cast<int>(match.prev_left(1));
 
-    if (flow_bbox.ContainsPoint(fx, fy)) {
-      // Use the larger mask so we only filter out truly ridiculous SF values
+    if (flow_mask->ContainsPoint(fx, fy)) {
+      // Use the larger mask so we only filter out truly ridiculous SF values. This only happens
+      // if we enable 'check_sf_start' to ensure that the 2D position of the keypoint in the previous
+      // frame is not ridiculously far away.
       if (!check_sf_start || detection.copy_mask->GetBoundingBox().ContainsPoint(fx_prev, fy_prev)) {
         coord_to_flow.emplace(pair<pair<int, int>, RawFlow>(pair<int, int>(fx, fy), match));
       }

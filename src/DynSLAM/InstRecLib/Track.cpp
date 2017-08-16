@@ -88,6 +88,9 @@ string Track::GetAsciiArt() const {
 Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
   assert(frame_idx < GetFrames().size() && "Cannot get the relative pose of a non-existent frame.");
 
+  // XXX: is this really what this method is doing now? Double-check, and fuse with GetFrameWorldPose if needed.
+  // That method is probably whack too.
+
   // Skip the original very distant frames with no relative pose info.
   bool found_good_pose = false;
   Eigen::Matrix4d *pose = new Eigen::Matrix4d;
@@ -137,8 +140,11 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFrameWorldPose(size_t frame_id
     }
     else {
       if (found_good_pose) {
+        /// XXX: should we at least try to do something if we have an (s/d) -> u -> s/d case? Otherwise we mess up the evaluation.
         // Do not tolerate gaps in the pose estimation
-        return dynslam::utils::Option<Eigen::Matrix4d>::Empty();
+//        return dynslam::utils::Option<Eigen::Matrix4d>::Empty();
+        found_good_pose = false;
+        pose->setIdentity();
       }
     }
   }
@@ -258,12 +264,21 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
       if (track_state_ != kUncertain) {
         // We just switched states
         if (HasReconstruction()) {
+          // XXX: reset the coordinate frame somehow, or even fully discard all old frames in the
+          // track, so that when we fuse the map we get the "new" model, and not ANY garbage from
+          // the old one.
+
+          cerr << "Uncertain -> S/D BUT a reconstruction was found. It needs to be cleared." << endl;
+
           // Corner case: an instance which was static or dynamic, started being reconstructed, then
           // became uncertain again, and then was labeled as static or dynamic once again. In this
           // case, we have no way of registering our new measurements to the existing
           // reconstruction, so we discard it in order to start fresh.
-          reconstruction_->SetView(nullptr);    // Prevent view double-free
-          reconstruction_.reset();
+//          reconstruction_->SetView(nullptr);    // Prevent view double-free
+//          reconstruction_->
+
+          cerr << "Resetting reconstruction to avoid corruption." << endl;
+          reconstruction_->Reset();
         }
       }
 
