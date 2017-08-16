@@ -231,6 +231,10 @@ class DynSlam {
     return stereo_baseline_m_;
   }
 
+  std::shared_ptr<instreclib::segmentation::InstanceSegmentationResult> GetLatestSeg() {
+    return latest_seg_result_;
+  }
+
   SUPPORT_EIGEN_FIELDS;
 
 private:
@@ -265,6 +269,8 @@ private:
   const Eigen::Matrix34f projection_left_rgb_;
   const Eigen::Matrix34f projection_right_rgb_;
   const float stereo_baseline_m_;
+
+  std::shared_ptr<instreclib::segmentation::InstanceSegmentationResult> latest_seg_result_;
 
   /// \brief Returns a path to the folder where the dataset's meshes should be dumped, creating it
   ///        using a naive system call if it does not exist.

@@ -179,7 +179,6 @@ struct TrackletEvaluation : public ICsvSerializable {
 /// [0]: Sengupta, S., Greveson, E., Shahrokni, A., & Torr, P. H. S. (2013). Urban 3D semantic modelling using stereo vision. Proceedings - IEEE International Conference on Robotics and Automation, 580–585. https://doi.org/10.1109/ICRA.2013.6630632
 class Evaluation {
  public:
-
   static std::string GetBaseCsvName(
       const std::string &dataset_root,
       const Input *input,
@@ -214,10 +213,35 @@ class Evaluation {
                                      bool is_dynamic,
                                      bool use_depth_weighting
   ) {
-    return utils::Format("%s-depth-result.csv",
+    return utils::Format("%s-unified-depth-result.csv",
                          GetBaseCsvName(dataset_root, input, voxel_size_meters, direct_refinement,
                                         is_dynamic, use_depth_weighting).c_str());
   }
+
+  static std::string GetDynamicDepthCsvName(const std::string &dataset_root,
+                                            const Input *input,
+                                            float voxel_size_meters,
+                                            bool direct_refinement,
+                                            bool is_dynamic,
+                                            bool use_depth_weighting
+  ) {
+    return utils::Format("%s-dynamic-depth-result.csv",
+                         GetBaseCsvName(dataset_root, input, voxel_size_meters, direct_refinement,
+                                        is_dynamic, use_depth_weighting).c_str());
+  }
+
+  static std::string GetStaticDepthCsvName(const std::string &dataset_root,
+                                            const Input *input,
+                                            float voxel_size_meters,
+                                            bool direct_refinement,
+                                            bool is_dynamic,
+                                            bool use_depth_weighting
+  ) {
+    return utils::Format("%s-static-depth-result.csv",
+                         GetBaseCsvName(dataset_root, input, voxel_size_meters, direct_refinement,
+                                        is_dynamic, use_depth_weighting).c_str());
+  }
+
 
   static std::string GetTrackingCsvName(const std::string &dataset_root,
                                         const Input *input,
@@ -253,7 +277,8 @@ class Evaluation {
              float voxel_size_meters,
              bool direct_refinement,
              bool is_dynamic,
-             bool use_depth_weighting)
+             bool use_depth_weighting,
+             bool separate_static_and_dynamic)
       : velo_to_left_gray_cam_(velo_to_left_gray_cam),
         proj_left_color_(proj_left_color),
         proj_right_color_(proj_right_color),
@@ -271,6 +296,13 @@ class Evaluation {
                                         is_dynamic, use_depth_weighting)),
         csv_tracking_dump_(GetTrackingCsvName(dataset_root, input, voxel_size_meters,
                                               direct_refinement, is_dynamic, use_depth_weighting)),
+        separate_static_and_dynamic_(separate_static_and_dynamic),
+        csv_dynamic_depth_dump_(GetDynamicDepthCsvName(dataset_root, input, voxel_size_meters,
+                                                       direct_refinement, is_dynamic,
+                                                       use_depth_weighting)),
+        csv_static_depth_dump_(GetStaticDepthCsvName(dataset_root, input, voxel_size_meters,
+                                                     direct_refinement, is_dynamic,
+                                                     use_depth_weighting)),
         eval_tracklets_(! input->GetConfig().tracklet_folder.empty())
   {
     if (this->eval_tracklets_) {
@@ -294,6 +326,13 @@ class Evaluation {
   /// \brief Supermethod in charge of all per-frame evaluation metrics.
   void EvaluateFrame(Input *input, DynSlam *dyn_slam);
 
+  /// hacky extension for separate eval (static+dynamic)
+  std::pair<DepthFrameEvaluation, DepthFrameEvaluation> EvaluateFrameSeparate(
+      int frame_idx,
+      Input *input,
+      DynSlam *dyn_slam
+  );
+
   DepthFrameEvaluation EvaluateFrame(int frame_idx, Input *input, DynSlam *dyn_slam);
 
   static uint depth_delta(uchar computed_depth, uchar ground_truth_depth) {
@@ -303,19 +342,17 @@ class Evaluation {
 
   /// \brief Compares a fused depth map and input depth map to the corresponding LIDAR pointcloud,
   ///        which is considered to be the ground truth.
-  /// \param compare_on_intersection If true, then the accuracy of both input and fused depth is
-  /// computed only for ground truth LIDAR points which have both corresponding input depth, as well
-  /// as fused depth. Otherwise, the input and depth accuracies are compute separately.
+  /// \note This method does not compute any metrics on its own. It relies on callbacks to do this.
   ///
   /// Projects each LIDAR point into both the left and the right camera frames, in order to compute
   /// the ground truth disparity. Then, if input and/or rendered depth values are available at
   /// those coordinates, computes their corresponding disparity as well, comparing it to the ground
   /// truth disparity. These values are then passed to a list of possible callbacks which can be
   /// tasked with, e.g., visualization, accuracy computations, etc.
-  DepthEvaluation EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
-                                const float *const rendered_depth,
-                                const cv::Mat1s &input_depth_mm,
-                                const std::vector<ILidarEvalCallback *> &callbacks) const;
+  void EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
+                     const float *const rendered_depth,
+                     const cv::Mat1s &input_depth_mm,
+                     const std::vector<ILidarEvalCallback *> &callbacks) const;
 
   /// \brief Simplistic evaluation of tracking performance, mostly meant to asses whether using the
   ///        direct refinement steps leads to any improvement.
@@ -338,8 +375,13 @@ class Evaluation {
 
  private:
   VelodyneIO *velodyne_;
+  // CSV results are written here when static and dynamic parts are NOT evaluated separately.
   CsvWriter csv_depth_dump_;
   CsvWriter csv_tracking_dump_;
+
+  bool separate_static_and_dynamic_;
+  CsvWriter csv_static_depth_dump_;
+  CsvWriter csv_dynamic_depth_dump_;
 
   const bool eval_tracklets_;
   std::map<int, std::vector<TrackletFrame, Eigen::aligned_allocator<TrackletFrame>>> frame_to_tracklets_;

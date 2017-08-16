@@ -12,6 +12,10 @@ namespace eval {
 class EvaluationCallback : public ILidarEvalCallback {
  public:
   const float delta_max;
+  /// \param compare_on_intersection If true, then the accuracy of both input and fused depth is
+  /// computed only for ground truth LIDAR points which have both corresponding input depth, as well
+  /// as fused depth. Otherwise, the input and depth accuracies are compute separately, even in
+  /// areas covered by only one of them.
   const bool compare_on_intersection;
   const bool kitti_style;
 
@@ -20,7 +24,7 @@ class EvaluationCallback : public ILidarEvalCallback {
                      bool kitti_style);
 
   void ProcessLidarPoint(int idx,
-                         const Eigen::Vector3d &velo_2d_homo,
+                         const Eigen::Vector3d &velo_2d_homo_px,
                          float rendered_disp,
                          float rendered_depth_m,
                          float input_disp,
@@ -29,7 +33,7 @@ class EvaluationCallback : public ILidarEvalCallback {
                          int frame_width,
                          int frame_height) override;
 
-  /// \brief Builds an aggregate evaluation object from the stats gathered by the object.
+  virtual /// \brief Builds an aggregate evaluation object from the stats gathered by the object.
   /// \note Should be used *after* the data gets populated by 'Evaluation::EvaluateDepth'.
   DepthEvaluation GetEvaluation() {
     DepthResult rendered_result(measurement_count_, rendered_stats_.error, rendered_stats_.missing, rendered_stats_.correct);
@@ -40,6 +44,15 @@ class EvaluationCallback : public ILidarEvalCallback {
                            std::move(input_result),
                            kitti_style);
   }
+
+ protected:
+  void ComputeAccuracy(float rendered_disp,
+                       float rendered_depth_m,
+                       float input_disp,
+                       float input_depth_m,
+                       float lidar_disp,
+                       Stats &input_stats,
+                       Stats &rendered_stats);
 
  private:
   Stats input_stats_;

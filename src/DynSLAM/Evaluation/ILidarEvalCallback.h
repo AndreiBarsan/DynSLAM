@@ -7,6 +7,9 @@
 /// \brief Used for auxiliary tasks during evaluation.
 class ILidarEvalCallback {
  public:
+
+  virtual ~ILidarEvalCallback() = default;
+
   /// \brief Called for every Velodyne point which falls on the camera frame.
   virtual void ProcessLidarPoint(int idx,
                                  const Eigen::Vector3d &velo_2d_homo,

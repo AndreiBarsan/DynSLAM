@@ -117,13 +117,14 @@ void DynSlam::ProcessFrame(Input *input) {
   // Split the scene up into instances, and fuse each instance independently.
   utils::Tic("Instance tracking and reconstruction");
   if (sparse_sf_provider_->FlowAvailable()) {
+    this->latest_seg_result_ = seg_result_future.get();
     // We need flow information in order to correctly determine which objects are moving, so we
     // can't do this when no scene flow is available (i.e., in the first frame).
     if (dynamic_mode_ && current_frame_no_ % experimental_fusion_every_ == 0) {
       instance_reconstructor_->ProcessFrame(
           this,
           static_scene_->GetView(),
-          *seg_result_future.get(),
+          *latest_seg_result_,
           sparse_sf_provider_->GetFlow(),
           *sparse_sf_provider_,
           always_reconstruct_objects_);
