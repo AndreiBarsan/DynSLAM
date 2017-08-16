@@ -162,8 +162,7 @@ class InstanceReconstructor {
   ///        available frames in the track.
   void InitializeReconstruction(Track &track) const;
 
-  /// \brief Masks the scene flow using the (smaller) conservative *bounding box* of the instance
-  /// detection.
+  /// \brief Masks the scene flow using the (smaller) conservative mask of the instance detection.
   void ExtractSceneFlow(
       const SparseSceneFlow &scene_flow,
       vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &out_instance_flow_vectors,
