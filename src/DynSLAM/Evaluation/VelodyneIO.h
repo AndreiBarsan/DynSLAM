@@ -18,7 +18,7 @@ namespace eval {
 /// cameras, which are triggered at a certain point in time). This effect has been eliminated from
 /// this postprocessed data by compensating for the egomotion!! Note that this is in contrast to the
 /// raw data.
-class Velodyne {
+class VelodyneIO {
  public:
   using LidarReadings = Eigen::Matrix<float, Eigen::Dynamic, 4, Eigen::RowMajor>;
 
@@ -42,7 +42,7 @@ class Velodyne {
  public:
   SUPPORT_EIGEN_FIELDS;
 
-  Velodyne(const std::string &folder_, const std::string &fname_format_,
+  VelodyneIO(const std::string &folder_, const std::string &fname_format_,
            const Eigen::Matrix4d &velodyne_to_rgb_)
       : velodyne_to_rgb(velodyne_to_rgb_),
         folder_(folder_),
@@ -52,7 +52,7 @@ class Velodyne {
         latest_point_count_(0)
   {}
 
-  virtual ~Velodyne() {
+  virtual ~VelodyneIO() {
     delete data_buffer_;
   }
 

@@ -1,11 +1,11 @@
 
 #include <iostream>
-#include "Velodyne.h"
+#include "VelodyneIO.h"
 
 namespace dynslam {
 namespace eval {
 
-Velodyne::LidarReadings Velodyne::ReadFrame(int frame_idx) {
+VelodyneIO::LidarReadings VelodyneIO::ReadFrame(int frame_idx) {
   using namespace std;
   string fpath_format = dynslam::utils::Format("%s/%s", folder_.c_str(), fname_format_.c_str());
   string fpath = dynslam::utils::Format(fpath_format, frame_idx);
@@ -25,7 +25,7 @@ Velodyne::LidarReadings Velodyne::ReadFrame(int frame_idx) {
   return GetLatestFrame();
 }
 
-Velodyne::LidarReadings Velodyne::GetLatestFrame() {
+VelodyneIO::LidarReadings VelodyneIO::GetLatestFrame() {
   assert(nullptr != latest_frame_ && "No frame read yet!");
   LidarReadings points = Eigen::Map<LidarReadings>(
       latest_frame_, latest_point_count_, kMeasurementsPerPoint);
