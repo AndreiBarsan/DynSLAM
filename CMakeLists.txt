@@ -118,6 +118,8 @@ set(DYNSLAM_SOURCES
     src/DynSLAM/Direct/image_alignment/device/cpu/dirImgAlignCPU.cpp
     # End experimental parts
 
+    src/DynSLAM/Evaluation/EvaluationCallback.cpp
+    src/DynSLAM/Evaluation/EvaluationCallback.h
     src/DynSLAM/DepthProvider.h
     src/DynSLAM/DSHandler3D.cpp
     src/DynSLAM/DynSlam.cpp
@@ -129,7 +131,7 @@ set(DYNSLAM_SOURCES
     src/DynSLAM/Evaluation/ILidarEvalCallback.h
     src/DynSLAM/Evaluation/Tracklets.cpp
     src/DynSLAM/Evaluation/Tracklets.h
-        src/DynSLAM/Evaluation/VelodyneIO.cpp
+    src/DynSLAM/Evaluation/VelodyneIO.cpp
     src/DynSLAM/InfiniTamDriver.cpp
     src/DynSLAM/Input.cpp
     src/DynSLAM/PrecomputedDepthProvider.cpp

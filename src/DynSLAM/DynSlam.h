@@ -259,8 +259,9 @@ private:
 
   std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> pose_history_;
 
-  /// \brief Matrix for projecting 3D homogeneous coordinates in the camera's coordinate frame to
-  ///       2D homogeneous coordinates expressed in pixels.
+  /// \brief Matrix for projecting 3D homogeneous coordinates in the left gray camera's coordinate
+  ///        frame to 2D homogeneous coordinates in the left color camera's coordinate frame
+  ///        (expressed in pixels).
   const Eigen::Matrix34f projection_left_rgb_;
   const Eigen::Matrix34f projection_right_rgb_;
   const float stereo_baseline_m_;

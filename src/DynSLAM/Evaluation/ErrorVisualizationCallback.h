@@ -19,15 +19,15 @@ class ErrorVisualizationCallback : public ILidarEvalCallback {
         vertices_(vertices)
   {}
 
-  void LidarPoint(int idx,
-                  const Eigen::Vector3d &velo_2d_homo,
-                  int rendered_disp,
-                  float rendered_depth,
-                  int input_disp,
-                  float input_depth,
-                  int velodyne_disp,
-                  int width,
-                  int height) override;
+  void ProcessLidarPoint(int idx,
+                         const Eigen::Vector3d &velo_2d_homo,
+                         float rendered_disp,
+                         float rendered_depth,
+                         float input_disp,
+                         float input_depth,
+                         float velodyne_disp,
+                         int frame_width,
+                         int frame_height) override;
 
   void Render();
 
