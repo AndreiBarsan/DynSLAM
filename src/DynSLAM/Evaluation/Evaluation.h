@@ -8,7 +8,7 @@
 #include "CsvWriter.h"
 #include "ILidarEvalCallback.h"
 #include "Tracklets.h"
-#include "Velodyne.h"
+#include "VelodyneIO.h"
 
 namespace dynslam {
 class DynSlam;
@@ -217,7 +217,7 @@ class Evaluation {
              bool direct_refinement,
              bool is_dynamic,
              bool use_depth_weighting)
-      : velodyne_(new Velodyne(utils::Format("%s/%s",
+      : velodyne_(new VelodyneIO(utils::Format("%s/%s",
                                              dataset_root.c_str(),
                                              input->GetConfig().velodyne_folder.c_str()),
                                 input->GetConfig().velodyne_fname_format,
@@ -295,18 +295,18 @@ class Evaluation {
   ///        direct refinement steps leads to any improvement.
   vector<TrackletEvaluation> EvaluateTracking(Input *input, DynSlam *dyn_slam);
 
-  Velodyne *GetVelodyne() {
+  VelodyneIO *GetVelodyne() {
     return velodyne_;
   }
 
-  const Velodyne *GetVelodyne() const {
+  const VelodyneIO *GetVelodyne() const {
     return velodyne_;
   }
 
   SUPPORT_EIGEN_FIELDS;
 
  private:
-  Velodyne *velodyne_;
+  VelodyneIO *velodyne_;
   CsvWriter csv_depth_dump_;
   CsvWriter csv_tracking_dump_;
 

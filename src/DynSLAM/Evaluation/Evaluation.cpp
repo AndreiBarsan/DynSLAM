@@ -5,6 +5,13 @@
 namespace dynslam {
 namespace eval {
 
+// Used internally.
+struct Stats {
+  long missing = 0;
+  long error = 0;
+  long correct = 0;
+};
+
 void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
   // TODO(andrei): Fused depth maps!!
 
@@ -130,6 +137,40 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
   return DepthFrameEvaluation(std::move(meta), max_depth_meters, std::move(evals));
 }
 
+
+/// \return Whether the reading is valid and should be processed further.
+bool ProjectLidar(const Eigen::Vector4f &velodyne_reading,
+                  const Eigen::Matrix4d &velo_to_left_gray_cam,
+                  const Eigen::Matrix34d &proj_left_color,
+                  const Eigen::Matrix34d &proj_right_color,
+                  float min_depth_meters,
+                  float max_depth_meters,
+                  Eigen::Vector3d& out_velo_2d_left,
+                  Eigen::Vector3d& out_velo_2d_right
+) {
+
+  Eigen::Vector4d velo_point = velodyne_reading.cast<double>();
+
+  // Ignore the reflectance; we only care about 3D homogeneous coordinates.
+  velo_point(3) = 1.0f;
+  Eigen::Vector4d cam_point = velo_to_left_gray_cam * velo_point;
+  cam_point /= cam_point(3);
+
+  double velo_z = cam_point(2);
+
+  if (velo_z < min_depth_meters || velo_z > max_depth_meters) {
+    return false;
+  }
+
+  out_velo_2d_left = proj_left_color * cam_point;
+  out_velo_2d_right = proj_right_color * cam_point;
+  out_velo_2d_left /= out_velo_2d_left(2);
+  out_velo_2d_right /= out_velo_2d_right(2);
+
+  return true;
+}
+
+
 DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                           const float *const rendered_depth,
                                           const cv::Mat1s &input_depth_mm,
@@ -146,33 +187,25 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                           bool kitti_style,
                                           ILidarEvalCallback *callback) const {
   const float left_focal_length_px = static_cast<float>(proj_left_color(0, 0));
-  long missing_rendered = 0;
-  long errors_rendered = 0;
-  long correct_rendered = 0;
-  long missing_input = 0;
-  long errors_input = 0;
-  long correct_input = 0;
-  long measurements = 0;
+  Stats rendered;
+  Stats input;
+  long measurement_count = 0;
 
   int epi_errors = 0;
 
   for (int i = 0; i < lidar_points.rows(); ++i) {
-    Eigen::Vector4d velo_point = lidar_points.row(i).cast<double>();
-    // Ignore the reflectance; we only care about 3D homogeneous coordinates.
-    velo_point(3) = 1.0f;
-    Eigen::Vector4d cam_point = velo_to_left_gray_cam * velo_point;
-    cam_point /= cam_point(3);
-
-    double velo_z = cam_point(2);
-
-    if (velo_z < min_depth_meters || velo_z > max_depth_meters) {
+    Eigen::Vector3d velo_2d_left, velo_2d_right;
+    bool valid = ProjectLidar(lidar_points.row(i),
+                              velo_to_left_gray_cam,
+                              proj_left_color,
+                              proj_right_color,
+                              min_depth_meters,
+                              max_depth_meters,
+                              velo_2d_left,
+                              velo_2d_right);
+    if (! valid) {
       continue;
     }
-
-    Eigen::Vector3d velo_2d_left = proj_left_color * cam_point;
-    Eigen::Vector3d velo_2d_right = proj_right_color * cam_point;
-    velo_2d_left /= velo_2d_left(2);
-    velo_2d_right /= velo_2d_right(2);
 
     int row_left = static_cast<int>(round(velo_2d_left(1)));
     int col_left = static_cast<int>(round(velo_2d_left(0)));
@@ -230,38 +263,38 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
     /// otherwise the fusion covers a much larger area, so its evaluation is tougher.
     // experimental metric
     if (compare_on_intersection && (fabs(input_depth_m) < 1e-5 || fabs(rendered_depth_m) < 1e-5)) {
-      missing_input++;
-      missing_rendered++;
+      input.missing++;
+      rendered.missing++;
     }
     else {
       if (fabs(input_depth_m) < 1e-5) {
-        missing_input++;
+        input.missing++;
       } else {
         bool is_error = (kitti_style) ?
                         (input_disp_delta > delta_max && (input_disp_delta > 0.05 * lidar_disp)) :
                         (input_disp_delta > delta_max);
         if (is_error) {
-          errors_input++;
+          input.error++;
         } else {
-          correct_input++;
+          input.correct++;
         }
       }
 
       if (rendered_depth_m < 1e-5) {
-        missing_rendered++;
+        rendered.missing++;
       } else {
         bool is_error = (kitti_style) ?
                         (rendered_disp_delta > delta_max && (rendered_disp_delta > 0.05 * lidar_disp)) :
                         (rendered_disp_delta > delta_max);
         if (is_error) {
-          errors_rendered++;
+          rendered.error++;
         } else {
-          correct_rendered++;
+          rendered.correct++;
         }
       }
     }
 
-    measurements++;
+    measurement_count++;
 
     if (nullptr != callback) {
       callback->LidarPoint(i,
@@ -274,22 +307,20 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                            frame_width,
                            frame_height);
     }
-
   }
 
   if (epi_errors > 5) {
     cerr << "WARNING: Found " << epi_errors << " possible epipolar violations in the ground truth, "
-         << "out of " << measurements << "." << endl;
+         << "out of " << measurement_count << "." << endl;
   }
 
-  DepthResult rendered_result(measurements, errors_rendered, missing_rendered, correct_rendered);
-  DepthResult input_result(measurements, errors_input, missing_input, correct_input);
+  DepthResult rendered_result(measurement_count, rendered.error, rendered.missing, rendered.correct);
+  DepthResult input_result(measurement_count, input.error, input.missing, input.correct);
 
   return DepthEvaluation(delta_max,
                          std::move(rendered_result),
                          std::move(input_result),
                          kitti_style);
-
 }
 
 // Track = ours, tracklet = ground truth

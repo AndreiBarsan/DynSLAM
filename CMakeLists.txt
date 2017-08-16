@@ -129,7 +129,7 @@ set(DYNSLAM_SOURCES
     src/DynSLAM/Evaluation/ILidarEvalCallback.h
     src/DynSLAM/Evaluation/Tracklets.cpp
     src/DynSLAM/Evaluation/Tracklets.h
-    src/DynSLAM/Evaluation/Velodyne.cpp
+        src/DynSLAM/Evaluation/VelodyneIO.cpp
     src/DynSLAM/InfiniTamDriver.cpp
     src/DynSLAM/Input.cpp
     src/DynSLAM/PrecomputedDepthProvider.cpp
