@@ -38,6 +38,7 @@ class InstanceDetection {
   /// \brief Smaller, more conservative mask used for scene-flow association.
   /// Allows faster and more robust computation of object motion by reducing the amount of outlier
   /// scene flow vectors associated with the object.
+  /// TODO(andrei): This should be safe to remove now.
   std::shared_ptr<instreclib::utils::Mask> conservative_mask;
 
   /// \brief The dataset associated with this instance's detection. Contains information such as
