@@ -182,10 +182,8 @@ public:
       glDepthMask(false);
 
       if (dyn_slam_->GetCurrentFrameNo() > 1) {
-        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
+        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
         auto lidar_pointcloud = velodyne->GetLatestFrame();
-        float min_depth_meters = dyn_slam_input_->GetDepthProvider()->GetMinDepthMeters();
-        float max_depth_meters = dyn_slam_input_->GetDepthProvider()->GetMaxDepthMeters();
 
         Eigen::Matrix4f epose = dyn_slam_->GetPose().inverse();
         auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
@@ -254,24 +252,10 @@ public:
               delta_max_visualization, visualize_input, Eigen::Vector2f(
                   main_view_->GetBounds().w, main_view_->GetBounds().h), lidar_vis_colors_, lidar_vis_vertices_);
 
-          bool compare_on_intersection = true;
           DepthEvaluation result = dyn_slam_->GetEvaluation()->EvaluateDepth(lidar_pointcloud,
                                                                              synthesized_depthmap,
                                                                              *input_depthmap,
-                                                                             velodyne->velodyne_to_rgb,
-                                                                             dyn_slam_->GetLeftRgbProjectionMatrix().cast<
-                                                                                 double>(),
-                                                                             dyn_slam_->GetRightRgbProjectionMatrix().cast<
-                                                                                 double>(),
-                                                                             dyn_slam_->GetStereoBaseline(),
-                                                                             width_,
-                                                                             height_,
-                                                                             min_depth_meters,
-                                                                             max_depth_meters,
-                                                                             delta_max_visualization,
-                                                                             compare_on_intersection,
-                                                                             false,
-                                                                             &vis_callback);
+                                                                             {&vis_callback});
           DepthResult depth_result = current_lidar_vis_ == kFusionVsLidar ? result.fused_result
                                                                           : result.input_result;
           message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
@@ -297,17 +281,17 @@ public:
         pane_texture_->RenderToViewport(true);
 
         Tic("LIDAR render");
-        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyne();
+        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
         if (velodyne->HasLatestFrame()) {
           PreviewLidar(velodyne->GetLatestFrame(),
                        dyn_slam_->GetLeftRgbProjectionMatrix(),
-                       velodyne->velodyne_to_rgb.cast<float>(),
+                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
                        rgb_view_);
         }
         else {
           PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
-                       dyn_slam_->GetRightRgbProjectionMatrix(),
-                       velodyne->velodyne_to_rgb.cast<float>(),
+                       dyn_slam_->GetLeftRgbProjectionMatrix(),
+                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
                        rgb_view_);
         }
         Toc(true);
@@ -340,8 +324,8 @@ public:
       pane_texture_->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
                             GL_RGBA, GL_UNSIGNED_BYTE);
 
-      // TODO(andrei): Make this gradual; currently it's shown as a single-colored blob (would need
-      // custom shader or manual conversion.
+      // TODO-LOW(andrei): Make this gradual; currently it's shown as a single-colored blob (would
+      // need custom shader or manual conversion).
 //      pane_texture_->Upload(dyn_slam_->GetObjectDepthPreview(visualized_object_idx_),
 //                            GL_RED, GL_FLOAT);
       pane_texture_->RenderToViewport(true);
@@ -385,7 +369,7 @@ public:
     }
   }
 
-  /// \brief Renders informative labels regardin the currently active bounding boxes.
+  /// \brief Renders informative labels for the currently active track.
   /// Meant to be rendered over the segmentation preview window pane.
   void DrawInstanceLables() {
     pangolin::GlFont &font = pangolin::GlFont::I();
@@ -437,7 +421,6 @@ public:
 
     glEnable(GL_DEPTH_TEST);
   }
-
 
   /// \brief Produces a visual pixelwise diff image of the supplied depth maps, into out_image.
   void DiffDepthmaps(
@@ -502,7 +485,7 @@ public:
   /// depth and compare the two.
   void PreviewLidar(
       const Eigen::MatrixX4f &lidar_points,
-      const Eigen::MatrixXf &P,
+      const Eigen::Matrix34f &P,
       const Eigen::Matrix4f &Tr,
       const pangolin::View &view
   ) {
@@ -1112,8 +1095,14 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
 
   assert((FLAGS_dynamic_mode || !FLAGS_direct_refinement) && "Cannot use direct refinement in non-dynamic mode.");
 
-  auto evaluation = new dynslam::eval::Evaluation(dataset_root, *input_out,
+  auto evaluation = new dynslam::eval::Evaluation(dataset_root,
+                                                  *input_out,
                                                   velo_to_left_gray_cam,
+                                                  left_color_proj,
+                                                  right_color_proj,
+                                                  baseline_m,
+                                                  frame_size(0),  // width
+                                                  frame_size(1),  // height
                                                   driver_settings->sceneParams.voxelSize,
                                                   FLAGS_direct_refinement,
                                                   FLAGS_dynamic_mode,

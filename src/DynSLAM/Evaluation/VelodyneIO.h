@@ -29,8 +29,8 @@ class VelodyneIO {
   static const size_t kBufferSize = 1000000;
 
   /// \brief 4x4 matrix which transforms 3D homogeneous coordinates from the Velodyne LIDAR's
-  ///        coordinate frame to the camera's coordinate frame.
-  const Eigen::Matrix4d velodyne_to_rgb;
+  ///        coordinate frame to the (typically left gray) camera's coordinate frame.
+//  const Eigen::Matrix4d velodyne_to_cam_;
 
  private:
   const std::string folder_;
@@ -42,11 +42,9 @@ class VelodyneIO {
  public:
   SUPPORT_EIGEN_FIELDS;
 
-  VelodyneIO(const std::string &folder_, const std::string &fname_format_,
-           const Eigen::Matrix4d &velodyne_to_rgb_)
-      : velodyne_to_rgb(velodyne_to_rgb_),
-        folder_(folder_),
-        fname_format_(fname_format_),
+  VelodyneIO(const std::string &folder, const std::string &fname_format)
+      : folder_(folder),
+        fname_format_(fname_format),
         data_buffer_(new float[kBufferSize]),
         latest_frame_(nullptr),
         latest_point_count_(0)

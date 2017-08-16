@@ -17,6 +17,14 @@ class DynSlam;
 namespace dynslam {
 namespace eval {
 
+// Used internally as an accumulator.
+struct Stats {
+  long missing = 0;
+  long error = 0;
+  long correct = 0;
+};
+
+
 struct DepthResult : public ICsvSerializable {
   const long measurement_count;
   const long error_count;
@@ -155,6 +163,20 @@ struct TrackletEvaluation : public ICsvSerializable {
 };
 
 /// \brief Main class handling the quantitative evaluation of the DynSLAM system.
+///
+/// A disparity is counted as accurate if the absoluted difference between it and the ground truth
+/// disparity is less than 'delta_max'. Based on the evaluation method from [0].
+///
+/// We also perform a KITTI-Stereo-2015-style evaluation, counting the number of pixels whose
+/// disparity exceeds 3px AND 5% of the ground truth value.
+///
+/// Evaluation end error visualizations are computed using a callback structure: the method
+/// 'EvaluateDepth' goes through a frame's LIDAR pointcloud and projects its points onto the left
+/// camera frame, discarding invalid points which fall outside it. For every point with valid
+/// ground truth (LIDAR), input, and fused depth, the system invokes a list of callbacks, which do
+/// things like error visualization, error aggregation, etc.
+///
+/// [0]: Sengupta, S., Greveson, E., Shahrokni, A., & Torr, P. H. S. (2013). Urban 3D semantic modelling using stereo vision. Proceedings - IEEE International Conference on Robotics and Automation, 580–585. https://doi.org/10.1109/ICRA.2013.6630632
 class Evaluation {
  public:
 
@@ -210,18 +232,41 @@ class Evaluation {
   }
 
  public:
+  const Eigen::Matrix4d velo_to_left_gray_cam_;
+  const Eigen::Matrix34d proj_left_color_;
+  const Eigen::Matrix34d proj_right_color_;
+  const float baseline_m_;
+  const int frame_width_;
+  const int frame_height_;
+  const float min_depth_m_;
+  const float max_depth_m_;
+  const float left_focal_length_px_;
+
   Evaluation(const std::string &dataset_root,
              const Input *input,
-             const Eigen::Matrix4d &velodyne_to_rgb,
+             const Eigen::Matrix4d &velo_to_left_gray_cam,
+             const Eigen::Matrix34d &proj_left_color,
+             const Eigen::Matrix34d &proj_right_color,
+             const float baseline_m,
+             const int frame_width,
+             const int frame_height,
              float voxel_size_meters,
              bool direct_refinement,
              bool is_dynamic,
              bool use_depth_weighting)
-      : velodyne_(new VelodyneIO(utils::Format("%s/%s",
+      : velo_to_left_gray_cam_(velo_to_left_gray_cam),
+        proj_left_color_(proj_left_color),
+        proj_right_color_(proj_right_color),
+        baseline_m_(baseline_m),
+        frame_width_(frame_width),
+        frame_height_(frame_height),
+        min_depth_m_(input->GetDepthProvider()->GetMinDepthMeters()),
+        max_depth_m_(input->GetDepthProvider()->GetMaxDepthMeters()),
+        left_focal_length_px_(static_cast<float>(proj_left_color_(0, 0))),
+        velodyne_(new VelodyneIO(utils::Format("%s/%s",
                                              dataset_root.c_str(),
                                              input->GetConfig().velodyne_folder.c_str()),
-                                input->GetConfig().velodyne_fname_format,
-                                velodyne_to_rgb)),
+                                input->GetConfig().velodyne_fname_format)),
         csv_depth_dump_(GetDepthCsvName(dataset_root, input, voxel_size_meters, direct_refinement,
                                         is_dynamic, use_depth_weighting)),
         csv_tracking_dump_(GetTrackingCsvName(dataset_root, input, voxel_size_meters,
@@ -229,7 +274,6 @@ class Evaluation {
         eval_tracklets_(! input->GetConfig().tracklet_folder.empty())
   {
     if (this->eval_tracklets_) {
-//      cout << "Found tracklet GT data. Enabling track evaluation!" << endl;
       std::string tracklet_fpath = utils::Format("%s/%s", dataset_root.c_str(),
                                                  input->GetConfig().tracklet_folder.c_str());
       frame_to_tracklets_ = ReadGroupedTracklets(tracklet_fpath);
@@ -266,44 +310,31 @@ class Evaluation {
   /// Projects each LIDAR point into both the left and the right camera frames, in order to compute
   /// the ground truth disparity. Then, if input and/or rendered depth values are available at
   /// those coordinates, computes their corresponding disparity as well, comparing it to the ground
-  /// truth disparity.
-  ///
-  /// A disparity is counted as accurate if the absoluted difference between it and the ground truth
-  /// disparity is less than 'delta_max'. Based on the evaluation method from [0].
-  ///
-  /// We also perform a KITTI-Stereo-2015-style evaluation, counting the number of pixels whose
-  /// disparity exceeds 3px AND 5% of the ground truth value.
-  ///
-  /// [0]: Sengupta, S., Greveson, E., Shahrokni, A., & Torr, P. H. S. (2013). Urban 3D semantic modelling using stereo vision. Proceedings - IEEE International Conference on Robotics and Automation, 580–585. https://doi.org/10.1109/ICRA.2013.6630632
+  /// truth disparity. These values are then passed to a list of possible callbacks which can be
+  /// tasked with, e.g., visualization, accuracy computations, etc.
   DepthEvaluation EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                 const float *const rendered_depth,
                                 const cv::Mat1s &input_depth_mm,
-                                const Eigen::Matrix4d &velo_to_left_gray_cam,
-                                const Eigen::Matrix34d &proj_left_color,
-                                const Eigen::Matrix34d &proj_right_color,
-                                const float baseline_m,
-                                const int frame_width,
-                                const int frame_height,
-                                const float min_depth_meters,
-                                const float max_depth_meters,
-                                const float delta_max,
-                                const bool compare_on_intersection,
-                                bool kitti_style,
-                                ILidarEvalCallback *callback) const;
+                                const std::vector<ILidarEvalCallback *> &callbacks) const;
 
   /// \brief Simplistic evaluation of tracking performance, mostly meant to asses whether using the
   ///        direct refinement steps leads to any improvement.
   vector<TrackletEvaluation> EvaluateTracking(Input *input, DynSlam *dyn_slam);
 
-  VelodyneIO *GetVelodyne() {
+  VelodyneIO *GetVelodyneIO() {
     return velodyne_;
   }
 
-  const VelodyneIO *GetVelodyne() const {
+  const VelodyneIO *GetVelodyneIO() const {
     return velodyne_;
   }
 
   SUPPORT_EIGEN_FIELDS;
+
+ protected:
+  bool ProjectLidar(const Eigen::Vector4f &velodyne_reading,
+                    Eigen::Vector3d& out_velo_2d_left,
+                    Eigen::Vector3d& out_velo_2d_right) const;
 
  private:
   VelodyneIO *velodyne_;

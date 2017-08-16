@@ -18,8 +18,8 @@ using namespace instreclib::utils;
 using namespace dynslam::utils;
 
 /// Rescale factors used for RGB and depth masking of object instances.
-float kCopyMaskRescaleFactor = 1.03f;
-float kDeleteMaskRescaleFactor = 1.15f;
+float kCopyMaskRescaleFactor = 1.01f;
+float kDeleteMaskRescaleFactor = 1.2f;
 
 /// \brief Rescale factor used for scene flow masking of instances.
 /// Smaller => fewer sparse scene flow vectors from, e.g., the background behind the object.
