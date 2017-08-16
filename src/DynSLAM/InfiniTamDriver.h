@@ -259,6 +259,10 @@ public:
     return fusion_weight_params_.depthWeighting;
   }
 
+  void Reset() {
+    this->denseMapper->ResetScene(this->scene);
+  }
+
   SUPPORT_EIGEN_FIELDS;
 
  private:

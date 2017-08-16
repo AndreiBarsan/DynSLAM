@@ -75,7 +75,11 @@ void ErrorVisualizationCallback::LidarPoint(int idx,
   }
   if (rendered_disp < 0 && fabs(rendered_depth) > 1e-5) {
     throw std::runtime_error(utils::Format(
-        "Cannot have negative disparities, but found rendered_disp = %d.", rendered_disp));
+        "Cannot have negative disparities, but found rendered_disp = %d; its corresponding "
+        "rendered depth was %.4f.",
+        rendered_disp,
+        rendered_depth
+    ));
   }
 
   if (target_val > 0) {

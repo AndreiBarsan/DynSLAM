@@ -13,7 +13,7 @@ void Mask::Set(const Mask &rhs) {
   if (nullptr != mask_data_) {
     delete mask_data_;
   }
-  mask_data_ = new cv::Mat(*rhs.mask_data_);
+  mask_data_ = new cv::Mat1b(*rhs.mask_data_);
 }
 
 void Mask::Rescale(float amount) {
@@ -32,7 +32,7 @@ void Mask::Rescale(float amount) {
   int new_y1 = bounding_box_.r.y1 + static_cast<int>(ceil(delta_height / 2.0));
 
   cv::Size new_size(new_width, new_height);
-  cv::Mat *tmp = new cv::Mat(new_size, CV_8UC1);
+  cv::Mat1b *tmp = new cv::Mat1b(new_size);
   cv::resize(*mask_data_, *tmp, tmp->size());
 
   bounding_box_ = BoundingBox(new_x0, new_y0, new_x1, new_y1);
