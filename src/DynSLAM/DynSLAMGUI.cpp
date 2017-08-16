@@ -18,6 +18,7 @@
 #include "DSHandler3D.h"
 #include "Evaluation/Evaluation.h"
 #include "Evaluation/ErrorVisualizationCallback.h"
+#include "Evaluation/EvaluationCallback.h"
 
 const std::string kKittiOdometry = "kitti-odometry";
 const std::string kKittiTracking = "kitti-tracking";
@@ -252,10 +253,16 @@ public:
               delta_max_visualization, visualize_input, Eigen::Vector2f(
                   main_view_->GetBounds().w, main_view_->GetBounds().h), lidar_vis_colors_, lidar_vis_vertices_);
 
-          DepthEvaluation result = dyn_slam_->GetEvaluation()->EvaluateDepth(lidar_pointcloud,
-                                                                             synthesized_depthmap,
-                                                                             *input_depthmap,
-                                                                             {&vis_callback});
+          bool compare_on_intersection = true;
+          bool kitti_style = true;
+          eval::EvaluationCallback eval_callback(delta_max_visualization,
+                                                 compare_on_intersection,
+                                                 kitti_style);
+          dyn_slam_->GetEvaluation()->EvaluateDepth(lidar_pointcloud,
+                                                    synthesized_depthmap,
+                                                    *input_depthmap,
+                                                    {&vis_callback, &eval_callback});
+          auto result = eval_callback.GetEvaluation();
           DepthResult depth_result = current_lidar_vis_ == kFusionVsLidar ? result.fused_result
                                                                           : result.input_result;
           message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",

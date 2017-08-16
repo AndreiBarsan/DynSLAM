@@ -2,13 +2,35 @@
 #include "Evaluation.h"
 #include "ILidarEvalCallback.h"
 #include "EvaluationCallback.h"
+#include "SegmentedEvaluationCallback.h"
 
 namespace dynslam {
 namespace eval {
 
-void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
-  // TODO(andrei): Fused depth maps!!
+void PrettyPrintStats(const string &label, const DepthFrameEvaluation &evals) {
+  // ...and print some quick info in real time as well.
+  cout << "Evaluation complete:" << endl;
+  bool missing_depths_are_errors = false;
+  if(missing_depths_are_errors) {
+    cout << "(Missing = errors)" << endl;
+  }
+  else {
+    cout << "(Not counting missing as errors.)" << endl;
+  }
+  for (auto &eval : evals.evaluations) {
+    cout << "[" << label << "] Evaluation on frame #" << evals.meta.frame_idx << ", delta max = "
+         << setw(2) << eval.delta_max
+         << "   Fusion accuracy = " << setw(7) << setprecision(3)
+         << eval.fused_result.GetCorrectPixelRatio(missing_depths_are_errors)
+         << " @ " << eval.fused_result.correct_count << " correct px "
+         << " | Input accuracy  = " <<  setw(7) << setprecision(3)
+         << eval.input_result.GetCorrectPixelRatio(missing_depths_are_errors)
+         << " @ " << eval.input_result.correct_count << " correct px "
+         << endl;
+  }
+}
 
+void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
   if (dyn_slam->GetCurrentFrameNo() > 0) {
     cout << "Starting evaluation of current frame..." << endl;
 
@@ -20,30 +42,82 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
       }
     }
 
-    DepthFrameEvaluation evals = EvaluateFrame(input->GetCurrentFrame() - 1, input, dyn_slam);
-    csv_depth_dump_.Write(evals);
+    if (separate_static_and_dynamic_) {
+      cout << "Evaluation will compute separate stats for static and dynamic elements of the scene."
+           << endl;
 
-    // ...and print some quick info in real time as well.
-    cout << "Evaluation complete:" << endl;
-    bool missing_depths_are_errors = false;
-    if(missing_depths_are_errors) {
-      cout << "(Missing = errors)" << endl;
     }
     else {
-      cout << "(Not counting missing as errors.)" << endl;
-    }
-    for (auto &eval : evals.evaluations) {
-      cout << "Evaluation on frame #" << evals.meta.frame_idx << ", delta max = "
-           << setw(2) << eval.delta_max
-           << "   Fusion accuracy = " << setw(7) << setprecision(3)
-           << eval.fused_result.GetCorrectPixelRatio(missing_depths_are_errors)
-           << " @ " << eval.fused_result.correct_count << " correct px "
-           << " | Input accuracy  = " <<  setw(7) << setprecision(3)
-           << eval.input_result.GetCorrectPixelRatio(missing_depths_are_errors)
-          << " @ " << eval.input_result.correct_count << " correct px "
+      cout << "Evaluation will compute unified stats for both static and dynamic parts of the scene."
            << endl;
+
+      DepthFrameEvaluation evals = EvaluateFrame(input->GetCurrentFrame() - 1, input, dyn_slam);
+      csv_depth_dump_.Write(evals);
+
+      PrettyPrintStats("Unified", evals);
     }
   }
+}
+
+/// TODO(andrei): Deduplicate copypasta code.
+std::pair<DepthFrameEvaluation, DepthFrameEvaluation> Evaluation::EvaluateFrameSeparate(
+    int frame_idx,
+    Input *input,
+    DynSlam *dyn_slam
+) {
+  auto lidar_pointcloud = velodyne_->ReadFrame(frame_idx);
+  if (frame_idx != input->GetCurrentFrame() - 1) {
+    throw runtime_error("Cannot yet access old poses for evaluation.");
+  }
+  Eigen::Matrix4f epose = dyn_slam->GetPose().inverse();
+  auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
+
+  const float *rendered_depthmap = dyn_slam->GetStaticMapRaycastDepthPreview(pango_pose);
+  auto input_depthmap = shared_ptr<cv::Mat1s>(nullptr);
+  auto input_rgb = shared_ptr<cv::Mat3b>(nullptr);
+  input->GetFrameCvImages(frame_idx, input_rgb, input_depthmap);
+
+  const int kLargestMaxDelta = 12;
+  bool compare_on_intersection = true;
+  const bool kKittiStyle = true;
+  const bool kNonKittiStyle = false;
+  float kKittiDeltaMax = 3.0f;
+
+  auto seg = dyn_slam->GetLatestSeg();
+
+  std::vector<ILidarEvalCallback *> callbacks;
+  callbacks.push_back(new SegmentedEvaluationCallback(0.5f, compare_on_intersection,
+                                                      kNonKittiStyle, seg.get()));
+
+  for (int delta_max = 1; delta_max <= kLargestMaxDelta; ++delta_max) {
+    callbacks.push_back(new SegmentedEvaluationCallback(delta_max,
+                                               compare_on_intersection,
+                                               kNonKittiStyle, seg.get()));
+  }
+
+  // Finally, perform the KITTI-style depth evaluation.
+  callbacks.push_back(new SegmentedEvaluationCallback(kKittiDeltaMax,
+                                             compare_on_intersection,
+                                             kKittiStyle, seg.get()));
+
+  EvaluateDepth(lidar_pointcloud, rendered_depthmap, *input_depthmap, callbacks);
+
+  std::vector<DepthEvaluation> static_evals;
+  std::vector<DepthEvaluation> dynamic_evals;
+  // Forced dynamic casts because std::vector is not covariant, grumble, grumble...
+  for(ILidarEvalCallback *callback : callbacks) {
+    auto *eval_callback = dynamic_cast<SegmentedEvaluationCallback *>(callback);
+    assert(nullptr != eval_callback && "Only evaluation callbacks are supported at this point.");
+
+    static_evals.push_back(std::move(eval_callback->GetStaticEvaluation()));
+    dynamic_evals.push_back(std::move(eval_callback->GetDynamicEvaluation()));
+    delete callback;
+  }
+
+  DepthEvaluationMeta meta(frame_idx, input->GetDatasetIdentifier());
+  return make_pair<DepthFrameEvaluation, DepthFrameEvaluation>(
+      DepthFrameEvaluation(std::move(meta), max_depth_m_, std::move(static_evals)),
+      DepthFrameEvaluation(std::move(meta), max_depth_m_, std::move(dynamic_evals)));
 }
 
 DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
@@ -77,18 +151,22 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
   // DepthEvaluation objects.
 
   std::vector<ILidarEvalCallback *> callbacks;
+
   // Also eval with max disparity of 0.5px, in the spirit of middlebury, even though this level is
   // susceptible to noise. (Just in case!)
   callbacks.push_back(new EvaluationCallback(0.5f, compare_on_intersection, kNonKittiStyle));
 
-  for(int delta_max = 1; delta_max <= kLargestMaxDelta; ++delta_max) {
-    callbacks.push_back(new EvaluationCallback(delta_max, compare_on_intersection, kNonKittiStyle));
+  for (int delta_max = 1; delta_max <= kLargestMaxDelta; ++delta_max) {
+    callbacks.push_back(new EvaluationCallback(delta_max,
+                                               compare_on_intersection,
+                                               kNonKittiStyle));
   }
 
   // Finally, perform the KITTI-style depth evaluation.
-  callbacks.push_back(new EvaluationCallback(kKittiDeltaMax, compare_on_intersection, kKittiStyle));
+  callbacks.push_back(new EvaluationCallback(kKittiDeltaMax,
+                                             compare_on_intersection,
+                                             kKittiStyle));
 
-  // XXX: get rid of these params...
   EvaluateDepth(lidar_pointcloud, rendered_depthmap, *input_depthmap, callbacks);
 
   std::vector<DepthEvaluation> evals;
@@ -133,7 +211,7 @@ bool Evaluation::ProjectLidar(const Eigen::Vector4f &velodyne_reading,
 }
 
 
-DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
+void Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
                                           const float *const rendered_depth,
                                           const cv::Mat1s &input_depth_mm,
                                           const std::vector<ILidarEvalCallback *> &callbacks) const {
@@ -155,7 +233,6 @@ DepthEvaluation Evaluation::EvaluateDepth(const Eigen::MatrixX4f &lidar_points,
     }
 
     if (row_left != row_right) {
-      int delta = row_left - row_right;
       float fdelta = velo_2d_left(1) - velo_2d_right(1);
 
       // Note that the LIDAR pointclouds aren't perfectly aligned, so this could occasionally happen.
@@ -205,9 +282,6 @@ int GetBestOverlapping(
     const TrackFrame &frame
 ) {
   using namespace instreclib::utils;
-
-  // TODO(andrei): render the pose est. error(s) on the segmentation preview, if available, like
-  // next to the [D] labels, for instance.
   int best_overlap = -1;
   int best_idx = -1;
 
@@ -215,7 +289,7 @@ int GetBestOverlapping(
   auto our_box = frame.instance_view.GetInstanceDetection().conservative_mask->GetBoundingBox();
 
   const int kMinOverlap = 30 * 30;
-  for(int i = 0; i < candidates.size(); ++i){
+  for(int i = 0; i < static_cast<long>(candidates.size()); ++i){
     BoundingBox theirs = BoundingBox::RoundCoords(candidates[i].bbox_2d);
     int overlap = theirs.IntersectWith(our_box).GetArea();
 
