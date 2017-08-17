@@ -116,7 +116,7 @@ struct DepthFrameEvaluation : public ICsvSerializable {
   const float max_depth_meters;
   const std::vector<DepthEvaluation> evaluations;
 
-  DepthFrameEvaluation(DepthEvaluationMeta &&meta,
+  DepthFrameEvaluation(DepthEvaluationMeta &meta,
                        float max_depth_meters,
                        vector<DepthEvaluation> &&evaluations)
       : meta(meta), max_depth_meters(max_depth_meters), evaluations(evaluations) {}
@@ -297,12 +297,12 @@ class Evaluation {
         csv_tracking_dump_(GetTrackingCsvName(dataset_root, input, voxel_size_meters,
                                               direct_refinement, is_dynamic, use_depth_weighting)),
         separate_static_and_dynamic_(separate_static_and_dynamic),
-        csv_dynamic_depth_dump_(GetDynamicDepthCsvName(dataset_root, input, voxel_size_meters,
-                                                       direct_refinement, is_dynamic,
-                                                       use_depth_weighting)),
         csv_static_depth_dump_(GetStaticDepthCsvName(dataset_root, input, voxel_size_meters,
                                                      direct_refinement, is_dynamic,
                                                      use_depth_weighting)),
+        csv_dynamic_depth_dump_(GetDynamicDepthCsvName(dataset_root, input, voxel_size_meters,
+                                                       direct_refinement, is_dynamic,
+                                                       use_depth_weighting)),
         eval_tracklets_(! input->GetConfig().tracklet_folder.empty())
   {
     if (this->eval_tracklets_) {

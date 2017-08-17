@@ -235,6 +235,10 @@ class DynSlam {
     return latest_seg_result_;
   }
 
+  bool IsDynamicMode() const {
+    return dynamic_mode_;
+  }
+
   SUPPORT_EIGEN_FIELDS;
 
 private:

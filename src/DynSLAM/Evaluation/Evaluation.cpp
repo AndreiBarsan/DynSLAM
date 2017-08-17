@@ -42,16 +42,32 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
       }
     }
 
+    int current_frame_idx = input->GetCurrentFrame() - 1;
+    if (! velodyne_->FrameAvailable(current_frame_idx)) {
+      cerr << "WARNING: Skipping evaluation for frame #" << current_frame_idx << " since no "
+           << "ground truth is available for it (normal for very short chunks)." << endl;
+
+      return;
+    }
+
     if (separate_static_and_dynamic_) {
       cout << "Evaluation will compute separate stats for static and dynamic elements of the scene."
            << endl;
+      auto static_dynamic = EvaluateFrameSeparate(current_frame_idx, input, dyn_slam);
+      auto static_evals = static_dynamic.first;
+      auto dynamic_evals = static_dynamic.second;
 
+      csv_static_depth_dump_.Write(static_evals);
+      csv_dynamic_depth_dump_.Write(dynamic_evals);
+
+      PrettyPrintStats("Static Map", static_evals);
+      PrettyPrintStats("Dynamic", dynamic_evals);
     }
     else {
       cout << "Evaluation will compute unified stats for both static and dynamic parts of the scene."
            << endl;
 
-      DepthFrameEvaluation evals = EvaluateFrame(input->GetCurrentFrame() - 1, input, dyn_slam);
+      DepthFrameEvaluation evals = EvaluateFrame(current_frame_idx, input, dyn_slam);
       csv_depth_dump_.Write(evals);
 
       PrettyPrintStats("Unified", evals);
@@ -84,21 +100,22 @@ std::pair<DepthFrameEvaluation, DepthFrameEvaluation> Evaluation::EvaluateFrameS
   float kKittiDeltaMax = 3.0f;
 
   auto seg = dyn_slam->GetLatestSeg();
+  auto reconstructor = dyn_slam->IsDynamicMode() ? dyn_slam->GetInstanceReconstructor() : nullptr;
 
   std::vector<ILidarEvalCallback *> callbacks;
   callbacks.push_back(new SegmentedEvaluationCallback(0.5f, compare_on_intersection,
-                                                      kNonKittiStyle, seg.get()));
+                                                      kNonKittiStyle, seg.get(), reconstructor));
 
   for (int delta_max = 1; delta_max <= kLargestMaxDelta; ++delta_max) {
     callbacks.push_back(new SegmentedEvaluationCallback(delta_max,
                                                compare_on_intersection,
-                                               kNonKittiStyle, seg.get()));
+                                               kNonKittiStyle, seg.get(), reconstructor));
   }
 
   // Finally, perform the KITTI-style depth evaluation.
   callbacks.push_back(new SegmentedEvaluationCallback(kKittiDeltaMax,
                                              compare_on_intersection,
-                                             kKittiStyle, seg.get()));
+                                             kKittiStyle, seg.get(), reconstructor));
 
   EvaluateDepth(lidar_pointcloud, rendered_depthmap, *input_depthmap, callbacks);
 
@@ -116,8 +133,8 @@ std::pair<DepthFrameEvaluation, DepthFrameEvaluation> Evaluation::EvaluateFrameS
 
   DepthEvaluationMeta meta(frame_idx, input->GetDatasetIdentifier());
   return make_pair<DepthFrameEvaluation, DepthFrameEvaluation>(
-      DepthFrameEvaluation(std::move(meta), max_depth_m_, std::move(static_evals)),
-      DepthFrameEvaluation(std::move(meta), max_depth_m_, std::move(dynamic_evals)));
+      DepthFrameEvaluation(meta, max_depth_m_, std::move(static_evals)),
+      DepthFrameEvaluation(meta, max_depth_m_, std::move(dynamic_evals)));
 }
 
 DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
@@ -180,7 +197,7 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
   }
 
   DepthEvaluationMeta meta(frame_idx, input->GetDatasetIdentifier());
-  return DepthFrameEvaluation(std::move(meta), max_depth_m_, std::move(evals));
+  return DepthFrameEvaluation(meta, max_depth_m_, std::move(evals));
 }
 
 

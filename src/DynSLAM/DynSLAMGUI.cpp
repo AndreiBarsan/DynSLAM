@@ -3,7 +3,6 @@
 #include <chrono>
 #include <iomanip>
 #include <iostream>
-#include <sys/time.h>
 
 #include <backward.hpp>
 #include <gflags/gflags.h>
@@ -12,7 +11,6 @@
 #include <pangolin/pangolin.h>
 
 #include "DynSlam.h"
-
 #include "PrecomputedDepthProvider.h"
 #include "InstRecLib/VisoSparseSFProvider.h"
 #include "DSHandler3D.h"
@@ -26,7 +24,7 @@ const std::string kKitti         = "kitti";
 
 DEFINE_string(dataset_type,
               kKittiOdometry,
-              "The type of the input dataset at which 'dataset_root'is pointing. Supported are "
+              "The type of the input dataset at which 'dataset_root' is pointing. Supported are "
               "'kitti-odometry' and 'kitti-tracking'.");
 DEFINE_string(dataset_root, "", "The root folder of the dataset or dataset sequence to use.");
 DEFINE_bool(dynamic_mode, true, "Whether DynSLAM should be aware of dynamic objects and attempt to "
@@ -35,7 +33,7 @@ DEFINE_bool(dynamic_mode, true, "Whether DynSLAM should be aware of dynamic obje
 DEFINE_int32(frame_offset, 0, "The frame index from which to start reading the dataset sequence.");
 DEFINE_bool(voxel_decay, true, "Whether to enable map regularization via voxel decay (a.k.a. voxel "
                                "garbage collection).");
-DEFINE_int32(min_decay_age, 100, "The minimum voxel *block* age for voxels within it to be eligible "
+DEFINE_int32(min_decay_age, 200, "The minimum voxel *block* age for voxels within it to be eligible "
                                 "for deletion (garbage collection).");
 DEFINE_int32(max_decay_weight, 1, "The maximum voxel weight for decay. Voxels which have "
                                   "accumulated more than this many measurements will not be "
@@ -48,17 +46,12 @@ DEFINE_bool(direct_refinement, false, "Whether to refine motion estimates for ot
 DEFINE_bool(use_depth_weighting, false, "Whether to adaptively set fusion weights as a function of "
                                         "the inverse depth. If disabled, all new measurements have "
                                         "a fixed weight of 1.");
+DEFINE_bool(semantic_evaluation, true, "Whether to separately evaluate the static and dynamic "
+                                       "parts of the reconstruction, based on the semantic "
+                                       "segmentation of each frame.");
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
 // issue, which could easily be avoided in the future.
-
-// TODO(andrei): Consider making the libviso module implement two interfaces
-// with the same underlying engine: visual odometry and sparse scene flow. You
-// could then feed this sparse flow (prolly wrapped inside an Eigen matrix or
-// something) into the instance reconstruction, which would then associate it
-// with instances, and run the more refined tracker, etc. In the first stage we
-// should get the coarse dynamic object pose estimation going, and then add the
-// refinement.
 
 // Handle SIGSEGV and its friends by printing sensible stack traces with code snippets.
 backward::SignalHandling sh;
@@ -990,8 +983,8 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
       throw runtime_error("Please specify a KITTI tracking sequence ID.");
     }
 
-//    input_config = Input::KittiTrackingConfig(t_seq_id);
-    input_config = Input::KittiTrackingDispnetConfig(t_seq_id);
+    input_config = Input::KittiTrackingConfig(t_seq_id);
+//    input_config = Input::KittiTrackingDispnetConfig(t_seq_id);
   }
   else {
     throw runtime_error(utils::Format("Unknown dataset type: [%s]", FLAGS_dataset_type.c_str()));
@@ -1113,7 +1106,8 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
                                                   driver_settings->sceneParams.voxelSize,
                                                   FLAGS_direct_refinement,
                                                   FLAGS_dynamic_mode,
-                                                  FLAGS_use_depth_weighting);
+                                                  FLAGS_use_depth_weighting,
+                                                  FLAGS_semantic_evaluation);
 
   Vector2i input_shape((*input_out)->GetRgbSize().width, (*input_out)->GetRgbSize().height);
   *dyn_slam_out = new gui::DynSlam(

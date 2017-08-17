@@ -7,6 +7,7 @@
 #include "Evaluation/Evaluation.h"
 
 DEFINE_bool(dynamic_weights, false, "Whether to use depth-based weighting when performing fusion.");
+DECLARE_bool(semantic_evaluation);
 
 namespace dynslam {
 
@@ -29,7 +30,7 @@ void DynSlam::ProcessFrame(Input *input) {
   utils::Toc();
 
   future<shared_ptr<InstanceSegmentationResult>> seg_result_future = async(launch::async, [this] {
-    if (dynamic_mode_) {
+    if (dynamic_mode_ || FLAGS_semantic_evaluation) {
       utils::Timer timer("Semantic segmentation");
       timer.Start();
       auto segmentation_result = segmentation_provider_->SegmentFrame(*input_rgb_image_);

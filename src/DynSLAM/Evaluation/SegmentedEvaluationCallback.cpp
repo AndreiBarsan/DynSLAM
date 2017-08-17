@@ -18,27 +18,69 @@ void SegmentedEvaluationCallback::ProcessLidarPoint(int idx,
   int px = static_cast<int>(round(velo_2d_homo_px(0)));
   int py = static_cast<int>(round(velo_2d_homo_px(1)));
 
-  for (const InstanceDetection &det : frame_segmentation->instance_detections) {
-    if (det.copy_mask->ContainsPoint(px, py)) {
-      // Use the mask used for feeding the reconstruction to establish if we're inside a dynamic
-      // object...
-      if (InstanceReconstructor::IsPossiblyDynamic(det.GetClassName())) {
-        ComputeAccuracy(rendered_disp, rendered_depth_m, input_disp, input_depth_m, lidar_disp,
-                        input_stats_dynamic_, rendered_stats_dynamic_);
+  bool matched_to_dyn_object = false;
+
+  for (const InstanceDetection &det : frame_segmentation_->instance_detections) {
+    // Use the mask used for feeding the reconstruction to establish if we're inside a dynamic
+    // object.
+    if (! det.copy_mask->ContainsPoint(px, py)) {
+      continue;
+    }
+
+    if (InstanceReconstructor::IsPossiblyDynamic(det.GetClassName())) {
+      matched_to_dyn_object = true;
+
+      if (InstanceReconstructor::ShouldReconstruct(det.GetClassName())) {
+        bool is_reconstructed = false;
+
+        if(reconstructor_ != nullptr) {
+          /// TODO-LOW(andrei): This is dirty, but it works... It should nevertheless be improved.
+          const Track &track = reconstructor_->GetTrackAtPoint(px, py);
+          is_reconstructed = track.GetState() != TrackState::kUncertain;
+        }
+
+        if (is_reconstructed) {
+          dynamic_eval_.ProcessLidarPoint(idx,
+                                          velo_2d_homo_px,
+                                          rendered_disp,
+                                          rendered_depth_m,
+                                          input_disp,
+                                          input_depth_m,
+                                          lidar_disp,
+                                          frame_width,
+                                          frame_height);
+        }
+        else {
+          // A car we aren't reconstructing, e.g. because it just entered the scene.
+          // Do not evaluate this point.
+          skipped_lidar_points_++;
+        }
+      } else {
+        // A dynamic but non-reconstructable object, like a pedestrian.
+        // Do not evaluate this point.
+        skipped_lidar_points_++;
       }
     }
-    else if (! det.delete_mask->ContainsPoint(px, py)) {
-      // ...and the larger delete mask to consider anything outside it as part of the static map.
-      ComputeAccuracy(rendered_disp, rendered_depth_m, input_disp, input_depth_m, lidar_disp,
-                      input_stats_static_, rendered_stats_static_);
+    else {
+      // LIDAR point belongs to e.g., a plant or table.
+      // We should consider this as part of the static map.
     }
+
+    // Safe to break, since the masks are guaranteed never to overlap.
+    break;
   }
 
-}
-
-DepthEvaluation SegmentedEvaluationCallback::GetEvaluation() {
-  // This looks like a sign we should use composition, not inheritance.
-  throw runtime_error("Please use 'GetStaticEvaluation' or 'GetDynamicEvaluation'.");
+  if (! matched_to_dyn_object) {
+    static_eval_.ProcessLidarPoint(idx,
+                                   velo_2d_homo_px,
+                                   rendered_disp,
+                                   rendered_depth_m,
+                                   input_disp,
+                                   input_depth_m,
+                                   lidar_disp,
+                                   frame_width,
+                                   frame_height);
+  }
 }
 
 }
