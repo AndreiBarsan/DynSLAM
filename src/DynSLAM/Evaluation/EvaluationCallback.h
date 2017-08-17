@@ -33,19 +33,28 @@ class EvaluationCallback : public ILidarEvalCallback {
                          int frame_width,
                          int frame_height) override;
 
-  virtual /// \brief Builds an aggregate evaluation object from the stats gathered by the object.
+  /// \brief Builds an aggregate evaluation object from the stats gathered by the object.
   /// \note Should be used *after* the data gets populated by 'Evaluation::EvaluateDepth'.
-  DepthEvaluation GetEvaluation() {
-    DepthResult rendered_result(measurement_count_, rendered_stats_.error, rendered_stats_.missing, rendered_stats_.correct);
-    DepthResult input_result(measurement_count_, input_stats_.error, input_stats_.missing, input_stats_.correct);
+  virtual DepthEvaluation GetEvaluation() {
+    return CreateDepthEvaluation(delta_max, measurement_count_, kitti_style, rendered_stats_, input_stats_);
+  }
 
+ protected:
+  static DepthEvaluation CreateDepthEvaluation(
+      float delta_max,
+      long measurement_count,
+      bool kitti_style,
+      const Stats& rendered_stats,
+      const Stats& input_stats
+  ) {
+    DepthResult rendered_result(measurement_count, rendered_stats.error, rendered_stats.missing, rendered_stats.correct);
+    DepthResult input_result(measurement_count, input_stats.error, input_stats.missing, input_stats.correct);
     return DepthEvaluation(delta_max,
                            std::move(rendered_result),
                            std::move(input_result),
                            kitti_style);
   }
 
- protected:
   void ComputeAccuracy(float rendered_disp,
                        float rendered_depth_m,
                        float input_disp,

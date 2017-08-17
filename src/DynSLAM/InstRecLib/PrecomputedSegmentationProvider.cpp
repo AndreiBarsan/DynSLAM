@@ -88,7 +88,7 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
   // We ignore detections smaller than this since they are not in any way useful in 3D object
   // reconstruction.
   // (bigger than this messes up e.g., the hill sequence @ 25m range)
-  int min_area = 50 * 50;
+  int min_area = 40 * 40;
 
   int instance_idx = 0;
   vector<InstanceDetection> detections;
@@ -135,7 +135,12 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
   //    dynslam::utils::Toc();
 
       copy_mask->Rescale(kCopyMaskRescaleFactor);
-      delete_mask->Rescale(kDeleteMaskRescaleFactor);
+      float del_scale = kDeleteMaskRescaleFactor;
+      // Adapt rescaling for distant objects
+      if (bounding_box.GetArea() < 55*55) {
+        del_scale *= 1.2f;
+      }
+      delete_mask->Rescale(del_scale);
       conservative_mask->Rescale(kConservativeMaskRescaleFactor);
 
       detections.emplace_back(class_probability, class_id, copy_mask, delete_mask, conservative_mask,

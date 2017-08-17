@@ -5,14 +5,21 @@
 namespace dynslam {
 namespace eval {
 
+using namespace std;
+
+bool VelodyneIO::FrameAvailable(int frame_idx) {
+  return utils::FileExists(GetVeloFpath(frame_idx));
+}
+
 VelodyneIO::LidarReadings VelodyneIO::ReadFrame(int frame_idx) {
-  using namespace std;
-  string fpath_format = dynslam::utils::Format("%s/%s", folder_.c_str(), fname_format_.c_str());
-  string fpath = dynslam::utils::Format(fpath_format, frame_idx);
-  cout << "Reading LIDAR for frame " << frame_idx << endl;
+  string fpath = GetVeloFpath(frame_idx);
+//  cout << "Reading LIDAR for frame " << frame_idx << endl;
 
 //    utils::Tic("Velodyne dump read");
   FILE *velo_in = fopen(fpath.c_str(), "rb");
+  if (nullptr == velo_in) {
+    throw std::runtime_error(utils::Format("Could not read Velodyne data from file: [%s]", fpath.c_str()));
+  }
   size_t read_floats = fread(data_buffer_, sizeof(float), kBufferSize, velo_in);
   fclose(velo_in);
 

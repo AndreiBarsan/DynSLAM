@@ -801,6 +801,8 @@ void InstanceReconstructor::ExtractSceneFlow(const SparseSceneFlow &scene_flow,
     }
   }
 
+  // TODO(andrei): This second half is NOT necessary and also slow... It should be removed
+  // post-deadline.
   for (int cons_row = 0; cons_row < flow_bbox.GetHeight(); ++cons_row) {
     for (int cons_col = 0; cons_col < flow_bbox.GetWidth(); ++cons_col) {
       int cons_frame_row = cons_row + flow_bbox.r.y0;
@@ -810,8 +812,8 @@ void InstanceReconstructor::ExtractSceneFlow(const SparseSceneFlow &scene_flow,
         continue;
       }
 
-      u_char c_mask_val = detection.conservative_mask->GetData()->at<u_char>(cons_row, cons_col);
-      if (c_mask_val == 1) {
+      u_char mask_val = flow_mask->GetData()->at<u_char>(cons_row, cons_col);
+      if (mask_val == 1) {
         auto coord_pair = pair<int, int>(const_frame_col, cons_frame_row);
         if (coord_to_flow.find(coord_pair) != coord_to_flow.cend()) {
           out_instance_flow_vectors.push_back(coord_to_flow.find(coord_pair)->second);

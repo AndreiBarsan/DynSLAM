@@ -16,12 +16,10 @@
 namespace instreclib {
 namespace reconstruction {
 
-/// \brief Minimum overlap score required to add a new frame to an existing
-/// feature track.
+/// \brief Minimum overlap score required to add a new frame to an existing feature track.
 /// Between 0.0 and 1.0.
 const float kTrackScoreThreshold = 0.15f;
 
-// TODO(andrei): Adapt this to allow bigger gaps in longer track, maybe.
 /// \brief Default age of the last frame in an object track after which we discard it.
 /// The smaller this is, the less memory the system uses, but the likelier it is to fragment object
 /// reconstructions into multiple volumes.
@@ -94,7 +92,20 @@ class InstanceTracker {
 
   const TrackMap& GetActiveTracks() const {
     return id_to_active_track_;
-  };
+  }
+
+  const Track& GetTrackAtPoint(int x, int y, int current_frame_idx) const {
+    for(auto it = std::begin(id_to_active_track_); it != std::end(id_to_active_track_); ++it) {
+      const Track& track = it->second;
+      if (track.GetLastFrame().frame_idx == (current_frame_idx - 1) &&
+          track.GetLastFrame().instance_view.GetInstanceDetection().copy_mask->ContainsPoint(x, y)
+      ) {
+        return track;
+      }
+    }
+    throw std::runtime_error(
+        dynslam::utils::Format("Unable to find a track containing the point (%d, %d).", x, y));
+  }
 };
 
 }  // namespace segmentation
