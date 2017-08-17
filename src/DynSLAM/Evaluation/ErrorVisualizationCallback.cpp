@@ -72,15 +72,21 @@ void ErrorVisualizationCallback::ProcessLidarPoint(
   int target_val = (visualize_input_) ? input_disp : rendered_disp;
   if (input_disp < 0 && fabs(input_depth) > 1e-5) {
     throw std::runtime_error(utils::Format(
-        "Cannot have negative disparities, but found input_disp = %d!", input_disp));
+        "Cannot have negative input disparities, but found input_disp = %d!", input_disp));
   }
   if (rendered_disp < 0 && fabs(rendered_depth) > 1e-5) {
-    throw std::runtime_error(utils::Format(
-        "Cannot have negative disparities, but found rendered_disp = %d; its corresponding "
-        "rendered depth was %.4f.",
+//    throw std::runtime_error(utils::Format(
+//        "Cannot have negative disparities, but found rendered_disp = %d; its corresponding "
+//        "rendered depth was %.4f.",
+//        rendered_disp,
+//        rendered_depth
+//    ));
+    std::cerr << utils::Format(
+        "Warning: Cannot have negative disparities, but found rendered_disp = %d; its corresponding "
+            "rendered depth was %.4f.",
         rendered_disp,
         rendered_depth
-    ));
+    ) << std::endl;
   }
 
   if (target_val > 0) {

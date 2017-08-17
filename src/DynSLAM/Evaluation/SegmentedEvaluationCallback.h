@@ -9,17 +9,17 @@ namespace eval {
 /// \brief Similar to 'EvaluationCallback', but computes separate error scores for static components
 /// of the environment and (potentially dynamic) cars. Other potentially dynamic, but not
 /// reconstructable, objects, such as cyclists and pedestrians are simply not evaluated.
-class SegmentedEvaluationCallback : public EvaluationCallback {
+class SegmentedEvaluationCallback : public ILidarEvalCallback {
  public:
   SegmentedEvaluationCallback(float delta_max, bool compare_on_intersection, bool kitti_style,
-                              instreclib::segmentation::InstanceSegmentationResult *frame_segmentation
+                              instreclib::segmentation::InstanceSegmentationResult *frame_segmentation,
+                              instreclib::reconstruction::InstanceReconstructor *reconstructor
   )
-      : input_stats_static_({}),
-        rendered_stats_static_({}),
-        input_stats_dynamic_({}),
-        rendered_stats_dynamic_({}),
-        frame_segmentation(frame_segmentation),
-        EvaluationCallback::EvaluationCallback(delta_max, compare_on_intersection, kitti_style) {}
+      : static_eval_(delta_max, compare_on_intersection, kitti_style),
+        dynamic_eval_(delta_max, compare_on_intersection, kitti_style),
+        frame_segmentation_(frame_segmentation),
+        reconstructor_(reconstructor)
+  {}
 
   void ProcessLidarPoint(int idx,
                          const Eigen::Vector3d &velo_2d_homo_px,
@@ -31,18 +31,25 @@ class SegmentedEvaluationCallback : public EvaluationCallback {
                          int frame_width,
                          int frame_height) override;
 
-  DepthEvaluation GetEvaluation() override;
+  DepthEvaluation GetStaticEvaluation() {
+    return static_eval_.GetEvaluation();
+  }
+
+  DepthEvaluation GetDynamicEvaluation() {
+    return dynamic_eval_.GetEvaluation();
+  }
+
+  long GetSkippedLidarPoints() const {
+    return skipped_lidar_points_;
+  }
 
  private:
-  Stats input_stats_static_;
-  Stats rendered_stats_static_;
-  Stats input_stats_dynamic_;
-  Stats rendered_stats_dynamic_;
+  EvaluationCallback static_eval_;
+  EvaluationCallback dynamic_eval_;
 
-  instreclib::segmentation::InstanceSegmentationResult *frame_segmentation;
-
-  long measurement_count_static_ = 0;
-  long measurement_count_dynamic_ = 0;
+  instreclib::segmentation::InstanceSegmentationResult *frame_segmentation_;
+  instreclib::reconstruction::InstanceReconstructor* reconstructor_;
+  long skipped_lidar_points_ = 0;
 };
 
 }

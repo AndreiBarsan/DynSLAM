@@ -54,6 +54,10 @@ class VelodyneIO {
     delete data_buffer_;
   }
 
+  /// \brief Checks if Velodyne data exists for the specified frame. Some frames do not have it
+  ///        available.
+  bool FrameAvailable(int frame_idx);
+
   /// \brief Returns an Nx4 **row-major** Eigen matrix containing the Velodyne readings from the
   ///        specified frame of the current dataset.
   LidarReadings ReadFrame(int frame_idx);
@@ -64,6 +68,12 @@ class VelodyneIO {
 
   bool HasLatestFrame() const {
     return nullptr != latest_frame_;
+  }
+
+ private:
+  std::string GetVeloFpath(int frame_idx) const {
+    std::string fpath_format = utils::Format("%s/%s", folder_.c_str(), fname_format_.c_str());
+    return utils::Format(fpath_format, frame_idx);
   }
 };
 

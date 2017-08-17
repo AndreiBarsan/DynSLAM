@@ -106,6 +106,11 @@ class InstanceReconstructor {
   /// TODO(andrei): Improve performance.
   void CompositeInstanceDepthMaps(ITMFloatImage *out, const pangolin::OpenGlMatrix &model_view);
 
+  /// Hacky method for checking whether there's an object getting reconstructed at the given coords.
+  const Track& GetTrackAtPoint(int x, int y) const {
+    return instance_tracker_->GetTrackAtPoint(x, y, frame_idx_);
+  }
+
  private:
   std::shared_ptr<InstanceTracker> instance_tracker_;
 
