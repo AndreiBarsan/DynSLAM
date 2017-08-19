@@ -31,13 +31,13 @@ void Input::GetFrameCvImages(
 
 bool Input::HasMoreImages() {
   string next_fpath =
-      GetFrameName(dataset_folder_, config_.left_gray_folder, config_.fname_format, frame_idx_);
+      GetFrameName(dataset_folder_, config_.left_color_folder, config_.fname_format, frame_idx_);
   return utils::FileExists(next_fpath);
 }
 
 bool Input::ReadNextFrame() {
-  ReadLeftGray(frame_idx_, left_frame_gray_buf_);
-  ReadRightGray(frame_idx_, right_frame_gray_buf_);
+//  ReadLeftGray(frame_idx_, left_frame_gray_buf_);
+//  ReadRightGray(frame_idx_, right_frame_gray_buf_);
   ReadLeftColor(frame_idx_, left_frame_color_buf_);
   ReadRightColor(frame_idx_, right_frame_color_buf_);
 

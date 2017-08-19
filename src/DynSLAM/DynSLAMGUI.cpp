@@ -49,6 +49,7 @@ DEFINE_bool(use_depth_weighting, false, "Whether to adaptively set fusion weight
 DEFINE_bool(semantic_evaluation, true, "Whether to separately evaluate the static and dynamic "
                                        "parts of the reconstruction, based on the semantic "
                                        "segmentation of each frame.");
+DEFINE_double(scale, 1.0, "Whether to run in reduced-scale mode. Used for experimental purposes.");
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
 // issue, which could easily be avoided in the future.
@@ -271,6 +272,8 @@ public:
       font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.90f, 0.90f);
 
       rgb_view_.Activate();
+      glClearColor(1.0, 1.0, 1.0, 1.0);
+      glClear(GL_COLOR_BUFFER_BIT);
       glColor3f(1.0f, 1.0f, 1.0f);
       if(dyn_slam_->GetCurrentFrameNo() >= 1) {
         if (display_raw_previews_->Get()) {
@@ -278,23 +281,23 @@ public:
         } else {
           UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_, true, GL_UNSIGNED_BYTE);
         }
-        pane_texture_->RenderToViewport(true);
+//        pane_texture_->RenderToViewport(true);
 
-        Tic("LIDAR render");
-        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
-        if (velodyne->HasLatestFrame()) {
-          PreviewLidar(velodyne->GetLatestFrame(),
-                       dyn_slam_->GetLeftRgbProjectionMatrix(),
-                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
-                       rgb_view_);
-        }
-        else {
-          PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
-                       dyn_slam_->GetLeftRgbProjectionMatrix(),
-                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
-                       rgb_view_);
-        }
-        Toc(true);
+//        Tic("LIDAR render");
+//        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
+//        if (velodyne->HasLatestFrame()) {
+//          PreviewLidar(velodyne->GetLatestFrame(),
+//                       dyn_slam_->GetLeftRgbProjectionMatrix(),
+//                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
+//                       rgb_view_);
+//        }
+//        else {
+//          PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
+//                       dyn_slam_->GetLeftRgbProjectionMatrix(),
+//                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
+//                       rgb_view_);
+//        }
+//        Toc(true);
       }
 
       if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
@@ -401,22 +404,28 @@ public:
   void PreviewSparseSF(const vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &flow, const pangolin::View &view) {
     pangolin::GlFont &font = pangolin::GlFont::I();
     Eigen::Vector2f frame_size(width_, height_);
-    font.Text("libviso2 scene flow preview").Draw(-0.90f, 0.89f);
+//    font.Text("libviso2 scene flow preview").Draw(-0.90f, 0.89f);
 
     // We don't need z-checks since we're rendering UI stuff.
     glDisable(GL_DEPTH_TEST);
     for(const RawFlow &match : flow) {
       Eigen::Vector2f bounds(segment_view_.GetBounds().w, segment_view_.GetBounds().h);
-      Eigen::Vector2f gl_pos = PixelsToGl(match.curr_left, frame_size, bounds);
-      Eigen::Vector2f gl_pos_old = PixelsToGl(match.prev_left, frame_size, bounds);
 
-      Eigen::Vector2f delta = gl_pos - gl_pos_old;
-      float magnitude = 15.0f * static_cast<float>(delta.norm());
+      // Very hacky way of making the lines thicker
+      for (int xof = -1; xof <= 1; ++xof) {
+        for (int yof = -1; yof <= 1; ++yof) {
+          Eigen::Vector2f of(xof, yof);
+          Eigen::Vector2f gl_pos = PixelsToGl(match.curr_left + of, frame_size, bounds);
+          Eigen::Vector2f gl_pos_old = PixelsToGl(match.prev_left + of, frame_size, bounds);
 
-      glColor4f(0.3f, 0.3f, 0.9f, 1.0f);
-      pangolin::glDrawCross(gl_pos[0], gl_pos[1], 0.025f);
-      glColor4f(max(0.2f, min(1.0f, magnitude)), 0.4f, 0.4f, 1.0f);
-      pangolin::glDrawLine(gl_pos_old[0], gl_pos_old[1], gl_pos[0], gl_pos[1]);
+          Eigen::Vector2f delta = gl_pos - gl_pos_old;
+          float magnitude = 15.0f * static_cast<float>(delta.norm());
+
+          glColor4f(max(0.2f, min(1.0f, magnitude)), 0.4f, 0.4f, 1.0f);
+          pangolin::glDrawCircle(gl_pos.cast<double>(), 0.010f);
+          pangolin::glDrawLine(gl_pos_old[0], gl_pos_old[1], gl_pos[0], gl_pos[1]);
+        }
+      }
     }
 
     glEnable(GL_DEPTH_TEST);
@@ -894,7 +903,8 @@ public:
 
 } // namespace gui
 
-Eigen::Matrix<double, 3, 4> ReadProjection(const string &expected_label, istream &in) {
+Eigen::Matrix<double, 3, 4> ReadProjection(const string &expected_label, istream &in, double downscale_factor) {
+  // The downscale factor is used to adjust the intrinsic matric for low-res input.
   Eigen::Matrix<double, 3, 4> matrix;
   string label;
   in >> label;
@@ -906,6 +916,10 @@ Eigen::Matrix<double, 3, 4> ReadProjection(const string &expected_label, istream
     }
   }
 
+  cout << "Adjusting projection matrix for scale [" << downscale_factor << "]." << endl;
+  matrix *= downscale_factor;
+  matrix(2, 2) = 1.0;
+
   return matrix;
 };
 
@@ -916,7 +930,8 @@ void ReadKittiOdometryCalibration(const string &fpath,
                                   Eigen::Matrix<double, 3, 4> &right_gray_proj,
                                   Eigen::Matrix<double, 3, 4> &left_color_proj,
                                   Eigen::Matrix<double, 3, 4> &right_color_proj,
-                                  Eigen::Matrix4d &velo_to_left_cam) {
+                                  Eigen::Matrix4d &velo_to_left_cam,
+                                  double downscale_factor) {
   static const string kLeftGray = "P0:";
   static const string kRightGray = "P1:";
   static const string kLeftColor = "P2:";
@@ -926,10 +941,10 @@ void ReadKittiOdometryCalibration(const string &fpath,
     throw runtime_error(utils::Format("Could not open calibration file: [%s]", fpath.c_str()));
   }
 
-  left_gray_proj = ReadProjection(kLeftGray, in);
-  right_gray_proj = ReadProjection(kRightGray, in);
-  left_color_proj = ReadProjection(kLeftColor, in);
-  right_color_proj = ReadProjection(kRightColor, in);
+  left_gray_proj = ReadProjection(kLeftGray, in, downscale_factor);
+  right_gray_proj = ReadProjection(kRightGray, in, downscale_factor);
+  left_color_proj = ReadProjection(kLeftColor, in, downscale_factor);
+  right_color_proj = ReadProjection(kRightColor, in, downscale_factor);
 
   string dummy;
   in >> dummy;
@@ -973,9 +988,21 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
                                DynSlam **dyn_slam_out,
                                Input **input_out) {
   Input::Config input_config;
+  double downscale_factor = FLAGS_scale;
+  if (downscale_factor > 1.0 || downscale_factor <= 0.0) {
+    throw runtime_error("Scaling factor must be > 0 and <= 1.0.");
+  }
+  float downscale_factor_f = static_cast<float>(downscale_factor);
+
   if (FLAGS_dataset_type == kKittiOdometry) {
-//    input_config = Input::KittiOdometryConfig();
-    input_config = Input::KittiOdometryDispnetConfig();
+    if (downscale_factor != 1.0) {
+//      input_config = Input::KittiOdometryLowresConfig(downscale_factor_f);
+    input_config = Input::KittiOdometryDispnetLowresConfig(downscale_factor_f);
+    }
+    else {
+//      input_config = Input::KittiOdometryConfig();
+      input_config = Input::KittiOdometryDispnetConfig();
+    }
   }
   else if (FLAGS_dataset_type == kKittiTracking){
     int t_seq_id = FLAGS_kitti_tracking_sequence_id;
@@ -1000,11 +1027,12 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
   // HERE BE DRAGONS Make sure you're using the correct matrix for the grayscale and/or color cameras!
   ReadKittiOdometryCalibration(dataset_root + "/" + input_config.calibration_fname,
                                left_gray_proj, right_gray_proj, left_color_proj, right_color_proj,
-                               velo_to_left_gray_cam);
+                               velo_to_left_gray_cam, downscale_factor);
 
   Eigen::Vector2i frame_size = GetFrameSize(dataset_root, input_config);
 
   cout << "Read calibration from KITTI-style data..." << endl
+       << "Frame size: " << frame_size << endl
        << "Proj (left, gray): " << endl << left_gray_proj << endl
        << "Proj (right, gray): " << endl << right_gray_proj << endl
        << "Proj (left, color): " << endl << left_color_proj << endl

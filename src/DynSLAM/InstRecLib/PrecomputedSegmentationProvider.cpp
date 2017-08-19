@@ -157,6 +157,10 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
   img_fpath_ss << this->seg_folder_ << "/"
                << "cls_" << setfill('0') << setw(6) << this->frame_idx_ << ".png";
   const string img_fpath = img_fpath_ss.str();
+  if (! dynslam::utils::FileExists(img_fpath)) {
+    throw runtime_error(dynslam::utils::Format("Unable to find segmentation preview at [%s].",
+                                               img_fpath.c_str()));
+  }
 
   if (last_seg_preview_ == nullptr) {
     last_seg_preview_ = new cv::Mat3b(rgb.rows, rgb.cols);
