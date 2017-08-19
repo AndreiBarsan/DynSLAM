@@ -159,9 +159,10 @@ class Track {
   /// \brief Returns the relative pose of the specified frame w.r.t. the first one.
   dynslam::utils::Option<Eigen::Matrix4d> GetFramePose(size_t frame_idx) const;
 
-  /// \brief Similar to 'GetFramePose' but in world coords, and without attempting to account for
-  ///        any gaps in the track (returns 'empty' if any are found).
-  dynslam::utils::Option<Eigen::Matrix4d> GetFrameWorldPose(size_t frame_idx) const;
+  /// \deprecated Used to return world pose, but that's no longer necessary. This now duplicates the
+  /// functionality of 'GetFramePose'.
+  /// TODO(andre): Safely remove this after the thesis deadline.
+  dynslam::utils::Option<Eigen::Matrix4d> GetFramePoseDeprecated(size_t frame_idx) const;
 
   bool NeedsCleanup() const {
     return needs_cleanup_;
