@@ -855,7 +855,7 @@ void InstanceReconstructor::CompositeInstanceDepthMaps(ITMFloatImage *out,
 //      cout << "Fusing track [" << t.GetId() << "]..." << endl;
 //      cout << "Frame: " << current_frame_idx << " | Track last active @: " << t.GetLastFrame().frame_idx << "." << endl;
 
-      Option<Eigen::Matrix4d> pose = t.GetFrameWorldPose(t.GetSize() - 1);
+      Option<Eigen::Matrix4d> pose = t.GetFramePoseDeprecated(t.GetSize() - 1);
       if (pose.IsPresent()) {
         Eigen::Matrix4d pose_mat = pose.Get();
         auto pango_object_pose = pangolin::OpenGlMatrix::ColMajor4x4(pose_mat.data());

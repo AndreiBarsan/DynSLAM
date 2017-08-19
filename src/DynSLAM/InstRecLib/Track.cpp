@@ -88,9 +88,6 @@ string Track::GetAsciiArt() const {
 Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
   assert(frame_idx < GetFrames().size() && "Cannot get the relative pose of a non-existent frame.");
 
-  // XXX: is this really what this method is doing now? Double-check, and fuse with GetFrameWorldPose if needed.
-  // That method is probably whack too.
-
   // Skip the original very distant frames with no relative pose info.
   bool found_good_pose = false;
   Eigen::Matrix4d *pose = new Eigen::Matrix4d;
@@ -118,21 +115,17 @@ Option<Eigen::Matrix4d> Track::GetFramePose(size_t frame_idx) const {
   return Option<Eigen::Matrix4d>(pose);
 }
 
-dynslam::utils::Option<Eigen::Matrix4d> Track::GetFrameWorldPose(size_t frame_idx) const {
+dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePoseDeprecated(size_t frame_idx) const {
   assert(frame_idx < GetFrames().size() && "Cannot get the relative pose of a non-existent frame.");
 
   bool found_good_pose = false;
   Eigen::Matrix4d *pose = new Eigen::Matrix4d;
   pose->setIdentity();
 
-  Eigen::Matrix4d first_cam_pose;
-
-  first_cam_pose = frames_[0].camera_pose.cast<double>();
   for (size_t i = 1; i <= frame_idx; ++i) {
     if (frames_[i].relative_pose->IsPresent()) {
       if (! found_good_pose) {
         found_good_pose = true;
-//        first_cam_pose = frames_[i-1].camera_pose.cast<double>();
       }
 
       const Eigen::Matrix4d &rel_pose = frames_[i].relative_pose->Get().matrix_form;
@@ -140,9 +133,9 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFrameWorldPose(size_t frame_id
     }
     else {
       if (found_good_pose) {
-        /// XXX: should we at least try to do something if we have an (s/d) -> u -> s/d case? Otherwise we mess up the evaluation.
-        // Do not tolerate gaps in the pose estimation
-//        return dynslam::utils::Option<Eigen::Matrix4d>::Empty();
+        // This is OK even if the previos "streak" had triggered a reconstruction, since as soon
+        // as we detect an resumed reconstruction after an interruption, we clear the reconstruction
+        // volume.
         found_good_pose = false;
         pose->setIdentity();
       }
@@ -150,9 +143,6 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFrameWorldPose(size_t frame_id
   }
 
   if (found_good_pose) {
-//    cout << "Found pose for track frame, with first camera pose being: " << endl << first_cam_pose
-//         << endl << endl;
-//    *pose = first_cam_pose * (*pose);
     return dynslam::utils::Option<Eigen::Matrix4d>(pose);
   }
   else {
@@ -263,21 +253,14 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
 
       if (track_state_ != kUncertain) {
         // We just switched states
+
         if (HasReconstruction()) {
-          // XXX: reset the coordinate frame somehow, or even fully discard all old frames in the
-          // track, so that when we fuse the map we get the "new" model, and not ANY garbage from
-          // the old one.
-
-          cerr << "Uncertain -> S/D BUT a reconstruction was found. It needs to be cleared." << endl;
-
           // Corner case: an instance which was static or dynamic, started being reconstructed, then
           // became uncertain again, and then was labeled as static or dynamic once again. In this
           // case, we have no way of registering our new measurements to the existing
           // reconstruction, so we discard it in order to start fresh.
-//          reconstruction_->SetView(nullptr);    // Prevent view double-free
-//          reconstruction_->
-
-          cerr << "Resetting reconstruction to avoid corruption." << endl;
+          cout << "Uncertain -> Static/Dynamic BUT a reconstruction was already present. "
+               << "Resetting reconstruction to avoid corruption." << endl;
           reconstruction_->Reset();
         }
       }

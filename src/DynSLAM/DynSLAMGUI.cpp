@@ -272,8 +272,6 @@ public:
       font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.90f, 0.90f);
 
       rgb_view_.Activate();
-      glClearColor(1.0, 1.0, 1.0, 1.0);
-      glClear(GL_COLOR_BUFFER_BIT);
       glColor3f(1.0f, 1.0f, 1.0f);
       if(dyn_slam_->GetCurrentFrameNo() >= 1) {
         if (display_raw_previews_->Get()) {
@@ -281,23 +279,23 @@ public:
         } else {
           UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_, true, GL_UNSIGNED_BYTE);
         }
-//        pane_texture_->RenderToViewport(true);
+        pane_texture_->RenderToViewport(true);
 
-//        Tic("LIDAR render");
-//        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
-//        if (velodyne->HasLatestFrame()) {
-//          PreviewLidar(velodyne->GetLatestFrame(),
-//                       dyn_slam_->GetLeftRgbProjectionMatrix(),
-//                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
-//                       rgb_view_);
-//        }
-//        else {
-//          PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
-//                       dyn_slam_->GetLeftRgbProjectionMatrix(),
-//                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
-//                       rgb_view_);
-//        }
-//        Toc(true);
+        Tic("LIDAR render");
+        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
+        if (velodyne->HasLatestFrame()) {
+          PreviewLidar(velodyne->GetLatestFrame(),
+                       dyn_slam_->GetLeftRgbProjectionMatrix(),
+                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
+                       rgb_view_);
+        }
+        else {
+          PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
+                       dyn_slam_->GetLeftRgbProjectionMatrix(),
+                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
+                       rgb_view_);
+        }
+        Toc(true);
       }
 
       if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
