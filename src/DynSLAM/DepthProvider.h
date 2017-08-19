@@ -91,6 +91,7 @@ class DepthProvider {
                              const StereoCalibration &calibration,
                              cv::Mat1s &out_depth
   ) {
+    std::cerr << "disparity=" << disparity.size() << ", out_depth = " << out_depth.size() << std::endl;
     assert(disparity.size() == out_depth.size());
     assert(!input_is_depth_ && "Should not attempt to compute depth from disparity when the read "
         "data is already a depth map, and not just a disparity map.");

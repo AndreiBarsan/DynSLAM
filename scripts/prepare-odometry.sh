@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A script for preparing a KITTI odometry sequence for DynSLAM.
-# TODO(andrei): Set up calibration files correctly and finish implementing.
+# TODO(andrei): Finish implementing in a fully generic way.
 
 set -euo pipefail
 IFS=$'\n\t'

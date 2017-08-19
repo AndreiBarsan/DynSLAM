@@ -44,7 +44,7 @@ class Input {
 
     // Whether to read ground truth odometry information from an OxTS dump folder (e.g., KITTI
     // dataset), or from a single-file ground truth, as provided with the kitti-odometry dataset.
-    // UNSUPPORTED AT THE MOMENT TODO(andrei): Support this.
+    // !! UNSUPPORTED AT THE MOMENT !!
     bool odometry_oxts = false;
     std::string odometry_fname = "";
 
@@ -126,20 +126,15 @@ class Input {
     return config;
   }
 
-  // TODO(andrei): Use this for lowres experiments.
   static Config KittiOdometryLowresConfig(float factor) {
     Config config = KittiOdometryConfig();
-    // TODO(andrei): Consider using full-res gray input for VO, in case it starts to fail at low resolutions.
-    config.left_gray_folder       = utils::Format("image_0_scale_%.2f", factor);
-    config.right_gray_folder      = utils::Format("image_1_scale_%.2f", factor);
-    config.left_color_folder      = utils::Format("image_2_scale_%.2f", factor);
-    config.right_color_folder     = utils::Format("image_3_scale_%.2f", factor);
+    config.left_gray_folder       = utils::Format("image_0_%.2f", factor);
+    config.right_gray_folder      = utils::Format("image_1_%.2f", factor);
+    config.left_color_folder      = utils::Format("image_2_%.2f", factor);
+    config.right_color_folder     = utils::Format("image_3_%.2f", factor);
 
-    // TODO(andrei): Adjust calibration parameters accordingly for the downscaling factor.
-    // Effectively: same area covered, so each pixel becomes twice as large.
-
-    config.depth_folder           = utils::Format("precomputed-depth/Frames_scale_%.2f", factor);
-    config.segmentation_folder    = utils::Format("seg_image_2_scale_%.2f/mnc", factor);
+    config.depth_folder           = utils::Format("precomputed-depth-elas-%.2f/Frames", factor);
+    config.segmentation_folder    = utils::Format("seg_image_2-%.2f/mnc", factor);
 
     return config;
   }
@@ -151,6 +146,20 @@ class Input {
     config.read_depth             = false;
     return config;
   }
+
+  static Config KittiOdometryDispnetLowresConfig(float factor) {
+    Config config = KittiOdometryDispnetConfig();
+    config.left_gray_folder       = utils::Format("image_0_%.2f", factor);
+    config.right_gray_folder      = utils::Format("image_1_%.2f", factor);
+    config.left_color_folder      = utils::Format("image_2_%.2f", factor);
+    config.right_color_folder     = utils::Format("image_3_%.2f", factor);
+
+    config.depth_folder           = utils::Format("precomputed-depth-dispnet-%.2f", factor);
+    config.segmentation_folder    = utils::Format("seg_image_2-%.2f/mnc", factor);
+
+    return config;
+  }
+
 
  public:
   Input(const std::string &dataset_folder,
