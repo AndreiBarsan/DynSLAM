@@ -992,14 +992,24 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
   }
   float downscale_factor_f = static_cast<float>(downscale_factor);
 
+  bool use_dispnet = true;
+
   if (FLAGS_dataset_type == kKittiOdometry) {
     if (downscale_factor != 1.0) {
-//      input_config = Input::KittiOdometryLowresConfig(downscale_factor_f);
-    input_config = Input::KittiOdometryDispnetLowresConfig(downscale_factor_f);
+      if (use_dispnet) {
+        input_config = Input::KittiOdometryDispnetLowresConfig(downscale_factor_f);
+      }
+      else {
+        input_config = Input::KittiOdometryLowresConfig(downscale_factor_f);
+      }
     }
     else {
-//      input_config = Input::KittiOdometryConfig();
-      input_config = Input::KittiOdometryDispnetConfig();
+      if (use_dispnet) {
+        input_config = Input::KittiOdometryDispnetConfig();
+      }
+      else {
+        input_config = Input::KittiOdometryConfig();
+      }
     }
   }
   else if (FLAGS_dataset_type == kKittiTracking){
@@ -1008,8 +1018,12 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
       throw runtime_error("Please specify a KITTI tracking sequence ID.");
     }
 
-    input_config = Input::KittiTrackingConfig(t_seq_id);
-//    input_config = Input::KittiTrackingDispnetConfig(t_seq_id);
+    if (use_dispnet) {
+      input_config = Input::KittiTrackingDispnetConfig(t_seq_id);
+    }
+    else {
+      input_config = Input::KittiTrackingConfig(t_seq_id);
+    }
   }
   else {
     throw runtime_error(utils::Format("Unknown dataset type: [%s]", FLAGS_dataset_type.c_str()));
