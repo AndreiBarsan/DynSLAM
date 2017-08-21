@@ -31,8 +31,11 @@ void PrettyPrintStats(const string &label, const DepthFrameEvaluation &evals) {
 }
 
 void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
-  if (dyn_slam->GetCurrentFrameNo() > 0) {
-    cout << "Starting evaluation of current frame..." << endl;
+  // TODO(andrei): Make this passable as param.
+  int frame_idx = dyn_slam->GetCurrentFrameNo() - 1;
+
+  if (frame_idx >= 0) {
+    cout << "Starting evaluation of frame [" << frame_idx << "].." << endl;
 
     if (this->eval_tracklets_) {
       vector<TrackletEvaluation> tracklet_evals = EvaluateTracking(input, dyn_slam);
@@ -42,18 +45,17 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
       }
     }
 
-    int current_frame_idx = input->GetCurrentFrame() - 1;
-    if (! velodyne_->FrameAvailable(current_frame_idx)) {
-      cerr << "WARNING: Skipping evaluation for frame #" << current_frame_idx << " since no "
+    if (! velodyne_->FrameAvailable(frame_idx)) {
+      cerr << "WARNING: Skipping evaluation for frame #" << frame_idx << " since no "
            << "ground truth is available for it (normal for very short chunks)." << endl;
 
       return;
     }
 
     if (separate_static_and_dynamic_) {
-      cout << "Evaluation will compute separate stats for static and dynamic elements of the scene."
-           << endl;
-      auto static_dynamic = EvaluateFrameSeparate(current_frame_idx, input, dyn_slam);
+      cout << "Evaluation of frame [" << frame_idx << "] will compute separate stats for static "
+           << "and dynamic elements of the scene." << endl;
+      auto static_dynamic = EvaluateFrameSeparate(frame_idx, input, dyn_slam);
       auto static_evals = static_dynamic.first;
       auto dynamic_evals = static_dynamic.second;
 
@@ -64,10 +66,10 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
       PrettyPrintStats("Dynamic", dynamic_evals);
     }
     else {
-      cout << "Evaluation will compute unified stats for both static and dynamic parts of the scene."
-           << endl;
+      cout << "Evaluation of frame [" << frame_idx << "] will compute unified stats for both "
+           << "static and dynamic parts of the scene." << endl;
 
-      DepthFrameEvaluation evals = EvaluateFrame(current_frame_idx, input, dyn_slam);
+      DepthFrameEvaluation evals = EvaluateFrame(frame_idx, input, dyn_slam);
       csv_depth_dump_.Write(evals);
 
       PrettyPrintStats("Unified", evals);
