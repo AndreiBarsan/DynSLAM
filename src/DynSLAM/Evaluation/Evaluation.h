@@ -22,6 +22,8 @@ struct Stats {
   long missing = 0;
   long error = 0;
   long correct = 0;
+  // Keeps track of the # of missing values even when 'compare_on_intersection' is true.
+  long missing_separate = 0;
 };
 
 
@@ -30,16 +32,23 @@ struct DepthResult : public ICsvSerializable {
   const long error_count;
   const long missing_count;
   const long correct_count;
+  const long missing_separate_count;
 
   DepthResult(const long measurement_count,
               const long error_count,
               const long missing_count,
-              const long correct_count)
+              const long correct_count,
+              const long missing_separate_count)
       : measurement_count(measurement_count),
         error_count(error_count),
         missing_count(missing_count),
-        correct_count(correct_count) {
+        correct_count(correct_count),
+        missing_separate_count(missing_separate_count)
+  {
     assert(measurement_count == (error_count + missing_count + correct_count));
+    // 'missing_count' may be more generous, and count a pixel as missing if it's missing in EITHER
+    // the fusion or the input.
+    assert(missing_count >= missing_separate_count);
   }
 
   /// \brief Returns the ratio of correct pixels in this depth evaluation result.
@@ -54,7 +63,7 @@ struct DepthResult : public ICsvSerializable {
   }
 
   string GetHeader() const override {
-    return "measurements_count,error_count,missing_count,correct_count";
+    return "measurements_count,error_count,missing_count,correct_count,missing_separate_count";
   }
 
   string GetData() const override {
@@ -62,7 +71,8 @@ struct DepthResult : public ICsvSerializable {
                          measurement_count,
                          error_count,
                          missing_count,
-                         correct_count);
+                         correct_count,
+                         missing_separate_count);
   }
 };
 
