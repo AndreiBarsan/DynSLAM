@@ -12,10 +12,10 @@ namespace eval {
 class EvaluationCallback : public ILidarEvalCallback {
  public:
   const float delta_max;
-  /// \param compare_on_intersection If true, then the accuracy of both input and fused depth is
-  /// computed only for ground truth LIDAR points which have both corresponding input depth, as well
-  /// as fused depth. Otherwise, the input and depth accuracies are compute separately, even in
-  /// areas covered by only one of them.
+  /// If true, then the accuracy of both input and fused depth is computed only for ground truth
+  /// LIDAR points which have both corresponding input depth, as well as fused depth. Otherwise,
+  /// the input and depth accuracies are compute separately, even in areas covered by only one of
+  /// them.
   const bool compare_on_intersection;
   const bool kitti_style;
 
@@ -46,14 +46,7 @@ class EvaluationCallback : public ILidarEvalCallback {
       bool kitti_style,
       const Stats& rendered_stats,
       const Stats& input_stats
-  ) {
-    DepthResult rendered_result(measurement_count, rendered_stats.error, rendered_stats.missing, rendered_stats.correct);
-    DepthResult input_result(measurement_count, input_stats.error, input_stats.missing, input_stats.correct);
-    return DepthEvaluation(delta_max,
-                           std::move(rendered_result),
-                           std::move(input_result),
-                           kitti_style);
-  }
+  );
 
   void ComputeAccuracy(float rendered_disp,
                        float rendered_depth_m,
