@@ -45,7 +45,9 @@ class DepthProvider {
   virtual void DepthFromStereo(const cv::Mat &left,
                                const cv::Mat &right,
                                const StereoCalibration &calibration,
-                               cv::Mat1s &out_depth) {
+                               cv::Mat1s &out_depth,
+                               float scale
+  ) {
     if (input_is_depth_) {
       // Our input is designated as direct depth, not just disparity.
       DisparityMapFromStereo(left, right, out_depth);
@@ -57,7 +59,7 @@ class DepthProvider {
 
     // This should be templated in a nicer fashion...
     if (out_disparity_.type() == CV_32FC1) {
-      DepthFromDisparityMap<float>(out_disparity_, calibration, out_depth);
+      DepthFromDisparityMap<float>(out_disparity_, calibration, out_depth, scale);
     } else if (out_disparity_.type() == CV_16SC1) {
       throw std::runtime_error("Cannot currently convert int16_t disparity to depth.");
     } else {
@@ -86,12 +88,15 @@ class DepthProvider {
   /// \param disparity The disparity map.
   /// \param calibration The stereo calibration parameters used to compute depth from disparity.
   /// \param out_depth The output depth map, which gets populated by this method.
+  /// \param scale Used to adjust the depth-from-disparity formula when using reduced-resolution
+  ///              input. Unless evaluating the system's performance on low-res input, this should
+  ///              be set to 1.
   template<typename T>
   void DepthFromDisparityMap(const cv::Mat_<T> &disparity,
                              const StereoCalibration &calibration,
-                             cv::Mat1s &out_depth
+                             cv::Mat1s &out_depth,
+                             float scale
   ) {
-    std::cerr << "disparity=" << disparity.size() << ", out_depth = " << out_depth.size() << std::endl;
     assert(disparity.size() == out_depth.size());
     assert(!input_is_depth_ && "Should not attempt to compute depth from disparity when the read "
         "data is already a depth map, and not just a disparity map.");
@@ -101,10 +106,10 @@ class DepthProvider {
     // the sidewalks.
     int32_t min_depth_mm = static_cast<int32_t>(min_depth_m_ * kMetersToMillimeters);
     int32_t max_depth_mm = static_cast<int32_t>(max_depth_m_ * kMetersToMillimeters);
-    int32_t max_representable_depth = std::numeric_limits<int16_t>::max();
 
     // InfiniTAM requires short depth maps, so we need to ensure our depth can actually fit in a
     // short.
+    int32_t max_representable_depth = std::numeric_limits<int16_t>::max();
     if (max_depth_mm >= max_representable_depth) {
       throw std::runtime_error(utils::Format("Unsupported maximum depth of %f meters (%d mm, "
                                                  "larger than the %d limit).", max_depth_m_,
@@ -115,14 +120,13 @@ class DepthProvider {
       for (int j = 0; j < disparity.cols; ++j) {
         T disp = disparity.template at<T>(i, j);
         int32_t depth_mm =
-            static_cast<int32_t>(kMetersToMillimeters * DepthFromDisparity(disp, calibration));
+            static_cast<int32_t>(kMetersToMillimeters * scale * DepthFromDisparity(disp, calibration));
 
         if (abs(disp) < 1e-5) {
           depth_mm = 0;
         }
 
         if (depth_mm > max_depth_mm || depth_mm < min_depth_mm) {
-//          depth_mm = max_representable_depth;
           depth_mm = 0;
         }
 

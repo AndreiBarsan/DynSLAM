@@ -21,11 +21,13 @@ void Input::GetFrameCvImages(
 
   PrecomputedDepthProvider *pdp = dynamic_cast<PrecomputedDepthProvider*>(GetDepthProvider());
   if (nullptr == pdp) {
-    GetDepthProvider()->DepthFromStereo(*rgb, rgb_right_temp, stereo_calibration_, *raw_depth);
+    throw runtime_error("Currently not fully supported.");
+    GetDepthProvider()->DepthFromStereo(*rgb, rgb_right_temp, stereo_calibration_, *raw_depth, input_scale_);
   }
   else {
     // If we're using precomputed depth, make sure you tell it exactly which frame we are evaluating.
-    pdp->GetDepth(frame_idx, this->stereo_calibration_, *raw_depth);
+    pdp->GetDepth(frame_idx, this->stereo_calibration_, depth_buf_small_, input_scale_);
+    cv::resize(depth_buf_small_, *raw_depth, cv::Size(), 1.0/input_scale_, 1.0/input_scale_, cv::INTER_NEAREST);
   }
 }
 
@@ -63,10 +65,20 @@ bool Input::ReadNextFrame() {
   }
 
   utils::Tic("Depth from stereo");
+  cv::Mat1s &depth_out = (input_scale_ != 1.0f) ? depth_buf_small_ : depth_buf_;
   depth_provider_->DepthFromStereo(left_frame_color_buf_,
                                    right_frame_color_buf_,
                                    stereo_calibration_,
-                                   depth_buf_);
+                                   depth_out,
+                                   input_scale_);
+  if (input_scale_ != 1.0f) {
+    cv::resize(depth_buf_small_,
+               depth_buf_,
+               cv::Size(),
+               1.0 / input_scale_,
+               1.0 / input_scale_,
+               cv::INTER_NEAREST);
+  }
   utils::Toc();
 
   const auto &depth_size = GetDepthSize();
@@ -98,6 +110,7 @@ void Input::GetCvStereoColor(cv::Mat3b **left_rgb, cv::Mat3b **right_rgb) {
 }
 
 void Input::ReadLeftGray(int frame_idx, cv::Mat1b &out) const {
+  // TODO(andrei): Support rescaling here.
   out = cv::imread(GetFrameName(dataset_folder_,
                                 config_.left_gray_folder,
                                 config_.fname_format,
@@ -106,6 +119,7 @@ void Input::ReadLeftGray(int frame_idx, cv::Mat1b &out) const {
 }
 
 void Input::ReadRightGray(int frame_idx, cv::Mat1b &out) const {
+  // TODO(andrei): Support rescaling here.
   out = cv::imread(GetFrameName(dataset_folder_,
                                 config_.right_gray_folder,
                                 config_.fname_format,
@@ -115,17 +129,19 @@ void Input::ReadRightGray(int frame_idx, cv::Mat1b &out) const {
 }
 
 void Input::ReadLeftColor(int frame_idx, cv::Mat3b &out) const {
-  out = cv::imread(GetFrameName(dataset_folder_,
-                                config_.left_color_folder,
-                                config_.fname_format,
-                                frame_idx));
+  cv::Mat3b buf = cv::imread(GetFrameName(dataset_folder_,
+                                          config_.left_color_folder,
+                                          config_.fname_format,
+                                          frame_idx));
+  cv::resize(buf, out, cv::Size(), 1 / input_scale_, 1 / input_scale_, cv::INTER_NEAREST);
 }
 
 void Input::ReadRightColor(int frame_idx, cv::Mat3b &out) const {
-  out = cv::imread(GetFrameName(dataset_folder_,
-                                config_.right_color_folder,
-                                config_.fname_format,
-                                frame_idx));
+  cv::Mat3b buf = cv::imread(GetFrameName(dataset_folder_,
+                                          config_.right_color_folder,
+                                          config_.fname_format,
+                                          frame_idx));
+  cv::resize(buf, out, cv::Size(), 1 / input_scale_, 1 / input_scale_, cv::INTER_NEAREST);
 }
 
 } // namespace dynslam

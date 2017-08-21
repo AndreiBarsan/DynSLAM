@@ -356,7 +356,7 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
   settings->sceneParams.mu = 0.5f;
   settings->sceneParams.voxelSize = 0.040f;
   // Volume approximated in meters.
-  settings->sdfLocalBlockNum = static_cast<long>(5 * 5 * 10 / settings->sceneParams.voxelSize);
+  settings->sdfLocalBlockNum = static_cast<long>(6 * 6 * 10 / settings->sceneParams.voxelSize);
 
   track.GetReconstruction() = make_shared<InfiniTamDriver>(
           settings,
@@ -385,17 +385,18 @@ uchar RgbToGrayscale(uchar r, uchar g, uchar b) {
 }
 
 /// \brief Converts a given (intensity, depth) frame into a list of "depth hypotheses" to be used
-///        in the direct alignment code. This function basically just massages data from the DynSLAM
-///        side into the format required in the direct alignment code, which is based on Liu,
-///        Peidong, et al., 2017 "Direct Visual Odometry for a Fisheye-Stereo Camera."
+///        in the direct alignment code.
+/// This function basically just massages data from the DynSLAM side into the format required in the
+/// direct alignment code, which is based on Liu et al., 2017 "Direct Visual Odometry for a
+/// Fisheye-Stereo Camera."
 vector<DepthHypothesis_GMM> GenHyps(const uchar *intensity, const float *depth, CameraBase &camera,
-                             int rows, int cols) {
+                                    int rows, int cols) {
   // Note: variance not used in depth alignment code, so there's no point in trying to estimate it
   // from, e.g., the depth.
   vector<DepthHypothesis_GMM> hypotheses;
 
-  for(int row = 0; row < rows; ++row) {
-    for(int col = 0; col < cols; ++col) {
+  for (int row = 0; row < rows; ++row) {
+    for (int col = 0; col < cols; ++col) {
       int idx = row * cols + col;
 
       if (depth[idx] < 0.01f) {
@@ -417,8 +418,8 @@ vector<DepthHypothesis_GMM> GenHyps(const uchar *intensity, const float *depth, 
   return hypotheses;
 }
 
-shared_ptr<uchar> RgbToGrayscaleImage(const Vector4u *rgb_image, int rows, int cols) {
-  uchar *grayscale_image = new uchar[rows * cols];
+uchar* RgbToGrayscaleImage(const Vector4u *rgb_image, int rows, int cols) {
+  auto grayscale_image = new uchar[rows * cols];
 
   for(int row = 0; row < rows; ++row) {
     for(int col = 0; col < cols; ++col) {
@@ -427,12 +428,12 @@ shared_ptr<uchar> RgbToGrayscaleImage(const Vector4u *rgb_image, int rows, int c
     }
   }
 
-  return shared_ptr<uchar>(grayscale_image);
+  return grayscale_image;
 }
 
 /// \brief Refines an existing pose using a direct method.
 /// The actual pose we're starting from is hidden in the latest frame of the track.
-/// \return Whether the refinement succeeded.
+/// \return Whether the refinement could run.
 bool ExperimentalDirectRefine(Track &track,
                               int first_idx,
                               int second_idx,
@@ -474,17 +475,14 @@ bool ExperimentalDirectRefine(Track &track,
        << " from track #" << track.GetId() << ". Frame size: " << cols << " x " << rows
        << ". K: " << endl << K << endl;
 
-  shared_ptr<uchar> uchar_data_first = RgbToGrayscaleImage(f_rgb, rows, cols);
+  uchar *uchar_data_first = RgbToGrayscaleImage(f_rgb, rows, cols);
   uchar *uchar_mask_first = nullptr;
-  shared_ptr<uchar> uchar_data_second = RgbToGrayscaleImage(s_rgb, rows, cols);
+  uchar *uchar_data_second = RgbToGrayscaleImage(s_rgb, rows, cols);
   uchar *uchar_mask_second = nullptr;
 
-  // TODO(andrei): It would be easier to modify the direct alignment code to not need the hypothesis
-  // list, rather than do this expensive thing here. Or use PSL? Anyway, modifying the dense
-  // alignment code if it works should lead to faster results either way.
   cout << "Generating hypotheses..." << endl;
-  vector<DepthHypothesis_GMM> hyps_first = GenHyps(uchar_data_first.get(), ff, *cam, rows, cols);
-  vector<DepthHypothesis_GMM> hyps_second = GenHyps(uchar_data_second.get(), sf, *cam, rows, cols);
+  vector<DepthHypothesis_GMM> hyps_first = GenHyps(uchar_data_first, ff, *cam, rows, cols);
+  vector<DepthHypothesis_GMM> hyps_second = GenHyps(uchar_data_second, sf, *cam, rows, cols);
 
   if (hyps_first.size() < 10 || hyps_second.size() < 10) {
     cout << "Hyps too small: first.size() == " << hyps_first.size() << "; second.size() == "
@@ -497,9 +495,9 @@ bool ExperimentalDirectRefine(Track &track,
   }
 
   auto first_ddm = make_shared<FrameCPU_denseDepthMap>(
-      first_idx, cam, uchar_data_first.get(), uchar_mask_first, rows, cols, channels);
+      first_idx, cam, uchar_data_first, uchar_mask_first, rows, cols, channels);
   auto second_ddm = make_shared<FrameCPU_denseDepthMap>(
-      second_idx, cam, uchar_data_second.get(), uchar_mask_second, rows, cols, channels);
+      second_idx, cam, uchar_data_second, uchar_mask_second, rows, cols, channels);
 
   // XXX: the top pyramid level is distorted!! when n = 4 or 3. For 2 and 1 it looks OK.
   int nMaxPyramidLevels = 2;
@@ -537,10 +535,8 @@ bool ExperimentalDirectRefine(Track &track,
 
   out_refined_pose = transformation.getTMatrix();
 
-  cout << "Inverse of this new rel pose: " << endl << out_refined_pose.inverse() << endl;
-//  delete hyps_first;
-//  delete hyps_second;
-
+  delete uchar_data_first;
+  delete uchar_data_second;
   return true;
 }
 
