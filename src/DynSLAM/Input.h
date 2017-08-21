@@ -167,7 +167,8 @@ class Input {
         DepthProvider *depth_provider,
         const Eigen::Vector2i &frame_size,
         const StereoCalibration &stereo_calibration,
-        int frame_offset = 0)
+        int frame_offset,
+        float input_scale)
       : dataset_folder_(dataset_folder),
         config_(config),
         depth_provider_(depth_provider),
@@ -175,7 +176,10 @@ class Input {
         frame_width_(frame_size(0)),
         frame_height_(frame_size(1)),
         stereo_calibration_(stereo_calibration),
-        depth_buf_(frame_size(1), frame_size(0))
+        depth_buf_(frame_size(1), frame_size(0)),
+        input_scale_(input_scale),
+        depth_buf_small_(static_cast<int>(round(frame_size(1) * input_scale)),
+                         static_cast<int>(round(frame_size(0) * input_scale)))
   {}
 
   bool HasMoreImages();
@@ -251,6 +255,12 @@ class Input {
   // on-the-fly depth map computation using libelas.
   cv::Mat1b left_frame_gray_buf_;
   cv::Mat1b right_frame_gray_buf_;
+
+  /// Used when evaluating low-resolution input.
+  float input_scale_;
+  cv::Mat1s depth_buf_small_;
+//  cv::Mat1s raw_depth_small(static_cast<int>(round(GetDepthSize().height * input_scale_)),
+//  static_cast<int>(round(GetDepthSize().width * input_scale_)));
 
   static std::string GetFrameName(const std::string &root,
                                   const std::string &folder,

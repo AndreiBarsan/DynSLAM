@@ -88,7 +88,7 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
   // We ignore detections smaller than this since they are not in any way useful in 3D object
   // reconstruction.
   // (bigger than this messes up e.g., the hill sequence @ 25m range)
-  int min_area = 40 * 40;
+  int min_area = static_cast<int>(round(40 * 40 * input_scale_));
 
   int instance_idx = 0;
   vector<InstanceDetection> detections;
@@ -129,6 +129,11 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
           mask_pixels
       );
 
+      bounding_box.r.x0 = static_cast<int>(round(bounding_box.r.x0 / input_scale_));
+      bounding_box.r.y0 = static_cast<int>(round(bounding_box.r.y0 / input_scale_));
+      bounding_box.r.x1 = static_cast<int>(round(bounding_box.r.x1 / input_scale_));
+      bounding_box.r.y1 = static_cast<int>(round(bounding_box.r.y1 / input_scale_));
+
       auto copy_mask = make_shared<Mask>(bounding_box, mask_cv_mat);
       auto delete_mask = make_shared<Mask>(*copy_mask);
       auto conservative_mask = make_shared<Mask>(*copy_mask);
@@ -136,8 +141,8 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
 
       copy_mask->Rescale(kCopyMaskRescaleFactor);
       float del_scale = kDeleteMaskRescaleFactor;
-      // Adapt rescaling for distant objects
-      if (bounding_box.GetArea() < 55*55) {
+      // Adapt rescaling for distant objects. Constant chosen empirically.
+      if (bounding_box.GetArea() < min_area * 1.375) {
         del_scale *= 1.2f;
       }
       delete_mask->Rescale(del_scale);
@@ -165,7 +170,8 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
   if (last_seg_preview_ == nullptr) {
     last_seg_preview_ = new cv::Mat3b(rgb.rows, rgb.cols);
   }
-  *last_seg_preview_ = cv::imread(img_fpath);
+  cv::Mat seg_preview = cv::imread(img_fpath);
+  cv::resize(seg_preview, *last_seg_preview_, cv::Size(), 1.0 / input_scale_, 1.0 / input_scale_, cv::INTER_LINEAR);
 
   if (! last_seg_preview_->data || last_seg_preview_->cols == 0 || last_seg_preview_->rows == 0) {
     throw runtime_error(Format(
