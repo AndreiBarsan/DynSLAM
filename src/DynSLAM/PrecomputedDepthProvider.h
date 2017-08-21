@@ -41,20 +41,11 @@ class PrecomputedDepthProvider : public DepthProvider {
 
 
   /// \brief Loads the precomputed depth map for the specified frame into 'out_depth'.
-  void GetDepth(int frame_idx, StereoCalibration &calibration, cv::Mat1s &out_depth) {
+  void GetDepth(int frame_idx, StereoCalibration &calibration, cv::Mat1s &out_depth, float scale) {
     if (input_is_depth_) {
       std::cout << "Will read precomputed depth..." << std::endl;
       ReadPrecomputed(frame_idx, out_depth);
       std::cout << "Done reading precomputed depth for specific frame [" << frame_idx << "]." << std::endl;
-
-      for (int i = 0; i < out_depth.rows; ++i) {
-        for(int j = 0; j < out_depth.cols; ++j) {
-          if (out_depth.at<int16_t>(i,j)<0) {
-            std::cout << "Negative depth read!" << std::endl;
-          }
-        }
-      }
-
       return;
     }
 
@@ -62,7 +53,7 @@ class PrecomputedDepthProvider : public DepthProvider {
 
     // TODO(andrei): Remove code duplication between this and 'DepthProvider'.
     if (out_disparity_.type() == CV_32FC1) {
-      DepthFromDisparityMap<float>(out_disparity_, calibration, out_depth);
+      DepthFromDisparityMap<float>(out_disparity_, calibration, out_depth, scale);
     } else if (out_disparity_.type() == CV_16SC1) {
       throw std::runtime_error("Unsupported.");
 //      DepthFromDisparityMap<uint16_t>(out_disparity_, calibration, out_depth);

@@ -5,6 +5,8 @@
 namespace instreclib {
 namespace utils {
 
+using namespace std;
+
 void Mask::Set(const Mask &rhs) {
   // Handle the bounding box
   this->bounding_box_ = rhs.bounding_box_;

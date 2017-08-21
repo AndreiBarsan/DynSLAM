@@ -15,12 +15,12 @@ namespace segmentation {
 /// on-the-fly.
 class PrecomputedSegmentationProvider : public SegmentationProvider {
  public:
-  PrecomputedSegmentationProvider(const std::string &seg_folder, int frame_offset = 0)
+  PrecomputedSegmentationProvider(const std::string &seg_folder, int frame_offset, float scale)
       : seg_folder_(seg_folder),
         frame_idx_(frame_offset),
         dataset_used(&kPascalVoc2012),
-        last_seg_preview_(nullptr) {
-  }
+        last_seg_preview_(nullptr),
+        input_scale_(scale) { }
 
   ~PrecomputedSegmentationProvider() override { delete last_seg_preview_; }
 
@@ -36,10 +36,12 @@ class PrecomputedSegmentationProvider : public SegmentationProvider {
   std::vector<InstanceDetection> ReadInstanceInfo(const std::string &base_img_fpath);
 
  private:
-  std::string seg_folder_;
+  const std::string seg_folder_;
   int frame_idx_;
   const SegmentationDataset *dataset_used;
   cv::Mat3b *last_seg_preview_;
+  // Used when evaluating low-res input.
+  const float input_scale_;
 
 };
 

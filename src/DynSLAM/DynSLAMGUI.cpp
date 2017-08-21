@@ -50,6 +50,7 @@ DEFINE_bool(semantic_evaluation, true, "Whether to separately evaluate the stati
                                        "parts of the reconstruction, based on the semantic "
                                        "segmentation of each frame.");
 DEFINE_double(scale, 1.0, "Whether to run in reduced-scale mode. Used for experimental purposes.");
+DEFINE_bool(use_dispnet, false, "Whether to use DispNet depth maps. Otherwise ELAS is used.");
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
 // issue, which could easily be avoided in the future.
@@ -205,11 +206,13 @@ public:
             pane_texture_->RenderToViewport(true);
             DrawPoses(time_ms);
             break;
+
           case kInputVsLidar:
             message = utils::Format("Input depth vs. LIDAR | delta_max = %d", delta_max_visualization);
             need_lidar = true;
             UploadCvTexture(*input_depthmap, *pane_texture_, false, GL_SHORT);
             break;
+
           case kFusionVsLidar:
             message = utils::Format("Fused map vs. LIDAR | delta_max = %d", delta_max_visualization);
             need_lidar = true;
@@ -902,7 +905,6 @@ public:
 } // namespace gui
 
 Eigen::Matrix<double, 3, 4> ReadProjection(const string &expected_label, istream &in, double downscale_factor) {
-  // The downscale factor is used to adjust the intrinsic matric for low-res input.
   Eigen::Matrix<double, 3, 4> matrix;
   string label;
   in >> label;
@@ -914,9 +916,10 @@ Eigen::Matrix<double, 3, 4> ReadProjection(const string &expected_label, istream
     }
   }
 
-  cout << "Adjusting projection matrix for scale [" << downscale_factor << "]." << endl;
-  matrix *= downscale_factor;
-  matrix(2, 2) = 1.0;
+// The downscale factor is used to adjust the intrinsic matrix for low-res input.
+//  cout << "Adjusting projection matrix for scale [" << downscale_factor << "]." << endl;
+//  matrix *= downscale_factor;
+//  matrix(2, 2) = 1.0;
 
   return matrix;
 };
@@ -973,10 +976,11 @@ Eigen::Vector2i GetFrameSize(const string &dataset_root, const Input::Config &co
   stringstream lc_fpath_ss;
   lc_fpath_ss << lc_folder << "/" << utils::Format(config.fname_format, 1);
 
+  // TODO(andrei): Make this a little nicer if it works.
   cv::Mat frame = cv::imread(lc_fpath_ss.str());
   return Eigen::Vector2i(
-      frame.cols,
-      frame.rows
+      frame.cols * 1.0f / FLAGS_scale,
+      frame.rows * 1.0f / FLAGS_scale
   );
 }
 
@@ -992,11 +996,9 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
   }
   float downscale_factor_f = static_cast<float>(downscale_factor);
 
-  bool use_dispnet = true;
-
   if (FLAGS_dataset_type == kKittiOdometry) {
     if (downscale_factor != 1.0) {
-      if (use_dispnet) {
+      if (FLAGS_use_dispnet) {
         input_config = Input::KittiOdometryDispnetLowresConfig(downscale_factor_f);
       }
       else {
@@ -1004,7 +1006,7 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
       }
     }
     else {
-      if (use_dispnet) {
+      if (FLAGS_use_dispnet) {
         input_config = Input::KittiOdometryDispnetConfig();
       }
       else {
@@ -1018,7 +1020,7 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
       throw runtime_error("Please specify a KITTI tracking sequence ID.");
     }
 
-    if (use_dispnet) {
+    if (FLAGS_use_dispnet) {
       input_config = Input::KittiTrackingDispnetConfig(t_seq_id);
     }
     else {
@@ -1069,10 +1071,11 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
   *input_out = new Input(
       dataset_root,
       input_config,
-      nullptr,          // set the depth later
+      nullptr,          // set the depth provider later
       frame_size,
       stereo_calibration,
-      frame_offset);
+      frame_offset,
+      downscale_factor);
   DepthProvider *depth = new PrecomputedDepthProvider(
       *input_out,
       dataset_root + "/" + input_config.depth_folder,
@@ -1105,7 +1108,8 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
 
   const string seg_folder = dataset_root + "/" + input_config.segmentation_folder;
   auto segmentation_provider =
-      new instreclib::segmentation::PrecomputedSegmentationProvider(seg_folder, frame_offset);
+      new instreclib::segmentation::PrecomputedSegmentationProvider(
+          seg_folder, frame_offset, static_cast<float>(downscale_factor));
 
   VisualOdometryStereo::parameters sf_params;
   // TODO(andrei): The main VO (which we're not using viso2 for, at the moment (June '17) and the

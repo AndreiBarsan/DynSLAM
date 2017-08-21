@@ -73,7 +73,6 @@ void PrecomputedDepthProvider::ReadPrecomputed(int frame_idx, cv::Mat &out) cons
       }
     }
   }
-
 }
 
 float PrecomputedDepthProvider::DepthFromDisparity(const float disparity_px,
