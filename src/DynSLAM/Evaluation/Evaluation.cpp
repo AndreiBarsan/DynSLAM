@@ -30,7 +30,10 @@ void PrettyPrintStats(const string &label, const DepthFrameEvaluation &evals) {
   }
 }
 
-void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam, int frame_idx) {
+void Evaluation::EvaluateFrame(Input *input,
+                               DynSlam *dyn_slam,
+                               int frame_idx,
+                               bool enable_compositing) {
   if (frame_idx < 0) {
     cerr << "Cannot evaluate negative frame [" << frame_idx << "]." << endl;
     return;
@@ -56,7 +59,7 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam, int frame_idx) {
   if (separate_static_and_dynamic_) {
     cout << "Evaluation of frame [" << frame_idx << "] will compute separate stats for static "
          << "and dynamic elements of the scene." << endl;
-    auto static_dynamic = EvaluateFrameSeparate(frame_idx, input, dyn_slam);
+    auto static_dynamic = EvaluateFrameSeparate(frame_idx, enable_compositing, input, dyn_slam);
     auto static_evals = static_dynamic.first;
     auto dynamic_evals = static_dynamic.second;
 
@@ -69,7 +72,7 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam, int frame_idx) {
     cout << "Evaluation of frame [" << frame_idx << "] will compute unified stats for both "
          << "static and dynamic parts of the scene." << endl;
 
-    DepthFrameEvaluation evals = EvaluateFrame(frame_idx, input, dyn_slam);
+    DepthFrameEvaluation evals = EvaluateFrame(frame_idx, enable_compositing, input, dyn_slam);
     csv_unified_depth_dump_.Write(evals);
 
     PrettyPrintStats("Unified", evals);
@@ -77,11 +80,11 @@ void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam, int frame_idx) {
 }
 
 // TODO(andrei): Deduplicate copypasta code.
-std::pair<DepthFrameEvaluation, DepthFrameEvaluation> Evaluation::EvaluateFrameSeparate(
-    int dynslam_frame_idx,
-    Input *input,
-    DynSlam *dyn_slam
-) {
+std::pair<DepthFrameEvaluation,
+          DepthFrameEvaluation> Evaluation::EvaluateFrameSeparate(int dynslam_frame_idx,
+                                                                  bool enable_compositing,
+                                                                  Input *input,
+                                                                  DynSlam *dyn_slam) {
   int input_frame_idx = input->GetFrameOffset() + dynslam_frame_idx;
   auto lidar_pointcloud = velodyne_->ReadFrame(input_frame_idx);
   int pose_idx = dynslam_frame_idx + 1;
@@ -92,7 +95,7 @@ std::pair<DepthFrameEvaluation, DepthFrameEvaluation> Evaluation::EvaluateFrameS
 
   auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
-  const float *rendered_depthmap = dyn_slam->GetStaticMapRaycastDepthPreview(pango_pose);
+  const float *rendered_depthmap = dyn_slam->GetStaticMapRaycastDepthPreview(pango_pose, enable_compositing);
   auto input_depthmap = shared_ptr<cv::Mat1s>(nullptr);
   auto input_rgb = shared_ptr<cv::Mat3b>(nullptr);
   input->GetFrameCvImages(input_frame_idx, input_rgb, input_depthmap);
@@ -142,9 +145,9 @@ std::pair<DepthFrameEvaluation, DepthFrameEvaluation> Evaluation::EvaluateFrameS
 }
 
 DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
+                                               bool enable_compositing,
                                                Input *input,
-                                               DynSlam *dyn_slam
-) {
+                                               DynSlam *dyn_slam) {
   throw std::runtime_error("Not supported at the moment.");
   auto lidar_pointcloud = velodyne_->ReadFrame(frame_idx);
 
@@ -154,7 +157,7 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
   Eigen::Matrix4f epose = dyn_slam->GetPose().inverse();
   auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
-  const float *rendered_depthmap = dyn_slam->GetStaticMapRaycastDepthPreview(pango_pose);
+  const float *rendered_depthmap = dyn_slam->GetStaticMapRaycastDepthPreview(pango_pose, enable_compositing);
   auto input_depthmap = shared_ptr<cv::Mat1s>(nullptr);
   auto input_rgb = shared_ptr<cv::Mat3b>(nullptr);
   input->GetFrameCvImages(frame_idx, input_rgb, input_depthmap);

@@ -1,3 +1,5 @@
+#ifndef DYNSLAM_ERRORVISUALIZATIONCALLBACK_H
+#define DYNSLAM_ERRORVISUALIZATIONCALLBACK_H
 
 #include "ILidarEvalCallback.h"
 
@@ -49,3 +51,4 @@ class ErrorVisualizationCallback : public ILidarEvalCallback {
 }
 }
 
+#endif // DYNSLAM_ERRORVISUALIZATIONCALLBACK_H

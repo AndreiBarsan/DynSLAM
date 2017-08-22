@@ -30,6 +30,8 @@ class PrecomputedSegmentationProvider : public SegmentationProvider {
 
   cv::Mat3b *GetSegResult() override;
 
+  std::shared_ptr<InstanceSegmentationResult> ReadSegmentation(int frame_idx);
+
  protected:
   /// \brief For the segmentation from the given file path, loads all available file containing
   /// detection information (class, bounding box, etc.) and instance masks.

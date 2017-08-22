@@ -136,7 +136,7 @@ set(DYNSLAM_SOURCES
     src/DynSLAM/Input.cpp
     src/DynSLAM/PrecomputedDepthProvider.cpp
     src/DynSLAM/PrecomputedDepthProvider.h
-    src/DynSLAM/Utils.cpp src/DynSLAM/Evaluation/SegmentedEvaluationCallback.cpp src/DynSLAM/Evaluation/SegmentedEvaluationCallback.h src/DynSLAM/Evaluation/Records.h)
+    src/DynSLAM/Utils.cpp src/DynSLAM/Evaluation/SegmentedEvaluationCallback.cpp src/DynSLAM/Evaluation/SegmentedEvaluationCallback.h src/DynSLAM/Evaluation/Records.h src/DynSLAM/Evaluation/SegmentedCallback.cpp src/DynSLAM/Evaluation/SegmentedCallback.h src/DynSLAM/Evaluation/SegmentedVisualizationCallback.cpp src/DynSLAM/Evaluation/SegmentedVisualizationCallback.h)
 
 set(DYNSLAM_GUI_SOURCES
     ${DYNSLAM_SOURCES}

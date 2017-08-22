@@ -112,10 +112,10 @@ class DynSlam {
   /// \brief Returns a raycast from the specified pose.
   /// If dynamic mode is enabled, the raycast will also contain the current active reconstructions,
   /// if any.
-  const float* GetStaticMapRaycastDepthPreview(const pangolin::OpenGlMatrix &model_view) {
+  const float* GetStaticMapRaycastDepthPreview(const pangolin::OpenGlMatrix &model_view, bool enable_compositing) {
     static_scene_->GetFloatImage(out_image_float_, PreviewType::kDepth, model_view);
 
-    if (dynamic_mode_) {
+    if (dynamic_mode_ && enable_compositing) {
       instance_reconstructor_->CompositeInstanceDepthMaps(out_image_float_, model_view);
     }
 
@@ -197,6 +197,7 @@ class DynSlam {
   /// For the KITTI dataset (and the KITTI-odometry one) this represents the center of the left
   /// camera.
   Eigen::Matrix4f GetPose() const {
+    /// XXX: inconsistency between this and the pose history?
     return static_scene_->GetPose();
   }
 
@@ -220,6 +221,7 @@ class DynSlam {
   }
 
   void WaitForJobs() {
+    // TODO fix this; it does not work.
     static_scene_->WaitForMeshDump();
   }
 
@@ -241,6 +243,14 @@ class DynSlam {
 
   bool IsDynamicMode() const {
     return dynamic_mode_;
+  }
+
+  // Hacky method used exclusively for evaluation. Reads segmentation data for a specific frame.
+  std::shared_ptr<instreclib::segmentation::InstanceSegmentationResult> GetSpecificSegmentation(int frame_idx) {
+    auto *psp = dynamic_cast<PrecomputedSegmentationProvider*>(segmentation_provider_);
+    assert (psp != nullptr && "This functionality is only supported when using precomputed segmentations.");
+
+    return psp->ReadSegmentation(frame_idx);
   }
 
   SUPPORT_EIGEN_FIELDS;
