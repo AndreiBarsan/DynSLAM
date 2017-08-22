@@ -150,7 +150,7 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePoseDeprecated(size_t fra
   }
 }
 
-Option<Pose>* EstimateInstanceMotion(
+Option<Pose>* Track::EstimateInstanceMotion(
     const vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &instance_raw_flow,
     const SparseSFProvider &ssf_provider,
     const vector<double> &initial_estimate
@@ -186,7 +186,8 @@ Option<Pose>* EstimateInstanceMotion(
     }
   }
   else {
-    cout << "Only " << flow_count << " scene flow points. Not estimating relative pose." << endl;
+    cout << "Only " << flow_count << " scene flow points. Not estimating relative pose for track "
+         << "#" << GetId() << "." << endl;
     return new Option<Pose>();
   }
 }

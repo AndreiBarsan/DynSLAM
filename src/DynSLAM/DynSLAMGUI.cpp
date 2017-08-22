@@ -247,8 +247,11 @@ public:
           pane_texture_->RenderToViewport(true);
           bool visualize_input = (current_lidar_vis_ == kInputVsLidar);
           eval::ErrorVisualizationCallback vis_callback(
-              delta_max_visualization, visualize_input, Eigen::Vector2f(
-                  main_view_->GetBounds().w, main_view_->GetBounds().h), lidar_vis_colors_, lidar_vis_vertices_);
+              delta_max_visualization,
+              visualize_input,
+              Eigen::Vector2f(main_view_->GetBounds().w, main_view_->GetBounds().h),
+              lidar_vis_colors_,
+              lidar_vis_vertices_);
 
           bool compare_on_intersection = true;
           bool kitti_style = true;
@@ -797,8 +800,8 @@ public:
     data_log_.Log(
         active_object_count_,
         static_cast<float>(free_gpu_gb) * 10.0f,   // Mini-hack to make the scales better
-        dyn_slam_->GetStaticMapMemory() * 10.0f * kBytesToGb,
-        (dyn_slam_->GetStaticMapMemory() + dyn_slam_->GetStaticMapSavedDecayMemory()) * 10.0f * kBytesToGb
+        dyn_slam_->GetStaticMapMemoryBytes() * 10.0f * kBytesToGb,
+        (dyn_slam_->GetStaticMapMemoryBytes() + dyn_slam_->GetStaticMapSavedDecayMemoryBytes()) * 10.0f * kBytesToGb
     );
 
     Tic("DynSLAM frame");

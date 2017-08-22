@@ -7,6 +7,7 @@
 
 #include "CsvWriter.h"
 #include "ILidarEvalCallback.h"
+#include "Records.h"
 #include "Tracklets.h"
 #include "VelodyneIO.h"
 
@@ -27,150 +28,6 @@ struct Stats {
 };
 
 
-struct DepthResult : public ICsvSerializable {
-  const long measurement_count;
-  const long error_count;
-  const long missing_count;
-  const long correct_count;
-  const long missing_separate_count;
-
-  DepthResult(const long measurement_count,
-              const long error_count,
-              const long missing_count,
-              const long correct_count,
-              const long missing_separate_count)
-      : measurement_count(measurement_count),
-        error_count(error_count),
-        missing_count(missing_count),
-        correct_count(correct_count),
-        missing_separate_count(missing_separate_count)
-  {
-    assert(measurement_count == (error_count + missing_count + correct_count));
-    // 'missing_count' may be more generous, and count a pixel as missing if it's missing in EITHER
-    // the fusion or the input.
-    assert(missing_count >= missing_separate_count);
-  }
-
-  /// \brief Returns the ratio of correct pixels in this depth evaluation result.
-  /// \param include_missing Whether to count pixels with no depth data in the evaluated depth map
-  ///                        as incorrect.
-  double GetCorrectPixelRatio(bool include_missing) const {
-    if (include_missing) {
-      return static_cast<double>(correct_count) / measurement_count;
-    } else {
-      return static_cast<double>(correct_count) / (measurement_count - missing_count);
-    }
-  }
-
-  string GetHeader() const override {
-    return "measurements_count,error_count,missing_count,correct_count,missing_separate_count";
-  }
-
-  string GetData() const override {
-    return utils::Format("%d,%d,%d,%d",
-                         measurement_count,
-                         error_count,
-                         missing_count,
-                         correct_count,
-                         missing_separate_count);
-  }
-};
-
-struct DepthEvaluationMeta {
-  const int frame_idx;
-  const std::string dataset_id;
-
-  DepthEvaluationMeta(const int frame_idx, const string &dataset_id)
-      : frame_idx(frame_idx), dataset_id(dataset_id) {}
-};
-
-/// \brief Stores the result of comparing a computed depth with a LIDAR ground truth.
-struct DepthEvaluation : public ICsvSerializable {
-  const float delta_max;
-  /// \brief Results for the depth map synthesized from engine.
-  const DepthResult fused_result;
-  /// \brief Results for the depth map received as input.
-  const DepthResult input_result;
-  /// \brief Whether errors were computed in the KITTI stereo benchmark (2015) style, i.e.,
-  ///        error if (delta>delta_max AND delta>5%GT).
-  const bool kitti_style;
-
-  DepthEvaluation(const float delta_max,
-                  DepthResult &&fused_result,
-                  DepthResult &&input_result,
-                  bool kitti_style)
-      : delta_max(delta_max),
-        fused_result(fused_result),
-        input_result(input_result),
-        kitti_style(kitti_style)
-  {}
-
-  string GetHeader() const override {
-    const string kitti_label = (kitti_style ? "-kitti" : "");
-    return utils::Format("fusion-total-%.2f%s,fusion-error-%.2f%s,fusion-missing-%.2f%s,fusion-correct-%.2f%s,"
-                         "input-total-%.2f%s,input-error-%.2f%s,input-missing-%.2f%s,input-correct-%.2f%s",
-                         delta_max, kitti_label.c_str(), delta_max, kitti_label.c_str(),
-                         delta_max, kitti_label.c_str(), delta_max, kitti_label.c_str(),
-                         delta_max, kitti_label.c_str(), delta_max, kitti_label.c_str(),
-                         delta_max, kitti_label.c_str(), delta_max, kitti_label.c_str());
-  }
-
-  string GetData() const override {
-    return utils::Format("%s,%s", fused_result.GetData().c_str(), input_result.GetData().c_str());
-  }
-};
-
-/// \brief Contains a frame's depth evaluation results for multiple values of $\delta_max$.
-struct DepthFrameEvaluation : public ICsvSerializable {
-  const DepthEvaluationMeta meta;
-  const float max_depth_meters;
-  const std::vector<DepthEvaluation> evaluations;
-
-  DepthFrameEvaluation(DepthEvaluationMeta &meta,
-                       float max_depth_meters,
-                       vector<DepthEvaluation> &&evaluations)
-      : meta(meta), max_depth_meters(max_depth_meters), evaluations(evaluations) {}
-
-  string GetHeader() const override {
-    std::stringstream ss;
-    ss << "frame";
-    for (auto &eval : evaluations) {
-      ss << "," << eval.GetHeader();
-    }
-    return ss.str();
-  }
-
-  string GetData() const override {
-    std::stringstream ss;
-    ss << meta.frame_idx;
-    for (auto &eval :evaluations) {
-      ss << "," << eval.GetData();
-    }
-    return ss.str();
-  }
-};
-
-/// \brief The evaluation of a single pose at a single time.
-struct TrackletEvaluation : public ICsvSerializable {
-  int frame_id;
-  int track_id;
-  double trans_error;
-  double rot_error;
-
-  TrackletEvaluation(int frame_id, int track_id, double trans_error, double rot_error)
-      : frame_id(frame_id),
-        track_id(track_id),
-        trans_error(trans_error),
-        rot_error(rot_error) {}
-
-  string GetHeader() const override {
-    return "frame_id,track_id,trans_error,rot_error";
-  }
-
-  string GetData() const override {
-    return utils::Format("%d,%d,%lf,%lf", frame_id, track_id, trans_error, rot_error);
-  }
-};
 
 /// \brief Main class handling the quantitative evaluation of the DynSLAM system.
 ///
@@ -189,6 +46,8 @@ struct TrackletEvaluation : public ICsvSerializable {
 /// [0]: Sengupta, S., Greveson, E., Shahrokni, A., & Torr, P. H. S. (2013). Urban 3D semantic modelling using stereo vision. Proceedings - IEEE International Conference on Robotics and Automation, 580–585. https://doi.org/10.1109/ICRA.2013.6630632
 class Evaluation {
  public:
+  // TODO(andrei): We could reduce code duplication in these helpers by e.g., grouping the misc
+  // config parameters into a config object.
   static std::string GetBaseCsvName(
       const std::string &dataset_root,
       const Input *input,
@@ -198,12 +57,6 @@ class Evaluation {
       bool use_depth_weighting,
       const string &base_folder = "../csv"
   ) {
-    if (is_dynamic) {
-      cout << "[Evaluation] DYNAMIC MODE IS ON FOR LOGGING" << endl;
-    }
-    else {
-      cout << "[Evaluation] DYNAMIC MODE IS OFF" << endl;
-    }
     return utils::Format("%s/%s-offset-%d-depth-%s-voxelsize-%.4f-max-depth-m-%.2f-%s-%s-%s",
                          base_folder.c_str(),
                          input->GetDatasetIdentifier().c_str(),
@@ -265,6 +118,18 @@ class Evaluation {
                                         is_dynamic, use_depth_weighting).c_str());
   }
 
+  static std::string GetMemoryCsvName(const std::string &dataset_root,
+                                      const Input *input,
+                                      float voxel_size_meters,
+                                      bool direct_refinement,
+                                      bool is_dynamic,
+                                      bool use_depth_weighting
+  ) {
+    return utils::Format("%s-memory.csv",
+                         GetBaseCsvName(dataset_root, input, voxel_size_meters, direct_refinement,
+                                        is_dynamic, use_depth_weighting).c_str());
+  }
+
  public:
   const Eigen::Matrix4d velo_to_left_gray_cam_;
   const Eigen::Matrix34d proj_left_color_;
@@ -302,7 +167,7 @@ class Evaluation {
                                              dataset_root.c_str(),
                                              input->GetConfig().velodyne_folder.c_str()),
                                 input->GetConfig().velodyne_fname_format)),
-        csv_depth_dump_(GetDepthCsvName(dataset_root, input, voxel_size_meters, direct_refinement,
+        csv_unified_depth_dump_(GetDepthCsvName(dataset_root, input, voxel_size_meters, direct_refinement,
                                         is_dynamic, use_depth_weighting)),
         csv_tracking_dump_(GetTrackingCsvName(dataset_root, input, voxel_size_meters,
                                               direct_refinement, is_dynamic, use_depth_weighting)),
@@ -313,15 +178,29 @@ class Evaluation {
         csv_dynamic_depth_dump_(GetDynamicDepthCsvName(dataset_root, input, voxel_size_meters,
                                                        direct_refinement, is_dynamic,
                                                        use_depth_weighting)),
+        csv_memory_(GetMemoryCsvName(dataset_root, input, voxel_size_meters,
+                                                       direct_refinement, is_dynamic,
+                                                       use_depth_weighting)),
         eval_tracklets_(! input->GetConfig().tracklet_folder.empty())
   {
     if (this->eval_tracklets_) {
       std::string tracklet_fpath = utils::Format("%s/%s", dataset_root.c_str(),
                                                  input->GetConfig().tracklet_folder.c_str());
       frame_to_tracklets_ = ReadGroupedTracklets(tracklet_fpath);
+      cout << "[Evaluation] Evaluating tracklets." << endl;
+    }
+    else {
+      cout << "[Evaluation] Not evaluating tracklets." << endl;
     }
 
-    cout << "Dumping depth data to file: " << csv_depth_dump_.output_fpath_ << endl;
+    if (is_dynamic) {
+      cout << "[Evaluation] DYNAMIC MODE IS ON FOR LOGGING" << endl;
+    }
+    else {
+      cout << "[Evaluation] DYNAMIC MODE IS OFF" << endl;
+    }
+
+    cout << "Dumping depth data to file: " << csv_unified_depth_dump_.output_fpath_ << endl;
   }
 
   Evaluation(const Evaluation&) = delete;
@@ -333,12 +212,23 @@ class Evaluation {
     delete velodyne_;
   }
 
-  /// \brief Supermethod in charge of all per-frame evaluation metrics.
-  void EvaluateFrame(Input *input, DynSlam *dyn_slam);
+  /// \brief Supermethod in charge of all per-frame evaluation metrics except memory.
+  void EvaluateFrame(Input *input, DynSlam *dyn_slam, int frame_idx);
+
+  void LogMemoryUse(const DynSlam *dyn_slam) {
+    MemoryUsageEntry memory_usage(
+        dyn_slam->GetCurrentFrameNo() - 1,
+        dyn_slam->GetStaticMapMemoryBytes(),
+        dyn_slam->GetStaticMapSavedDecayMemoryBytes(),
+        dyn_slam->GetStaticMapDecayParams()
+    );
+
+    csv_memory_.Write(memory_usage);
+  }
 
   /// hacky extension for separate eval (static+dynamic)
   std::pair<DepthFrameEvaluation, DepthFrameEvaluation> EvaluateFrameSeparate(
-      int frame_idx,
+      int dynslam_frame_idx,
       Input *input,
       DynSlam *dyn_slam
   );
@@ -386,12 +276,13 @@ class Evaluation {
  private:
   VelodyneIO *velodyne_;
   // CSV results are written here when static and dynamic parts are NOT evaluated separately.
-  CsvWriter csv_depth_dump_;
+  CsvWriter csv_unified_depth_dump_;
   CsvWriter csv_tracking_dump_;
 
   bool separate_static_and_dynamic_;
   CsvWriter csv_static_depth_dump_;
   CsvWriter csv_dynamic_depth_dump_;
+  CsvWriter csv_memory_;
 
   const bool eval_tracklets_;
   std::map<int, std::vector<TrackletFrame, Eigen::aligned_allocator<TrackletFrame>>> frame_to_tracklets_;
