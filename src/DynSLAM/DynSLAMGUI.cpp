@@ -17,6 +17,7 @@
 #include "Evaluation/Evaluation.h"
 #include "Evaluation/ErrorVisualizationCallback.h"
 #include "Evaluation/EvaluationCallback.h"
+#include "Evaluation/SegmentedVisualizationCallback.h"
 
 const std::string kKittiOdometry = "kitti-odometry";
 const std::string kKittiTracking = "kitti-tracking";
@@ -51,6 +52,12 @@ DEFINE_bool(semantic_evaluation, true, "Whether to separately evaluate the stati
                                        "segmentation of each frame.");
 DEFINE_double(scale, 1.0, "Whether to run in reduced-scale mode. Used for experimental purposes.");
 DEFINE_bool(use_dispnet, false, "Whether to use DispNet depth maps. Otherwise ELAS is used.");
+DEFINE_int32(evaluation_delay, 0, "How many frames behind the current one should the evaluation be "
+                                  "performed. A value of 0 signifies always computing the "
+                                  "evaluation metrics on the most recent frames. Useful for "
+                                  "measuring the impact of the regularization, which ``follows'' "
+                                  "the camera with a delay of 'min_decay_age'. Warning: does not "
+                                  "support dynamic scenes.");
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
 // issue, which could easily be avoided in the future.
@@ -170,6 +177,37 @@ public:
 
       long time_ms = utils::GetTimeMs();
 
+      rgb_view_.Activate();
+      glColor3f(1.0f, 1.0f, 1.0f);
+      if(dyn_slam_->GetCurrentFrameNo() >= 1) {
+        if (display_raw_previews_->Get()) {
+          UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_, true, GL_UNSIGNED_BYTE);
+        } else {
+          UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_, true, GL_UNSIGNED_BYTE);
+        }
+        pane_texture_->RenderToViewport(true);
+
+        Tic("LIDAR render");
+        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
+        if (velodyne->HasLatestFrame()) {
+          PreviewLidar(velodyne->GetLatestFrame(),
+                       dyn_slam_->GetLeftRgbProjectionMatrix(),
+                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
+                       rgb_view_);
+        }
+        else {
+          PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
+                       dyn_slam_->GetLeftRgbProjectionMatrix(),
+                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
+                       rgb_view_);
+        }
+        Toc(true);
+      }
+
+      if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
+        PreviewSparseSF(dyn_slam_->GetLatestFlow().matches, rgb_view_);
+      }
+
       main_view_->Activate(*pane_cam_);
       glEnable(GL_DEPTH_TEST);
       glColor3f(1.0f, 1.0f, 1.0f);
@@ -177,15 +215,21 @@ public:
       glDisable(GL_DEPTH_TEST);
       glDepthMask(false);
 
-      if (dyn_slam_->GetCurrentFrameNo() > 1) {
+      int evaluated_frame_idx = dyn_slam_->GetCurrentFrameNo() - 1 - FLAGS_evaluation_delay;
+      if (evaluated_frame_idx > 0) {
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
-        auto lidar_pointcloud = velodyne->GetLatestFrame();
+        int input_frame_idx = dyn_slam_input_->GetFrameOffset() + evaluated_frame_idx;
 
-        Eigen::Matrix4f epose = dyn_slam_->GetPose().inverse();
+        auto visualized_lidar_pointcloud = velodyne->ReadFrame(input_frame_idx);
+
+        Eigen::Matrix4f epose = dyn_slam_->GetPoseHistory()[evaluated_frame_idx + 1];
         auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
-        const float *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastDepthPreview(pango_pose);
-        const cv::Mat1s *input_depthmap = dyn_slam_->GetDepthPreview();
+        bool enable_compositing = (FLAGS_evaluation_delay == 0);
+        const float *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastDepthPreview(pango_pose, enable_compositing);
+        auto input_depthmap = shared_ptr<cv::Mat1s>(nullptr);
+        auto input_rgb = shared_ptr<cv::Mat3b>(nullptr);
+        dyn_slam_input_->GetFrameCvImages(input_frame_idx, input_rgb, input_depthmap);
 
         /// Result of diffing our disparity maps (input and synthesized).
         uchar diff_buffer[width_ * height_ * 4];
@@ -246,19 +290,39 @@ public:
         if (need_lidar) {
           pane_texture_->RenderToViewport(true);
           bool visualize_input = (current_lidar_vis_ == kInputVsLidar);
-          eval::ErrorVisualizationCallback vis_callback(
+//          eval::ErrorVisualizationCallback vis_callback(
+//              delta_max_visualization,
+//              visualize_input,
+//              Eigen::Vector2f(main_view_->GetBounds().w, main_view_->GetBounds().h),
+//              lidar_vis_colors_,
+//              lidar_vis_vertices_);
+          auto vis_mode = eval::SegmentedCallback::LidarAssociation::kStaticMap;
+          auto seg = dyn_slam_->GetSpecificSegmentation(input_frame_idx);
+          eval::SegmentedVisualizationCallback vis_callback(
               delta_max_visualization,
               visualize_input,
               Eigen::Vector2f(main_view_->GetBounds().w, main_view_->GetBounds().h),
               lidar_vis_colors_,
-              lidar_vis_vertices_);
+              lidar_vis_vertices_,
+//              dyn_slam_->GetLatestSeg().get(),
+              seg.get(),
+//              dyn_slam_->GetInstanceReconstructor(),
+              nullptr,
+              vis_mode
+          );
+          if (vis_mode == eval::SegmentedCallback::LidarAssociation::kDynamicReconstructed) {
+            message += " | Reconstructed dynamic objects only ";
+          }
+          else if (vis_mode == eval::SegmentedCallback::LidarAssociation::kStaticMap) {
+            message += " | Static map only";
+          }
 
           bool compare_on_intersection = true;
           bool kitti_style = true;
           eval::EvaluationCallback eval_callback(delta_max_visualization,
                                                  compare_on_intersection,
                                                  kitti_style);
-          dyn_slam_->GetEvaluation()->EvaluateDepth(lidar_pointcloud,
+          dyn_slam_->GetEvaluation()->EvaluateDepth(visualized_lidar_pointcloud,
                                                     synthesized_depthmap,
                                                     *input_depthmap,
                                                     {&vis_callback, &eval_callback});
@@ -276,37 +340,6 @@ public:
       //*/
 
       font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.90f, 0.90f);
-
-      rgb_view_.Activate();
-      glColor3f(1.0f, 1.0f, 1.0f);
-      if(dyn_slam_->GetCurrentFrameNo() >= 1) {
-        if (display_raw_previews_->Get()) {
-          UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_, true, GL_UNSIGNED_BYTE);
-        } else {
-          UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_, true, GL_UNSIGNED_BYTE);
-        }
-        pane_texture_->RenderToViewport(true);
-
-        Tic("LIDAR render");
-        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
-        if (velodyne->HasLatestFrame()) {
-          PreviewLidar(velodyne->GetLatestFrame(),
-                       dyn_slam_->GetLeftRgbProjectionMatrix(),
-                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
-                       rgb_view_);
-        }
-        else {
-          PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
-                       dyn_slam_->GetLeftRgbProjectionMatrix(),
-                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
-                       rgb_view_);
-        }
-        Toc(true);
-      }
-
-      if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
-        PreviewSparseSF(dyn_slam_->GetLatestFlow().matches, rgb_view_);
-      }
 
       depth_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);

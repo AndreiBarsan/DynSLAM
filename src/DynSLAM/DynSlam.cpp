@@ -8,6 +8,7 @@
 
 DEFINE_bool(dynamic_weights, false, "Whether to use depth-based weighting when performing fusion.");
 DECLARE_bool(semantic_evaluation);
+DECLARE_int32(evaluation_delay);
 
 namespace dynslam {
 
@@ -150,11 +151,11 @@ void DynSlam::ProcessFrame(Input *input) {
     }
   }
 
-  int evaluation_begin_ = 1;
-  if (FLAGS_enable_evaluation && current_frame_no_ >= evaluation_begin_) {
+  int evaluated_frame_idx = current_frame_no_ - FLAGS_evaluation_delay;
+  if (FLAGS_enable_evaluation && evaluated_frame_idx > 0) {
     utils::Tic("Evaluation");
-    // TODO support delayed evaluation here XXX
-    evaluation_->EvaluateFrame(input, this, current_frame_no_);
+    bool enable_compositing = (FLAGS_evaluation_delay == 0);
+    evaluation_->EvaluateFrame(input, this, evaluated_frame_idx, enable_compositing);
     evaluation_->LogMemoryUse(this);
     utils::Toc();
   }

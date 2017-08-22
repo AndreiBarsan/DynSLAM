@@ -213,7 +213,10 @@ class Evaluation {
   }
 
   /// \brief Supermethod in charge of all per-frame evaluation metrics except memory.
-  void EvaluateFrame(Input *input, DynSlam *dyn_slam, int frame_idx);
+  void EvaluateFrame(Input *input,
+                     DynSlam *dyn_slam,
+                     int frame_idx,
+                     bool enable_compositing);
 
   void LogMemoryUse(const DynSlam *dyn_slam) {
     MemoryUsageEntry memory_usage(
@@ -227,13 +230,16 @@ class Evaluation {
   }
 
   /// hacky extension for separate eval (static+dynamic)
-  std::pair<DepthFrameEvaluation, DepthFrameEvaluation> EvaluateFrameSeparate(
-      int dynslam_frame_idx,
-      Input *input,
-      DynSlam *dyn_slam
-  );
+  std::pair<DepthFrameEvaluation,
+          DepthFrameEvaluation> EvaluateFrameSeparate(int dynslam_frame_idx,
+                                                      bool enable_compositing,
+                                                      Input *input,
+                                                      DynSlam *dyn_slam);
 
-  DepthFrameEvaluation EvaluateFrame(int frame_idx, Input *input, DynSlam *dyn_slam);
+  DepthFrameEvaluation EvaluateFrame(int frame_idx,
+                                       bool enable_compositing,
+                                       Input *input,
+                                       DynSlam *dyn_slam);
 
   static uint depth_delta(uchar computed_depth, uchar ground_truth_depth) {
     return static_cast<uint>(abs(

@@ -18,7 +18,7 @@ using namespace instreclib::utils;
 using namespace dynslam::utils;
 
 /// Rescale factors used for RGB and depth masking of object instances.
-float kCopyMaskRescaleFactor = 1.01f;
+float kCopyMaskRescaleFactor = 1.00f;
 float kDeleteMaskRescaleFactor = 1.2f;
 
 /// \brief Rescale factor used for scene flow masking of instances.
@@ -158,6 +158,9 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
 }
 
 shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentFrame(const cv::Mat3b &rgb) {
+  if (last_seg_preview_ == nullptr) {
+    last_seg_preview_ = new cv::Mat3b(rgb.rows, rgb.cols);
+  }
   stringstream img_fpath_ss;
   img_fpath_ss << this->seg_folder_ << "/"
                << "cls_" << setfill('0') << setw(6) << this->frame_idx_ << ".png";
@@ -165,10 +168,6 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
   if (! dynslam::utils::FileExists(img_fpath)) {
     throw runtime_error(dynslam::utils::Format("Unable to find segmentation preview at [%s].",
                                                img_fpath.c_str()));
-  }
-
-  if (last_seg_preview_ == nullptr) {
-    last_seg_preview_ = new cv::Mat3b(rgb.rows, rgb.cols);
   }
   cv::Mat seg_preview = cv::imread(img_fpath);
   cv::resize(seg_preview, *last_seg_preview_, cv::Size(), 1.0 / input_scale_, 1.0 / input_scale_, cv::INTER_LINEAR);
@@ -179,19 +178,9 @@ shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::SegmentF
         img_fpath.c_str()));
   }
 
-  stringstream meta_img_ss;
-  meta_img_ss << this->seg_folder_ << "/" << setfill('0') << setw(6) << this->frame_idx_ << ".png";
-  vector<InstanceDetection> instance_detections = ReadInstanceInfo(meta_img_ss.str());
-
-  // We read pre-computed segmentations off the disk, so we assume this is 0.
-  long inference_time_ns = 0L;
-
+  auto result = ReadSegmentation(this->frame_idx_);
   this->frame_idx_++;
-
-  return make_shared<InstanceSegmentationResult>(
-      dataset_used,
-      instance_detections,
-      inference_time_ns);
+  return result;
 }
 
 const cv::Mat3b* PrecomputedSegmentationProvider::GetSegResult() const {
@@ -200,6 +189,20 @@ const cv::Mat3b* PrecomputedSegmentationProvider::GetSegResult() const {
 
 cv::Mat3b* PrecomputedSegmentationProvider::GetSegResult() {
   return this->last_seg_preview_;
+}
+
+std::shared_ptr<InstanceSegmentationResult> PrecomputedSegmentationProvider::ReadSegmentation(int frame_idx) {
+  stringstream meta_img_ss;
+  meta_img_ss << this->seg_folder_ << "/" << setfill('0') << setw(6) << frame_idx << ".png";
+  vector<InstanceDetection> instance_detections = ReadInstanceInfo(meta_img_ss.str());
+
+  // We read pre-computed segmentations off the disk, so we assume this is 0.
+  long inference_time_ns = 0L;
+
+  return make_shared<InstanceSegmentationResult>(
+      dataset_used,
+      instance_detections,
+      inference_time_ns);
 }
 
 }  // namespace segmentation
