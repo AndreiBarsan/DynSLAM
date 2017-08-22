@@ -26,8 +26,7 @@ void AddCircle(
     int n_vertices = 25
 ) {
   const double slice_size = 2 * M_PI / n_vertices;
-
-  for(int i = 0; i <n_vertices;++i) {
+  for(int i = 0; i < n_vertices;++i) {
     float x_off = static_cast<float>(radius * cos(-i * slice_size));
     float y_off = static_cast<float>(radius * sin(-i * slice_size)) * aspect_ratio;
     vertex_data[idx_v++] = pos(0) + x_off;
@@ -66,9 +65,8 @@ void ErrorVisualizationCallback::ProcessLidarPoint(
 ) {
   Eigen::Vector3b color;
 
-  uint target_disp_delta = static_cast<uint>(
-      (visualize_input_) ? abs(input_disp - velodyne_disp)
-                         : abs(rendered_disp - velodyne_disp));
+  float target_disp_delta = (float)((visualize_input_) ? fabs(input_disp - velodyne_disp)
+                                                       : fabs(rendered_disp - velodyne_disp));
   int target_val = (visualize_input_) ? input_disp : rendered_disp;
   if (input_disp < 0 && fabs(input_depth) > 1e-5) {
     throw std::runtime_error(utils::Format(

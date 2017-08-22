@@ -172,6 +172,7 @@ class Input {
       : dataset_folder_(dataset_folder),
         config_(config),
         depth_provider_(depth_provider),
+        frame_offset_(frame_offset),
         frame_idx_(frame_offset),
         frame_width_(frame_size(0)),
         frame_height_(frame_size(1)),
@@ -237,10 +238,15 @@ class Input {
     return config_;
   }
 
+  int GetFrameOffset() const {
+    return frame_offset_;
+  }
+
  private:
   std::string dataset_folder_;
   Config config_;
   DepthProvider *depth_provider_;
+  const int frame_offset_;
   int frame_idx_;
   int frame_width_;
   int frame_height_;

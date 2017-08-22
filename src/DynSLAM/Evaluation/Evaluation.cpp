@@ -30,70 +30,72 @@ void PrettyPrintStats(const string &label, const DepthFrameEvaluation &evals) {
   }
 }
 
-void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam) {
-  // TODO(andrei): Make this passable as param.
-  int frame_idx = dyn_slam->GetCurrentFrameNo() - 1;
+void Evaluation::EvaluateFrame(Input *input, DynSlam *dyn_slam, int frame_idx) {
+  if (frame_idx < 0) {
+    cerr << "Cannot evaluate negative frame [" << frame_idx << "]." << endl;
+    return;
+  }
 
-  if (frame_idx >= 0) {
-    cout << "Starting evaluation of frame [" << frame_idx << "].." << endl;
+  cout << "Starting evaluation of frame [" << frame_idx << "].." << endl;
 
-    if (this->eval_tracklets_) {
-      vector<TrackletEvaluation> tracklet_evals = EvaluateTracking(input, dyn_slam);
+  if (this->eval_tracklets_) {
+    vector<TrackletEvaluation> tracklet_evals = EvaluateTracking(input, dyn_slam);
 
-      for(const TrackletEvaluation &eval : tracklet_evals) {
-        csv_tracking_dump_.Write(eval);
-      }
+    for (const TrackletEvaluation &eval : tracklet_evals) {
+      csv_tracking_dump_.Write(eval);
     }
+  }
 
-    if (! velodyne_->FrameAvailable(frame_idx)) {
-      cerr << "WARNING: Skipping evaluation for frame #" << frame_idx << " since no "
-           << "ground truth is available for it (normal for very short chunks)." << endl;
+  if (!velodyne_->FrameAvailable(frame_idx)) {
+    cerr << "WARNING: Skipping evaluation for frame #" << frame_idx << " since no "
+         << "ground truth is available for it (normal for very short chunks)." << endl;
 
-      return;
-    }
+    return;
+  }
 
-    if (separate_static_and_dynamic_) {
-      cout << "Evaluation of frame [" << frame_idx << "] will compute separate stats for static "
-           << "and dynamic elements of the scene." << endl;
-      auto static_dynamic = EvaluateFrameSeparate(frame_idx, input, dyn_slam);
-      auto static_evals = static_dynamic.first;
-      auto dynamic_evals = static_dynamic.second;
+  if (separate_static_and_dynamic_) {
+    cout << "Evaluation of frame [" << frame_idx << "] will compute separate stats for static "
+         << "and dynamic elements of the scene." << endl;
+    auto static_dynamic = EvaluateFrameSeparate(frame_idx, input, dyn_slam);
+    auto static_evals = static_dynamic.first;
+    auto dynamic_evals = static_dynamic.second;
 
-      csv_static_depth_dump_.Write(static_evals);
-      csv_dynamic_depth_dump_.Write(dynamic_evals);
+    csv_static_depth_dump_.Write(static_evals);
+    csv_dynamic_depth_dump_.Write(dynamic_evals);
 
-      PrettyPrintStats("Static Map", static_evals);
-      PrettyPrintStats("Dynamic", dynamic_evals);
-    }
-    else {
-      cout << "Evaluation of frame [" << frame_idx << "] will compute unified stats for both "
-           << "static and dynamic parts of the scene." << endl;
+    PrettyPrintStats("Static Map", static_evals);
+    PrettyPrintStats("Dynamic", dynamic_evals);
+  } else {
+    cout << "Evaluation of frame [" << frame_idx << "] will compute unified stats for both "
+         << "static and dynamic parts of the scene." << endl;
 
-      DepthFrameEvaluation evals = EvaluateFrame(frame_idx, input, dyn_slam);
-      csv_depth_dump_.Write(evals);
+    DepthFrameEvaluation evals = EvaluateFrame(frame_idx, input, dyn_slam);
+    csv_unified_depth_dump_.Write(evals);
 
-      PrettyPrintStats("Unified", evals);
-    }
+    PrettyPrintStats("Unified", evals);
   }
 }
 
-/// TODO(andrei): Deduplicate copypasta code.
+// TODO(andrei): Deduplicate copypasta code.
 std::pair<DepthFrameEvaluation, DepthFrameEvaluation> Evaluation::EvaluateFrameSeparate(
-    int frame_idx,
+    int dynslam_frame_idx,
     Input *input,
     DynSlam *dyn_slam
 ) {
-  auto lidar_pointcloud = velodyne_->ReadFrame(frame_idx);
-  if (frame_idx != input->GetCurrentFrame() - 1) {
-    throw runtime_error("Cannot yet access old poses for evaluation.");
-  }
-  Eigen::Matrix4f epose = dyn_slam->GetPose().inverse();
+  int input_frame_idx = input->GetFrameOffset() + dynslam_frame_idx;
+  auto lidar_pointcloud = velodyne_->ReadFrame(input_frame_idx);
+  int pose_idx = dynslam_frame_idx + 1;
+  Eigen::Matrix4f epose = dyn_slam->GetPoseHistory()[pose_idx];
+  cout << "Getting DynSLAM pose[" << pose_idx << "] from a total history of length "
+       << dyn_slam->GetPoseHistory().size() << endl;
+  cout << "This corresponds to input frame " << input_frame_idx << endl;
+
   auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
   const float *rendered_depthmap = dyn_slam->GetStaticMapRaycastDepthPreview(pango_pose);
   auto input_depthmap = shared_ptr<cv::Mat1s>(nullptr);
   auto input_rgb = shared_ptr<cv::Mat3b>(nullptr);
-  input->GetFrameCvImages(frame_idx, input_rgb, input_depthmap);
+  input->GetFrameCvImages(input_frame_idx, input_rgb, input_depthmap);
 
   const int kLargestMaxDelta = 12;
   bool compare_on_intersection = true;
@@ -133,7 +135,7 @@ std::pair<DepthFrameEvaluation, DepthFrameEvaluation> Evaluation::EvaluateFrameS
     delete callback;
   }
 
-  DepthEvaluationMeta meta(frame_idx, input->GetDatasetIdentifier());
+  DepthEvaluationMeta meta(dynslam_frame_idx, input->GetDatasetIdentifier());
   return make_pair<DepthFrameEvaluation, DepthFrameEvaluation>(
       DepthFrameEvaluation(meta, max_depth_m_, std::move(static_evals)),
       DepthFrameEvaluation(meta, max_depth_m_, std::move(dynamic_evals)));
@@ -143,6 +145,7 @@ DepthFrameEvaluation Evaluation::EvaluateFrame(int frame_idx,
                                                Input *input,
                                                DynSlam *dyn_slam
 ) {
+  throw std::runtime_error("Not supported at the moment.");
   auto lidar_pointcloud = velodyne_->ReadFrame(frame_idx);
 
   if (frame_idx != input->GetCurrentFrame() - 1) {

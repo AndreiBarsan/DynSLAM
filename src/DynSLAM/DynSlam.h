@@ -207,12 +207,16 @@ class DynSlam {
 
   // TODO(andrei): Similar stats also taking instances (and maybe views) into account. Take into
   // account the destroyed tracks (old ones) somehow.
-  size_t GetStaticMapMemory() const {
+  size_t GetStaticMapMemoryBytes() const {
     return static_scene_->GetUsedMemoryBytes();
   }
 
-  size_t GetStaticMapSavedDecayMemory() const {
-    return static_scene_->GetSavedDecayMemory();
+  size_t GetStaticMapSavedDecayMemoryBytes() const {
+    return static_scene_->GetSavedDecayMemoryBytes();
+  }
+
+  const VoxelDecayParams& GetStaticMapDecayParams() const {
+    return static_scene_->GetVoxelDecayParams();
   }
 
   void WaitForJobs() {
