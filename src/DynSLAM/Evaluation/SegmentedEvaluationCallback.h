@@ -2,6 +2,7 @@
 #define DYNSLAM_SEGMENTEDEVALUATIONCALLBACK_H
 
 #include "EvaluationCallback.h"
+#include "SegmentedCallback.h"
 
 namespace dynslam {
 namespace eval {
@@ -9,16 +10,15 @@ namespace eval {
 /// \brief Similar to 'EvaluationCallback', but computes separate error scores for static components
 /// of the environment and (potentially dynamic) cars. Other potentially dynamic, but not
 /// reconstructable, objects, such as cyclists and pedestrians are simply not evaluated.
-class SegmentedEvaluationCallback : public ILidarEvalCallback {
+class SegmentedEvaluationCallback : public SegmentedCallback {
  public:
   SegmentedEvaluationCallback(float delta_max, bool compare_on_intersection, bool kitti_style,
                               instreclib::segmentation::InstanceSegmentationResult *frame_segmentation,
                               instreclib::reconstruction::InstanceReconstructor *reconstructor
   )
-      : static_eval_(delta_max, compare_on_intersection, kitti_style),
-        dynamic_eval_(delta_max, compare_on_intersection, kitti_style),
-        frame_segmentation_(frame_segmentation),
-        reconstructor_(reconstructor)
+      : SegmentedCallback(frame_segmentation, reconstructor),
+        static_eval_(delta_max, compare_on_intersection, kitti_style),
+        dynamic_eval_(delta_max, compare_on_intersection, kitti_style)
   {}
 
   void ProcessLidarPoint(int idx,
@@ -47,9 +47,6 @@ class SegmentedEvaluationCallback : public ILidarEvalCallback {
   EvaluationCallback static_eval_;
   EvaluationCallback dynamic_eval_;
 
-  instreclib::segmentation::InstanceSegmentationResult *frame_segmentation_;
-  instreclib::reconstruction::InstanceReconstructor* reconstructor_;
-  long skipped_lidar_points_ = 0;
 };
 
 }
