@@ -81,7 +81,7 @@ class Track {
  public:
   /// \brief The maximum number of frames with relative motion estimation failure before a static
   ///        object is reverted to the "Uncertain" state.
-  int kMaxUncertainFramesStatic = 3;
+  int kMaxUncertainFramesStatic = 0;
   /// \see kMaxUncertainFramesStatic
   int kMaxUncertainFramesDynamic = 2;
   /// \brief Translation error threshold used to differentiate static from dynamic objects.
@@ -238,6 +238,12 @@ class Track {
 
   /// \brief The number of frames fused in the reconstruction.
   int fused_frames_ = 0;
+
+
+  dynslam::utils::Option<Pose>* EstimateInstanceMotion(
+      const vector<RawFlow, Eigen::aligned_allocator<RawFlow>> &instance_raw_flow,
+      const SparseSFProvider &ssf_provider,
+      const vector<double> &initial_estimate);
 
   SUPPORT_EIGEN_FIELDS;
 };

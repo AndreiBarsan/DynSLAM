@@ -150,10 +150,12 @@ void DynSlam::ProcessFrame(Input *input) {
     }
   }
 
-  int evaluation_begin_ = 0;
+  int evaluation_begin_ = 1;
   if (FLAGS_enable_evaluation && current_frame_no_ >= evaluation_begin_) {
     utils::Tic("Evaluation");
-    evaluation_->EvaluateFrame(input, this);
+    // TODO support delayed evaluation here XXX
+    evaluation_->EvaluateFrame(input, this, current_frame_no_);
+    evaluation_->LogMemoryUse(this);
     utils::Toc();
   }
 

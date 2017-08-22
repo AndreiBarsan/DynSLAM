@@ -223,7 +223,7 @@ public:
     return GetVoxelSizeBytes() * SDF_BLOCK_SIZE3 * num_used_blocks;
   }
 
-  size_t GetSavedDecayMemory() const {
+  size_t GetSavedDecayMemoryBytes() const {
     size_t block_size_bytes = GetVoxelSizeBytes() * SDF_BLOCK_SIZE3;
     size_t decayed_block_count = denseMapper->GetDecayedBlockCount();
     return decayed_block_count * block_size_bytes;

@@ -6,7 +6,7 @@ namespace eval {
 
 class ErrorVisualizationCallback : public ILidarEvalCallback {
  public:
-  ErrorVisualizationCallback(uint delta_max,
+  ErrorVisualizationCallback(float delta_max,
                              bool visualize_input,
                              const Eigen::Vector2f &output_pane_bounds,
                              unsigned char *colors,
@@ -35,7 +35,7 @@ class ErrorVisualizationCallback : public ILidarEvalCallback {
   int idx_v = 0;
   int idx_c = 0;
 
-  uint delta_max_;
+  float delta_max_;
 
   /// \brief Whether to visualize delta vs. input, or vs the fused depth map.
   bool visualize_input_;
