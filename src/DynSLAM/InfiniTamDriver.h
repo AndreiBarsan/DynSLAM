@@ -205,6 +205,26 @@ public:
     }
   }
 
+  /// \brief Goes through all remaining visible lists until present time, triggering garbage
+  /// collection for all of them. Should not be used mid-sequence.
+  void DecayCatchup() {
+    if (voxel_decay_params_.enabled) {
+      cout << "Will perform voxel decay (GC) for all remaining frames up to the present. "
+           << "Continuing to reconstruct past this point may lead to artifacts!" << endl;
+
+      for (int i = 0; i < voxel_decay_params_.min_decay_age; ++i) {
+        denseMapper->Decay(scene,
+                           renderState_live,
+                           voxel_decay_params_.max_decay_weight,
+                           // Set the actual min age to 0 to clean everything up real good.
+                           0,
+                           false);
+      }
+
+      cout << "Decay (GC) catchup complete." << endl;
+    }
+  }
+
   /// \brief Aggressive decay which ignores the minimum age requirement and acts on ALL voxels.
   /// Typically used to clean up finished reconstructions. Can be much slower than `Decay`, even by
   /// a few orders of magnitude if used on the full static map.

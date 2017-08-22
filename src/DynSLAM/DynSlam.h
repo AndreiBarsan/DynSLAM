@@ -246,11 +246,18 @@ class DynSlam {
   }
 
   // Hacky method used exclusively for evaluation. Reads segmentation data for a specific frame.
-  std::shared_ptr<instreclib::segmentation::InstanceSegmentationResult> GetSpecificSegmentation(int frame_idx) {
+  std::shared_ptr<instreclib::segmentation::InstanceSegmentationResult>
+  GetSpecificSegmentationForEval(int frame_idx) {
     auto *psp = dynamic_cast<PrecomputedSegmentationProvider*>(segmentation_provider_);
     assert (psp != nullptr && "This functionality is only supported when using precomputed segmentations.");
 
     return psp->ReadSegmentation(frame_idx);
+  }
+
+  /// \brief Run voxel decay all the way up to the latest frame.
+  /// Useful for cleaning up at the end of the sequence. Should not be used mid-sequence.
+  void StaticMapDecayCatchup() {
+    static_scene_->DecayCatchup();
   }
 
   SUPPORT_EIGEN_FIELDS;
