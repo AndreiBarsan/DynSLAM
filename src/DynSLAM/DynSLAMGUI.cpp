@@ -297,7 +297,7 @@ public:
 //              lidar_vis_colors_,
 //              lidar_vis_vertices_);
           auto vis_mode = eval::SegmentedCallback::LidarAssociation::kStaticMap;
-          auto seg = dyn_slam_->GetSpecificSegmentation(input_frame_idx);
+          auto seg = dyn_slam_->GetSpecificSegmentationForEval(input_frame_idx);
           eval::SegmentedVisualizationCallback vis_callback(
               delta_max_visualization,
               visualize_input,
@@ -681,6 +681,11 @@ public:
         current_lidar_vis_ = (VisualizeError::kEnd - 1);
       }
     });
+
+    pangolin::Var<function<void(void)>> collect("ui.Map Voxel [G]C Catchup", [&]() {
+      dyn_slam_->StaticMapDecayCatchup();
+    });
+    pangolin::RegisterKeyPressCallback('g', [&]() { dyn_slam_->StaticMapDecayCatchup(); });
 
     /***************************************************************************
      * GUI Checkboxes
