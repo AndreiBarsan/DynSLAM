@@ -32,6 +32,7 @@ DEFINE_bool(dynamic_mode, true, "Whether DynSLAM should be aware of dynamic obje
                                 "reconstruct them. Disabling this makes the system behave like a "
                                 "vanilla outdoor InfiniTAM.");
 DEFINE_int32(frame_offset, 0, "The frame index from which to start reading the dataset sequence.");
+DEFINE_int32(frame_limit, 0, "How many frames to process in auto mode. 0 = no limit.");
 DEFINE_bool(voxel_decay, true, "Whether to enable map regularization via voxel decay (a.k.a. voxel "
                                "garbage collection).");
 DEFINE_int32(min_decay_age, 200, "The minimum voxel *block* age for voxels within it to be eligible "
@@ -58,6 +59,8 @@ DEFINE_int32(evaluation_delay, 0, "How many frames behind the current one should
                                   "measuring the impact of the regularization, which ``follows'' "
                                   "the camera with a delay of 'min_decay_age'. Warning: does not "
                                   "support dynamic scenes.");
+DEFINE_bool(close_on_complete, true, "Whether to shut down automatically once 'frame_limit' is reached.");
+// TODO autoplay toggling flag
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
 // issue, which could easily be avoided in the future.
@@ -172,41 +175,22 @@ public:
       pangolin::GlFont &font = pangolin::GlFont::I();
 
       if (autoplay_->Get()) {
-        ProcessFrame();
+        if (FLAGS_frame_limit == 0 || dyn_slam_->GetCurrentFrameNo() < FLAGS_frame_limit) {
+          ProcessFrame();
+        }
+        else {
+          cerr << "Warning: reached autoplay limit of [" << FLAGS_frame_limit << "]. Stopped."
+               << endl;
+          *autoplay_ = false;
+          if (FLAGS_close_on_complete) {
+            cerr << "Closing as instructed. Bye!" << endl;
+            pangolin::QuitAll();
+            return;
+          }
+        }
       }
 
       long time_ms = utils::GetTimeMs();
-
-      rgb_view_.Activate();
-      glColor3f(1.0f, 1.0f, 1.0f);
-      if(dyn_slam_->GetCurrentFrameNo() >= 1) {
-        if (display_raw_previews_->Get()) {
-          UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_, true, GL_UNSIGNED_BYTE);
-        } else {
-          UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_, true, GL_UNSIGNED_BYTE);
-        }
-        pane_texture_->RenderToViewport(true);
-
-        Tic("LIDAR render");
-        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
-        if (velodyne->HasLatestFrame()) {
-          PreviewLidar(velodyne->GetLatestFrame(),
-                       dyn_slam_->GetLeftRgbProjectionMatrix(),
-                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
-                       rgb_view_);
-        }
-        else {
-          PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
-                       dyn_slam_->GetLeftRgbProjectionMatrix(),
-                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
-                       rgb_view_);
-        }
-        Toc(true);
-      }
-
-      if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
-        PreviewSparseSF(dyn_slam_->GetLatestFlow().matches, rgb_view_);
-      }
 
       main_view_->Activate(*pane_cam_);
       glEnable(GL_DEPTH_TEST);
@@ -304,7 +288,6 @@ public:
               Eigen::Vector2f(main_view_->GetBounds().w, main_view_->GetBounds().h),
               lidar_vis_colors_,
               lidar_vis_vertices_,
-//              dyn_slam_->GetLatestSeg().get(),
               seg.get(),
 //              dyn_slam_->GetInstanceReconstructor(),
               nullptr,
@@ -338,8 +321,38 @@ public:
         font.Text(message).Draw(-0.90f, 0.80f);
       }
       //*/
-
       font.Text("Frame #%d", dyn_slam_->GetCurrentFrameNo()).Draw(-0.90f, 0.90f);
+
+      rgb_view_.Activate();
+      glColor3f(1.0f, 1.0f, 1.0f);
+      if(dyn_slam_->GetCurrentFrameNo() >= 1) {
+        if (display_raw_previews_->Get()) {
+          UploadCvTexture(*(dyn_slam_->GetRgbPreview()), *pane_texture_, true, GL_UNSIGNED_BYTE);
+        } else {
+          UploadCvTexture(*(dyn_slam_->GetStaticRgbPreview()), *pane_texture_, true, GL_UNSIGNED_BYTE);
+        }
+        pane_texture_->RenderToViewport(true);
+
+        Tic("LIDAR render");
+        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
+        if (velodyne->HasLatestFrame()) {
+          PreviewLidar(velodyne->GetLatestFrame(),
+                       dyn_slam_->GetLeftRgbProjectionMatrix(),
+                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
+                       rgb_view_);
+        }
+        else {
+          PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
+                       dyn_slam_->GetLeftRgbProjectionMatrix(),
+                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
+                       rgb_view_);
+        }
+        Toc(true);
+      }
+
+      if (dyn_slam_->GetCurrentFrameNo() > 1 && preview_sf_->Get()) {
+        PreviewSparseSF(dyn_slam_->GetLatestFlow().matches, rgb_view_);
+      }
 
       depth_view_.Activate();
       glColor3f(1.0, 1.0, 1.0);
@@ -399,10 +412,11 @@ public:
         dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount()
       );
 
+      // TODO(andrei): Re-enable once you finish with the automated experiments.
       // Disable autoplay once we reach the end of a sequence.
-      if (! this->dyn_slam_input_->HasMoreImages()) {
-        (*this->autoplay_) = false;
-      }
+//      if (! this->dyn_slam_input_->HasMoreImages()) {
+//        (*this->autoplay_) = false;
+//      }
 
       // Swap frames and Process Events
       pangolin::FinishFrame();
@@ -690,7 +704,7 @@ public:
     /***************************************************************************
      * GUI Checkboxes
      **************************************************************************/
-    autoplay_ = new pangolin::Var<bool>("ui.[A]utoplay", false, true);
+    autoplay_ = new pangolin::Var<bool>("ui.[A]utoplay", true, true);
     pangolin::RegisterKeyPressCallback('a', [this]() {
       *(this->autoplay_) = ! *(this->autoplay_);
     });
@@ -828,6 +842,11 @@ public:
   void ProcessFrame() {
     cout << endl << "[Starting frame " << dyn_slam_->GetCurrentFrameNo() + 1 << "]" << endl;
     active_object_count_ = dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount();
+
+    if (! dyn_slam_input_->HasMoreImages() && FLAGS_close_on_complete) {
+      pangolin::QuitAll();
+      return;
+    }
 
     size_t free_gpu_memory_bytes;
     size_t total_gpu_memory_bytes;

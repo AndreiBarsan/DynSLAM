@@ -197,7 +197,7 @@ class DynSlam {
   /// For the KITTI dataset (and the KITTI-odometry one) this represents the center of the left
   /// camera.
   Eigen::Matrix4f GetPose() const {
-    /// XXX: inconsistency between this and the pose history?
+    /// XXX: inconsistency between the reference frames of this and the pose history?
     return static_scene_->GetPose();
   }
 
@@ -206,8 +206,6 @@ class DynSlam {
     return pose_history_;
   }
 
-  // TODO(andrei): Similar stats also taking instances (and maybe views) into account. Take into
-  // account the destroyed tracks (old ones) somehow.
   size_t GetStaticMapMemoryBytes() const {
     return static_scene_->GetUsedMemoryBytes();
   }

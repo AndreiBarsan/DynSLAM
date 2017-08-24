@@ -31,7 +31,7 @@ void Input::GetFrameCvImages(
   }
 }
 
-bool Input::HasMoreImages() {
+bool Input::HasMoreImages() const {
   string next_fpath =
       GetFrameName(dataset_folder_, config_.left_color_folder, config_.fname_format, frame_idx_);
   return utils::FileExists(next_fpath);

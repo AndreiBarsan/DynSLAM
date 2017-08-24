@@ -11,6 +11,8 @@
 #include "Tracklets.h"
 #include "VelodyneIO.h"
 
+DECLARE_int32(max_decay_weight);
+
 namespace dynslam {
 class DynSlam;
 }
@@ -57,8 +59,9 @@ class Evaluation {
       bool use_depth_weighting,
       const string &base_folder = "../csv"
   ) {
-    return utils::Format("%s/%s-offset-%d-depth-%s-voxelsize-%.4f-max-depth-m-%.2f-%s-%s-%s",
+    return utils::Format("%s/k-%d-%s-offset-%d-depth-%s-voxelsize-%.4f-max-depth-m-%.2f-%s-%s-%s",
                          base_folder.c_str(),
+                         FLAGS_max_decay_weight,
                          input->GetDatasetIdentifier().c_str(),
                          input->GetCurrentFrame(),
                          input->GetDepthProvider()->GetName().c_str(),
