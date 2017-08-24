@@ -353,10 +353,14 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
   // We don't want to create an (expensive) meshing engine for every instance.
   settings->createMeshingEngine = false;
 
-  settings->sceneParams.mu = 0.5f;
-  settings->sceneParams.voxelSize = 0.040f;
+  settings->sceneParams.mu = 1.00f;
+  settings->sceneParams.voxelSize = 0.035f;
+
+  // Can fix spurious hole issues (rare)
+//  settings->sceneParams.voxelSize = 0.030f;
   // Volume approximated in meters.
   settings->sdfLocalBlockNum = static_cast<long>(6 * 6 * 10 / settings->sceneParams.voxelSize);
+//  settings->sdfLocalBlockNum = static_cast<long>(4 * 4 * 10 / settings->sceneParams.voxelSize);
 
   track.GetReconstruction() = make_shared<InfiniTamDriver>(
           settings,
@@ -746,6 +750,8 @@ vector<InstanceView, Eigen::aligned_allocator<InstanceView>> InstanceReconstruct
   vector<InstanceView, Eigen::aligned_allocator<InstanceView>> instance_views;
   for (const InstanceDetection &instance_detection : segmentation_result.instance_detections) {
     if (IsPossiblyDynamic(instance_detection.GetClassName())) {
+      // This is probably better; TODO(andrei): Dig into this after deadline.
+//    if (ShouldReconstruct(instance_detection.GetClassName())) {
       // bool use_gpu = main_view->rgb->isAllocated_CUDA; // May need to modify 'MemoryBlock' to
       // check this, since the field is private.
       bool use_gpu = true;

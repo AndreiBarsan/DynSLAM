@@ -183,7 +183,7 @@ class Input {
                          static_cast<int>(round(frame_size(0) * input_scale)))
   {}
 
-  bool HasMoreImages();
+  bool HasMoreImages() const;
 
   /// \brief Advances the input reader to the next frame.
   /// \returns True if the next frame's files could be read successfully.
