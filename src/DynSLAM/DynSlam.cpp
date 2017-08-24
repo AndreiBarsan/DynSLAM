@@ -156,9 +156,9 @@ void DynSlam::ProcessFrame(Input *input) {
     utils::Tic("Evaluation");
     bool enable_compositing = (FLAGS_evaluation_delay == 0);
     evaluation_->EvaluateFrame(input, this, evaluated_frame_idx, enable_compositing);
-    evaluation_->LogMemoryUse(this);
     utils::Toc();
   }
+  evaluation_->LogMemoryUse(this);
 
   // Final sanity check after the frame is processed: individual components should check for errors.
   // If something slips through and gets here, it's bad and we want to stop execution.

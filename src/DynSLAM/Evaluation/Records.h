@@ -50,7 +50,7 @@ struct DepthResult : public ICsvSerializable {
   }
 
   std::string GetData() const override {
-    return utils::Format("%d,%d,%d,%d",
+    return utils::Format("%d,%d,%d,%d,%d",
                          measurement_count,
                          error_count,
                          missing_count,
@@ -92,7 +92,7 @@ struct DepthEvaluation : public ICsvSerializable {
   std::string GetHeader() const override {
     const std::string kitti_label = (kitti_style ? "-kitti" : "");
     return utils::Format(
-        "fusion-total-%.2f%s,fusion-error-%.2f%s,fusion-missing-%.2f%s,fusion-correct-%.2f%s,fusion-missing-separate-%.2f%s"
+        "fusion-total-%.2f%s,fusion-error-%.2f%s,fusion-missing-%.2f%s,fusion-correct-%.2f%s,fusion-missing-separate-%.2f%s,"
         "input-total-%.2f%s,input-error-%.2f%s,input-missing-%.2f%s,input-correct-%.2f%s,input-missing-separate-%.2f%s",
         delta_max, kitti_label.c_str(), delta_max, kitti_label.c_str(),
         delta_max, kitti_label.c_str(), delta_max, kitti_label.c_str(),
