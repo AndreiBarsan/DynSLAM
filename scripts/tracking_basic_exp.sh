@@ -14,11 +14,19 @@ cd cmake-build-debug && make DynSLAMGUI -j8 || exit 1
 
 TRACKING_ROOT=~/datasets/kitti/tracking-dataset/
 
-SEQUENCES=(0 1 2 3 4 5 6 7 8 9)
+# Sequences [0-8] was done on 24 August, evening.
+# Sequence [1] ... pending (running when I left, dispnet+dynamic)
+# SEQUENCES=(1 2 3 4 5 6 7 8 9)
+#SEQUENCES=(8 9 10 11 12 13 14 15 16 17 18 19 20)
+# These seem to be missing segmentation or depth data? (low-priority; focus on 0-9, i.e., first 10).
+# (19 13)
+SEQUENCES=(1)
 USE_DISPNET_OPTIONS=(true false)
-DYNAMIC_MODE_OPTIONS=(true false)
+#DYNAMIC_MODE_OPTIONS=(false true)
+DYNAMIC_MODE_OPTIONS=(true)
 
-MIN_DECAY_AGE=150
+# Careful you don't mess up the ~280 mostly-still sequence 06!
+MIN_DECAY_AGE=300
 MAX_DECAY_WEIGHT=99999
 
 SEQ_COUNT=${#SEQUENCES[*]}
@@ -41,7 +49,7 @@ for (( i = 0; i < $SEQ_COUNT; i++ )); do
             cmd="./DynSLAMGUI \
                 --dataset_root=$TRACKING_ROOT
                 --dataset_type=kitti-tracking           \
-                --kitti_tracking_sequence_id=$i         \
+                --kitti_tracking_sequence_id=$SEQ_ID    \
                 --dynamic_mode=$DYNAMIC_MODE            \
                 --enable_evaluation=true                \
                 --min_decay_age=$MIN_DECAY_AGE           \
