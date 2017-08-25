@@ -204,8 +204,6 @@ public:
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
         int input_frame_idx = dyn_slam_input_->GetFrameOffset() + evaluated_frame_idx;
 
-        auto visualized_lidar_pointcloud = velodyne->ReadFrame(input_frame_idx);
-
         Eigen::Matrix4f epose = dyn_slam_->GetPoseHistory()[evaluated_frame_idx + 1];
         auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
@@ -305,17 +303,21 @@ public:
           eval::EvaluationCallback eval_callback(delta_max_visualization,
                                                  compare_on_intersection,
                                                  kitti_style);
-          dyn_slam_->GetEvaluation()->EvaluateDepth(visualized_lidar_pointcloud,
-                                                    synthesized_depthmap,
-                                                    *input_depthmap,
-                                                    {&vis_callback, &eval_callback});
-          auto result = eval_callback.GetEvaluation();
-          DepthResult depth_result = current_lidar_vis_ == kFusionVsLidar ? result.fused_result
-                                                                          : result.input_result;
-          message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
-                                   depth_result.GetCorrectPixelRatio(true),
-                                   depth_result.GetCorrectPixelRatio(false));
-          vis_callback.Render();
+
+          if (velodyne->FrameAvailable(input_frame_idx)) {
+            auto visualized_lidar_pointcloud = velodyne->ReadFrame(input_frame_idx);
+            dyn_slam_->GetEvaluation()->EvaluateDepth(visualized_lidar_pointcloud,
+                                                      synthesized_depthmap,
+                                                      *input_depthmap,
+                                                      {&vis_callback, &eval_callback});
+            auto result = eval_callback.GetEvaluation();
+            DepthResult depth_result = current_lidar_vis_ == kFusionVsLidar ? result.fused_result
+                                                                            : result.input_result;
+            message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
+                                     depth_result.GetCorrectPixelRatio(true),
+                                     depth_result.GetCorrectPixelRatio(false));
+            vis_callback.Render();
+          }
         }
 
         font.Text(message).Draw(-0.90f, 0.80f);
@@ -844,6 +846,7 @@ public:
     active_object_count_ = dyn_slam_->GetInstanceReconstructor()->GetActiveTrackCount();
 
     if (! dyn_slam_input_->HasMoreImages() && FLAGS_close_on_complete) {
+      cerr << "No more images, and I'm instructed to shut down when that happens. Bye!" << endl;
       pangolin::QuitAll();
       return;
     }
