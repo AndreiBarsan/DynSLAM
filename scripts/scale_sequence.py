@@ -207,12 +207,6 @@ def scale(dataset_root, sequence_type, sequence_id, scale, force, skip_resize,
 
     Used to evaluate the behavior of DynSLAM on lower-resolution input.
     """
-    # * collect list of left_rgb and right_rgb, scale them down, keep track of
-    #   the names and locations of these downscaled frames, and then invoke
-    #   ELAS (kitti2klg), DispNet (prolly directly from this script for
-    #   simplicity), and MNC via something like the segment_tracking utility
-    #   (which sets up env variables and stuff), but which just takes in
-    #   arbitrary folders for input and output.
 
     if sequence_type not in seq_to_pat:
         raise ValueError("Unknown sequence type [{}]. Supported are [{}].".format(
