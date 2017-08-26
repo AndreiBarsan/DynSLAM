@@ -99,22 +99,13 @@ void DynSlam::ProcessFrame(Input *input) {
   });
 
   seg_result_future.wait();
-  // 'get' ensures any exceptions are propagated.
+  // 'get' ensures any exceptions are propagated (unlike 'wait').
   ssf_and_vo.get();
 
   utils::Tic("Input preprocessing");
   input->GetCvImages(&input_rgb_image_, &input_raw_depth_image_);
   static_scene_->UpdateView(*input_rgb_image_, *input_raw_depth_image_);
   utils::Toc();
-
-  // Perform semantic segmentation, dense depth computation, and dense fusion every K frames.
-  // TODO(andrei): Support instance tracking in this framework: we would need SSF between t and t-k,
-  //               so we DEFINITELY need separate VO to run in, say, 50ms at every frame, and then
-  //               heavier, denser feature matching to run in ~200ms in parallel to the semantic
-  //               segmentation, matching between this frames and, say, 3 frames ago. Luckily,
-  // libviso should keep track of images internally, so if we have two instances we can just push
-  // data and get SSF at whatever intervals we would like.
-  int experimental_fusion_every_ = 1;
 
   // Split the scene up into instances, and fuse each instance independently.
   utils::Tic("Instance tracking and reconstruction");

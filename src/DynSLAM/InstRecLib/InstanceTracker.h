@@ -103,6 +103,7 @@ class InstanceTracker {
         return track;
       }
     }
+
     throw std::runtime_error(
         dynslam::utils::Format("Unable to find a track containing the point (%d, %d).", x, y));
   }

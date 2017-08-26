@@ -55,8 +55,8 @@ void EvaluationCallback::ComputeAccuracy(float rendered_disp,
   const float ren_disp_delta = fabs(rendered_disp - lidar_disp);
   const float input_disp_delta = fabs(input_disp - lidar_disp);
 
-  bool missing_input = fabs(input_depth_m) < 1e-5;
-  bool missing_rendered = fabs(rendered_depth_m) < 1e-5;
+  bool missing_input = (fabs(input_depth_m) < 1e-5);
+  bool missing_rendered = (fabs(rendered_depth_m) < 1e-5);
 
   if (missing_input) {
     input_stats.missing_separate++;
