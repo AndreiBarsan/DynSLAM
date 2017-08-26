@@ -15,22 +15,11 @@ cd cmake-build-debug && make DynSLAMGUI -j8 || exit 1
 
 ODOMETRY_ROOT=~/datasets/kitti/odometry-dataset
 
-# TODO(andrei): Ensure this list is always up-to-date.
-# [5] still needs ELAS, but DispNet is done.
-#
-# [0] is done (capped @ 4399)
-# [1] was complete for dispnet and ELAS on August 23.
-# [2] is done (capped @ 4399)
-# [3] is done (capped @ 4399)
-# [4] is done (capped @ 4399)
-# [6] is done (capped @ 4399)
-# [7] is done (capped @ 4399)
-# [8] is done (capped @ 4399)
-# [9] is done (capped @ 4399)
-# [10] is done (capped @ 4399)
+# Original:
+#SEQUENCES=(0 1 2 3 4 5 6 7 8 9 10)
+# Currently left:
+SEQUENCES=()
 
-#SEQUENCES=(2 6 7 8 9 10 5)
-SEQUENCES=(5)
 #USE_DISPNET_OPTIONS=(true false)
 USE_DISPNET_OPTIONS=(false)
 

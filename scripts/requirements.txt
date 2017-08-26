@@ -22,10 +22,13 @@ nbconvert==5.2.1
 nbformat==4.3.0
 notebook==5.0.0
 numpy==1.13.0
+olefile==0.44
 pandas==0.20.3
 pandocfilters==1.4.1
+patsy==0.4.1
 pexpect==4.2.1
 pickleshare==0.7.4
+Pillow==4.2.1
 prompt-toolkit==1.0.14
 ptyprocess==0.5.1
 Pygments==2.2.0
@@ -35,8 +38,10 @@ pytz==2017.2
 pyzmq==16.0.2
 qtconsole==4.3.0
 scipy==0.19.0
+seaborn==0.8
 simplegeneric==0.8.1
 six==1.10.0
+statsmodels==0.8.0
 terminado==0.6
 testpath==0.3
 tornado==4.5.1
