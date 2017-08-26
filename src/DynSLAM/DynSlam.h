@@ -41,7 +41,8 @@ class DynSlam {
           const Eigen::Matrix34f& proj_right_rgb,
           float stereo_baseline_m,
           bool enable_direct_refinement,
-          bool dynamic_mode)
+          bool dynamic_mode,
+          int fusion_every)
     : static_scene_(itm_static_scene_engine),
       segmentation_provider_(segmentation_provider),
       instance_reconstructor_(new InstanceReconstructor(
@@ -63,7 +64,8 @@ class DynSlam {
       pose_history_({ Eigen::Matrix4f::Identity() }),
       projection_left_rgb_(proj_left_rgb),
       projection_right_rgb_(proj_right_rgb),
-      stereo_baseline_m_(stereo_baseline_m)
+      stereo_baseline_m_(stereo_baseline_m),
+      experimental_fusion_every_(fusion_every)
   {}
 
   /// \brief Reads in and processes the next frame from the data source.
@@ -280,8 +282,8 @@ private:
   ///        basically just outdoor InfiniTAM.
   bool dynamic_mode_;
 
-  /// If dynamic mode is on, whether to force instance reconstruction even for non-dynamic objects,
-  /// like parked cars.
+  /// \brief If dynamic mode is on, whether to force instance reconstruction even for non-dynamic
+  /// objects, like parked cars. All experiments in the thesis are performed with this 'true'.
   bool always_reconstruct_objects_ = true;
 
   std::vector<Eigen::Matrix4f, Eigen::aligned_allocator<Eigen::Matrix4f>> pose_history_;
@@ -293,10 +295,23 @@ private:
   const Eigen::Matrix34f projection_right_rgb_;
   const float stereo_baseline_m_;
 
+  /// \brief Stores the result of the most recent segmentation.
   std::shared_ptr<instreclib::segmentation::InstanceSegmentationResult> latest_seg_result_;
 
+  /// \brief Perform dense depth computation and dense fusion every K frames.
+  /// A value of '1' is the default, and means regular operation fusing every frame.
+  /// This is used to evaluate the impact of doing semantic segmentation less often. Note that we
+  /// still *do* perform it, as we still need to evaluate the system every frame.
+  /// TODO(andrei): Support instance tracking in this framework: we would need SSF between t and t-k,
+  ///               so we DEFINITELY need separate VO to run in, say, 50ms at every frame, and then
+  ///               heavier, denser feature matching to run in ~200ms in parallel to the semantic
+  ///               segmentation, matching between this frames and, say, 3 frames ago. Luckily,
+  /// libviso should keep track of images internally, so if we have two instances we can just push
+  /// data and get SSF at whatever intervals we would like.
+  const int experimental_fusion_every_;
+
   /// \brief Returns a path to the folder where the dataset's meshes should be dumped, creating it
-  ///        using a naive system call if it does not exist.
+  ///        using a native system call if it does not exist.
   std::string EnsureDumpFolderExists(const string& dataset_name) const;
 };
 

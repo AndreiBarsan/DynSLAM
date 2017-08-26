@@ -111,6 +111,11 @@ class InstanceReconstructor {
     return instance_tracker_->GetTrackAtPoint(x, y, frame_idx_);
   }
 
+  /// Only for 'dynslam::eval' use.
+  int GetFrameIdx_Evaluation() const {
+    return frame_idx_;
+  }
+
  private:
   std::shared_ptr<InstanceTracker> instance_tracker_;
 

@@ -11,7 +11,10 @@
 #include "Tracklets.h"
 #include "VelodyneIO.h"
 
+// TODO-LOW(andrei): Don't directly rely on flags. Put the flags in a proper config and rely on that
+// for naming things, generating metadata, etc.
 DECLARE_int32(max_decay_weight);
+DECLARE_int32(fusion_every);
 
 namespace dynslam {
 class DynSlam;
@@ -59,17 +62,20 @@ class Evaluation {
       bool use_depth_weighting,
       const string &base_folder = "../csv"
   ) {
-    return utils::Format("%s/k-%d-%s-offset-%d-depth-%s-voxelsize-%.4f-max-depth-m-%.2f-%s-%s-%s",
-                         base_folder.c_str(),
-                         FLAGS_max_decay_weight,
-                         input->GetDatasetIdentifier().c_str(),
-                         input->GetCurrentFrame(),
-                         input->GetDepthProvider()->GetName().c_str(),
-                         voxel_size_meters,
-                         input->GetDepthProvider()->GetMaxDepthMeters(),
-                         is_dynamic ? "dynamic-mode" : "NO-dynamic",
-                         direct_refinement ? "with-direct-ref" : "NO-direct-ref",
-                         use_depth_weighting ? "with-fusion-weights" : "NO-fusion-weights");
+    return utils::Format(
+        "%s/k-%d-%s-offset-%d-depth-%s-voxelsize-%.4f-max-depth-m-%.2f-%s-%s-%s%s",
+        base_folder.c_str(),
+        FLAGS_max_decay_weight,
+        input->GetDatasetIdentifier().c_str(),
+        input->GetCurrentFrame(),
+        input->GetDepthProvider()->GetName().c_str(),
+        voxel_size_meters,
+        input->GetDepthProvider()->GetMaxDepthMeters(),
+        is_dynamic ? "dynamic-mode" : "NO-dynamic",
+        direct_refinement ? "with-direct-ref" : "NO-direct-ref",
+        use_depth_weighting ? "with-fusion-weights" : "NO-fusion-weights",
+        FLAGS_fusion_every == 1 ? "" : utils::Format("-fuse-every-%d", FLAGS_fusion_every).c_str()
+    );
   }
 
   static std::string GetDepthCsvName(const std::string &dataset_root,

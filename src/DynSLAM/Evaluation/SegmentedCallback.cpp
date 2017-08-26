@@ -2,6 +2,9 @@
 #include "SegmentedEvaluationCallback.h"
 #include "SegmentedCallback.h"
 
+
+DECLARE_int32(fusion_every);
+
 namespace dynslam {
 namespace eval {
 
@@ -25,7 +28,9 @@ SegmentedCallback::LidarAssociation SegmentedCallback::GetPointAssociation(
       if (InstanceReconstructor::ShouldReconstruct(det.GetClassName())) {
         bool is_reconstructed = false;
 
-        if (reconstructor_ != nullptr) {
+        // Does not support dynamic object reconstruction evaluation when skipping frames.
+        if (reconstructor_ != nullptr && FLAGS_fusion_every == 1)
+        {
           /// TODO-LOW(andrei): This is dirty, but it works... It should nevertheless be improved.
           const Track &track = reconstructor_->GetTrackAtPoint(px, py);
           is_reconstructed = track.GetState() != kUncertain;

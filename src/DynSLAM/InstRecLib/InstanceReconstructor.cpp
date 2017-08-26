@@ -359,7 +359,7 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
   // Can fix spurious hole issues (rare)
 //  settings->sceneParams.voxelSize = 0.030f;
   // Volume approximated in meters.
-  settings->sdfLocalBlockNum = static_cast<long>(6 * 6 * 10 / settings->sceneParams.voxelSize);
+  settings->sdfLocalBlockNum = static_cast<long>(5 * 5 * 10 / settings->sceneParams.voxelSize);
 //  settings->sdfLocalBlockNum = static_cast<long>(4 * 4 * 10 / settings->sceneParams.voxelSize);
 
   track.GetReconstruction() = make_shared<InfiniTamDriver>(
