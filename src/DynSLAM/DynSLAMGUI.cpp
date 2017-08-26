@@ -59,8 +59,16 @@ DEFINE_int32(evaluation_delay, 0, "How many frames behind the current one should
                                   "measuring the impact of the regularization, which ``follows'' "
                                   "the camera with a delay of 'min_decay_age'. Warning: does not "
                                   "support dynamic scenes.");
-DEFINE_bool(close_on_complete, true, "Whether to shut down automatically once 'frame_limit' is reached.");
-// TODO autoplay toggling flag
+DEFINE_bool(close_on_complete, true, "Whether to shut down automatically once 'frame_limit' is "
+                                     "reached.");
+DEFINE_bool(record, false, "Whether to record a video of the GUI and save it to disk. Using an "
+                           "external program usually leads to better results, though.");
+DEFINE_bool(chase_cam, false, "Whether to preview the reconstruction in chase cam mode, following "
+                             "the camera from a third person view.");
+DEFINE_int32(fusion_every, 1, "Fuse every kth frame into the map. Used for evaluating the system's "
+                              "behavior under reduced temporal resolution.");
+
+// TODO-LOW(andrei): autoplay toggling flag.
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
 // issue, which could easily be avoided in the future.
@@ -136,11 +144,14 @@ public:
 
     auto phist = dyn_slam_->GetPoseHistory();
 
-    // Make the poses a little bit more visible.
-    float frustum_root_cube_scale = 0.01f;
+    // Make the poses a little bit more visible (set to > 0.0f to enable).
+    float frustum_root_cube_scale = 0.00f;
+
+    const float kMaxFrustumScale = 0.66;
     Eigen::Vector3f color_white(1.0f, 1.0f, 1.0f);
     for (int i = 0; i < static_cast<int>(phist.size()) - 1; ++i) {
-      DrawPoseFrustum(phist[i], color_white, frustum_root_cube_scale);
+      float frustum_scale = max(0.15f, kMaxFrustumScale - 0.05f * (phist.size() - 1 - i));
+      DrawPoseFrustum(phist[i], color_white, frustum_scale, frustum_root_cube_scale);
     }
 
     if (! phist.empty()) {
@@ -148,12 +159,12 @@ public:
       Eigen::Vector3f glowing_green(0.5f,
                                     0.5f + static_cast<float>(sin(current_time_ms / 250.0) * 0.5 + 0.5) * 0.5f,
                                     0.5f);
-      DrawPoseFrustum(phist[phist.size() - 1], glowing_green, frustum_root_cube_scale);
+      DrawPoseFrustum(phist[phist.size() - 1], glowing_green, kMaxFrustumScale, frustum_root_cube_scale);
     }
   }
 
   void DrawPoseFrustum(const Eigen::Matrix4f &pose, const Eigen::Vector3f &color,
-                       float frustum_root_cube_scale) const {
+                       float frustum_scale, float frustum_root_cube_scale) const {
     glPushMatrix();
     Eigen::Matrix4f inv_pose = pose.inverse();
     glMultMatrixf(inv_pose.data());
@@ -163,7 +174,7 @@ public:
     Eigen::Matrix34f projection = dyn_slam_->GetLeftRgbProjectionMatrix();
     const Eigen::Matrix3f Kinv = projection.block(0, 0, 3, 3).inverse();
     glColor3f(color(0), color(1), color(2));
-    pangolin::glDrawFrustrum(Kinv, width_, height_, inv_pose, 1.0f);
+    pangolin::glDrawFrustrum(Kinv, width_, height_, inv_pose, frustum_scale);
   }
 
   /// \brief Executes the main Pangolin input and rendering loop.
@@ -199,6 +210,16 @@ public:
       glDisable(GL_DEPTH_TEST);
       glDepthMask(false);
 
+      if (FLAGS_chase_cam) {
+        Eigen::Matrix4f cam_mv = dyn_slam_->GetPose().inverse();
+        pangolin::OpenGlMatrix pm(cam_mv);
+        pm = pangolin::OpenGlMatrix::RotateY(M_PI * 0.5 * 0.05f) *
+             pangolin::OpenGlMatrix::RotateX(M_PI * 0.5 * 0.02f) *
+             pangolin::OpenGlMatrix::Translate(-0.5, 1.2, 8.0) *
+             pm;
+        pane_cam_->SetModelViewMatrix(pm);
+      }
+
       int evaluated_frame_idx = dyn_slam_->GetCurrentFrameNo() - 1 - FLAGS_evaluation_delay;
       if (evaluated_frame_idx > 0) {
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
@@ -223,7 +244,12 @@ public:
         string message;
         switch(current_lidar_vis_) {
           case kNone:
-            message = "Free cam preview";
+            if (FLAGS_chase_cam) {
+              message = "Chase cam preview";
+            }
+            else {
+              message = "Free cam preview";
+            }
             // Render the normal preview with no lidar overlay
             preview = dyn_slam_->GetStaticMapRaycastPreview(
                 pane_cam_->GetModelViewMatrix(),
@@ -336,19 +362,19 @@ public:
         pane_texture_->RenderToViewport(true);
 
         Tic("LIDAR render");
-        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
-        if (velodyne->HasLatestFrame()) {
-          PreviewLidar(velodyne->GetLatestFrame(),
-                       dyn_slam_->GetLeftRgbProjectionMatrix(),
-                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
-                       rgb_view_);
-        }
-        else {
-          PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
-                       dyn_slam_->GetLeftRgbProjectionMatrix(),
-                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
-                       rgb_view_);
-        }
+//        auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
+//        if (velodyne->HasLatestFrame()) {
+//          PreviewLidar(velodyne->GetLatestFrame(),
+//                       dyn_slam_->GetLeftRgbProjectionMatrix(),
+//                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
+//                       rgb_view_);
+//        }
+//        else {
+//          PreviewLidar(velodyne->ReadFrame(dyn_slam_input_->GetCurrentFrame() - 1),
+//                       dyn_slam_->GetLeftRgbProjectionMatrix(),
+//                       dyn_slam_->GetEvaluation()->velo_to_left_gray_cam_.cast<float>(),
+//                       rgb_view_);
+//        }
         Toc(true);
       }
 
@@ -422,6 +448,18 @@ public:
 
       // Swap frames and Process Events
       pangolin::FinishFrame();
+
+      if (FLAGS_record) {
+        const string kRecordingRoot = "../recordings/";
+        if (! utils::FileExists(kRecordingRoot)) {
+          throw std::runtime_error(utils::Format(
+              "Recording enabled but the output directory (%s) could not be found!",
+              kRecordingRoot.c_str()));
+        }
+        string frame_fname = utils::Format("recorded-frame-%04d", dyn_slam_->GetCurrentFrameNo());
+        pangolin::SaveWindowOnRender(kRecordingRoot + "/" + frame_fname);
+      }
+
     }
   }
 
@@ -711,7 +749,7 @@ public:
       *(this->autoplay_) = ! *(this->autoplay_);
     });
     display_raw_previews_ = new pangolin::Var<bool>("ui.Raw Previews", false, true);
-    preview_sf_ = new pangolin::Var<bool>("ui.Show Scene Flow", true, true);
+    preview_sf_ = new pangolin::Var<bool>("ui.Show Scene Flow", false, true);
 
     pangolin::RegisterKeyPressCallback('r', [&]() {
       *display_raw_previews_ = !display_raw_previews_->Get();
@@ -803,6 +841,7 @@ public:
                                                   GL_UNSIGNED_BYTE);
     this->pane_texture_mono_uchar_ = new pangolin::GlTexture(width_, height_, GL_RGB, false, 0,
                                                              GL_RED, GL_UNSIGNED_BYTE);
+
     cout << "Pangolin UI setup complete." << endl;
   }
 
@@ -1217,7 +1256,7 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
                                                   FLAGS_semantic_evaluation);
 
   Vector2i input_shape((*input_out)->GetRgbSize().width, (*input_out)->GetRgbSize().height);
-  *dyn_slam_out = new gui::DynSlam(
+  *dyn_slam_out = new DynSlam(
       driver,
       segmentation_provider,
       sparse_sf_provider,
@@ -1227,7 +1266,9 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
       right_color_proj.cast<float>(),
       baseline_m,
       FLAGS_direct_refinement,
-      FLAGS_dynamic_mode);
+      FLAGS_dynamic_mode,
+      FLAGS_fusion_every
+  );
 }
 
 } // namespace dynslam
