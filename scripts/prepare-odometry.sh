@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # A script for preparing a KITTI odometry sequence for DynSLAM.
+#
+# Unfinished. Only sets up ground truth VO at the moment, which is not a
+# key part, since libviso2 works fine.
 # TODO(andrei): Finish implementing in a fully generic way.
 
 set -euo pipefail
