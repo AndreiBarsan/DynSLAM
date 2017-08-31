@@ -76,7 +76,7 @@ void ProcessSilhouette_CPU(Vector4u *source_rgb,
 //  int delete_box_width = delete_bbox.GetWidth();
 //  int delete_box_height = delete_bbox.GetHeight();
 
-  memset(dest_rgb, 0, frame_width * frame_height * sizeof(*source_rgb));
+  memset(dest_rgb, 255, frame_width * frame_height * sizeof(*source_rgb));
   memset(dest_depth, 0, frame_width * frame_height * sizeof(DEPTH_T));
 
   // Keep track of the minimum depth in the frame, so we can use it as a heuristic when
@@ -106,6 +106,11 @@ void ProcessSilhouette_CPU(Vector4u *source_rgb,
         if (depth != kInvalidDepth && depth < min_depth) {
           min_depth = depth;
         }
+      }
+      else {
+        dest_rgb[copy_idx].r = 255;
+        dest_rgb[copy_idx].g = 255;
+        dest_rgb[copy_idx].b = 255;
       }
     }
   }
@@ -236,7 +241,6 @@ void InstanceReconstructor::ProcessSilhouette(Track &track,
         // Dynamic object which we should reconstruct, such as a car.
         auto rgb_segment_h = instance_view->rgb->GetData(MEMORYDEVICE_CPU);
         auto depth_segment_h = instance_view->depth->GetData(MEMORYDEVICE_CPU);
-
         ProcessSilhouette_CPU(rgb_data_h, depth_data_h,
                               rgb_segment_h, depth_segment_h,
                               frame_size,
@@ -355,6 +359,7 @@ void InstanceReconstructor::InitializeReconstruction(Track &track) const {
 
   settings->sceneParams.mu = 1.00f;
   settings->sceneParams.voxelSize = 0.035f;
+//  settings->sceneParams.voxelSize = 0.250f;
 
   // Can fix spurious hole issues (rare)
 //  settings->sceneParams.voxelSize = 0.030f;
