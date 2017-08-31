@@ -44,14 +44,16 @@ DEFINE_int32(kitti_tracking_sequence_id, -1, "Used in conjunction with --dataset
 DEFINE_bool(direct_refinement, false, "Whether to refine motion estimates for other cars computed "
                                      "sparsely with RANSAC using a semidense direct image "
                                      "alignment method.");
-// TODO-LOW(andrei): Adjust voxel decay params when depth weighting is enabled.
+// TODO-LOW(andrei): Automatically adjust the voxel GC params when depth weighting is enabled.
 DEFINE_bool(use_depth_weighting, false, "Whether to adaptively set fusion weights as a function of "
-                                        "the inverse depth. If disabled, all new measurements have "
-                                        "a fixed weight of 1.");
+                                        "the inverse depth (w \\propto \\frac{1}{Z}). If disabled, "
+                                        "all new measurements have a constant weight of 1.");
 DEFINE_bool(semantic_evaluation, true, "Whether to separately evaluate the static and dynamic "
                                        "parts of the reconstruction, based on the semantic "
                                        "segmentation of each frame.");
-DEFINE_double(scale, 1.0, "Whether to run in reduced-scale mode. Used for experimental purposes.");
+DEFINE_double(scale, 1.0, "Whether to run in reduced-scale mode. Used for experimental purposes. "
+                          "Requires the (odometry) sequence to have been preprocessed using the "
+                          "'scale_sequence.py' script.");
 DEFINE_bool(use_dispnet, false, "Whether to use DispNet depth maps. Otherwise ELAS is used.");
 DEFINE_int32(evaluation_delay, 0, "How many frames behind the current one should the evaluation be "
                                   "performed. A value of 0 signifies always computing the "
@@ -67,7 +69,6 @@ DEFINE_bool(chase_cam, false, "Whether to preview the reconstruction in chase ca
                              "the camera from a third person view.");
 DEFINE_int32(fusion_every, 1, "Fuse every kth frame into the map. Used for evaluating the system's "
                               "behavior under reduced temporal resolution.");
-
 // TODO-LOW(andrei): autoplay toggling flag.
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
@@ -156,9 +157,8 @@ public:
 
     if (! phist.empty()) {
       // Highlight the most recent pose.
-      Eigen::Vector3f glowing_green(0.5f,
-                                    0.5f + static_cast<float>(sin(current_time_ms / 250.0) * 0.5 + 0.5) * 0.5f,
-                                    0.5f);
+      Eigen::Vector3f glowing_green(
+          0.5f, 0.5f + static_cast<float>(sin(current_time_ms / 250.0) * 0.5 + 0.5) * 0.5f, 0.5f);
       DrawPoseFrustum(phist[phist.size() - 1], glowing_green, kMaxFrustumScale, frustum_root_cube_scale);
     }
   }
@@ -402,13 +402,18 @@ public:
 
       object_view_.Activate();
       glColor4f(1.0, 1.0, 1.0, 1.0f);
+      // Preview instance frame RGB
+      {
       pane_texture_->Upload(dyn_slam_->GetObjectPreview(visualized_object_idx_),
                             GL_RGBA, GL_UNSIGNED_BYTE);
-
-      // TODO-LOW(andrei): Make this gradual; currently it's shown as a single-colored blob (would
-      // need custom shader or manual conversion).
-//      pane_texture_->Upload(dyn_slam_->GetObjectDepthPreview(visualized_object_idx_),
-//                            GL_RED, GL_FLOAT);
+      }
+      // Preview instance frame depth
+      {
+//        FloatDepthmapToShort(
+//            dyn_slam_->GetObjectDepthPreview(visualized_object_idx_),
+//            this->depth_preview_buffer_);
+//        UploadCvTexture(this->depth_preview_buffer_, *pane_texture_, false, GL_SHORT);
+      }
       pane_texture_->RenderToViewport(true);
 
       auto &tracker = dyn_slam_->GetInstanceReconstructor()->GetInstanceTracker();
@@ -1224,7 +1229,7 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
   sf_params.match.refinement = 1;     // Default = 1 (per-pixel); 2 = sub-pixel, slower
   sf_params.ransac_iters = 200;       // Default = 200
   sf_params.inlier_threshold = 2.0;   // Default = 2.0 (insufficient for e.g., hill sequence)
-//  sf_params.inlier_threshold = 2.7;   // Required for the hill sequence
+//  sf_params.inlier_threshold = 2.7;   // May be required for the hill sequence
   sf_params.bucket.max_features = 15;    // Default = 2
   // VO is computed using the color frames.
   sf_params.calib.cu = left_color_proj(0, 2);
