@@ -122,9 +122,13 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePoseDeprecated(size_t fra
   Eigen::Matrix4d *pose = new Eigen::Matrix4d;
   pose->setIdentity();
 
+  Eigen::Matrix4d first_good_cam_pose;
+  first_good_cam_pose.setIdentity();
+
   for (size_t i = 1; i <= frame_idx; ++i) {
     if (frames_[i].relative_pose->IsPresent()) {
       if (! found_good_pose) {
+        first_good_cam_pose = frames_[i].camera_pose.cast<double>();
         found_good_pose = true;
       }
 
@@ -143,6 +147,8 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePoseDeprecated(size_t fra
   }
 
   if (found_good_pose) {
+    Eigen::Matrix4d aux = first_good_cam_pose * *pose;
+    *pose = aux;
     return dynslam::utils::Option<Eigen::Matrix4d>(pose);
   }
   else {
