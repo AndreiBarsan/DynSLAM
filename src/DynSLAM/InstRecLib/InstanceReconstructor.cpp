@@ -854,6 +854,7 @@ void CompositeDepth(ITMFloatImage *target, const ITMFloatImage *source) {
 
 void InstanceReconstructor::CompositeInstanceDepthMaps(ITMFloatImage *out,
                                                        const pangolin::OpenGlMatrix &model_view) {
+  // TODO(andrei): With a little bit of massaging, this could be implemented using the OpenGL zbuffer.
   for(auto &entry : instance_tracker_->GetActiveTracks()) {
     Track &t = instance_tracker_->GetTrack(entry.first);
     int current_frame_idx = this->frame_idx_;
@@ -864,8 +865,10 @@ void InstanceReconstructor::CompositeInstanceDepthMaps(ITMFloatImage *out,
 
       Option<Eigen::Matrix4d> pose = t.GetFramePoseDeprecated(t.GetSize() - 1);
       if (pose.IsPresent()) {
-        Eigen::Matrix4d pose_mat = pose.Get();
-        auto pango_object_pose = pangolin::OpenGlMatrix::ColMajor4x4(pose_mat.data());
+        /// XXX: experimental freeview fused code
+        Eigen::Matrix4d pose_mat = pose.Get().inverse();
+        pose_mat.setIdentity();
+        auto pango_object_pose = model_view * pangolin::OpenGlMatrix::ColMajor4x4(pose_mat.data());
         t.GetReconstruction()->GetFloatImage(&instance_depth_buffer_,
                                              dynslam::PreviewType::kDepth,
                                              pango_object_pose);

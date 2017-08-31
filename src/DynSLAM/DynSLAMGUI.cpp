@@ -225,8 +225,10 @@ public:
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
         int input_frame_idx = dyn_slam_input_->GetFrameOffset() + evaluated_frame_idx;
 
-        Eigen::Matrix4f epose = dyn_slam_->GetPoseHistory()[evaluated_frame_idx + 1];
-        auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
+//        Eigen::Matrix4f epose = dyn_slam_->GetPoseHistory()[evaluated_frame_idx + 1];
+        /// XXX: experiment for compositing in free view
+//        auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
+        auto pango_pose = pane_cam_->GetModelViewMatrix();
 
         bool enable_compositing = (FLAGS_evaluation_delay == 0);
         const float *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastDepthPreview(pango_pose, enable_compositing);
