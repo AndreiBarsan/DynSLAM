@@ -147,8 +147,15 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePoseDeprecated(size_t fra
   }
 
   if (found_good_pose) {
+    cout << "Returning instance #" << GetId() << " pose at frame idx = " << frame_idx << ". "
+        "First good cam pose:" << endl << first_good_cam_pose << endl << endl;
     Eigen::Matrix4d aux = first_good_cam_pose * *pose;
+    cout << "Pose (relative): " << endl << *pose << endl << endl;
+    // XXX: something seems weird with 'pose'. Why does it lead to an offset with static objects?
+    // It seems to be doing weird things with dynamic objects too. Perhaps when dealing with
+    // static objects the egomotion doesn't get compensated for properly?
     *pose = aux;
+    cout << "Result:" << endl << *pose << endl << endl;
     return dynslam::utils::Option<Eigen::Matrix4d>(pose);
   }
   else {
