@@ -852,9 +852,11 @@ void CompositeDepth(ITMFloatImage *target, const ITMFloatImage *source) {
   }
 }
 
-/// \brief Z-buffering in software as a first prototype.
+/// \brief Adds an object instance to the reconstruction previeww.
+/// Z-buffering in software as a first prototype (yes, very slow and silly).
 void CompositeColor(ITMUChar4Image *target_color, ITMFloatImage *target_depth,
-                    const ITMUChar4Image *instance_color, const ITMFloatImage *instance_depth
+                    const ITMUChar4Image *instance_color, const ITMFloatImage *instance_depth,
+                    const Vector4u &tint, const float tint_strength
 ) {
   assert(target_color->noDims == target_depth->noDims &&
          target_color->noDims == instance_color->noDims &&
@@ -872,18 +874,17 @@ void CompositeColor(ITMUChar4Image *target_color, ITMFloatImage *target_depth,
     for(int j = 0; j < width; j++) {
       int idx = i * width + j;
 
-      if (t_depth_data[idx] == 0) {
+      bool instance_on_top = (s_depth_data[idx] != 0 &&
+          s_color_data[idx] != Vector4u(0, 0, 0, 255) &&
+          (t_depth_data[idx] == 0 || t_depth_data[idx] > s_depth_data[idx]));
+
+      if (instance_on_top) {
         t_depth_data[idx] = s_depth_data[idx];
-        t_color_data[idx] = s_color_data[idx];
+        t_color_data[idx].r = static_cast<uchar>(s_color_data[idx].r * (1.0 - tint_strength) + tint.r * tint_strength);
+        t_color_data[idx].g = static_cast<uchar>(s_color_data[idx].g * (1.0 - tint_strength) + tint.g * tint_strength);
+        t_color_data[idx].b = static_cast<uchar>(s_color_data[idx].b * (1.0 - tint_strength) + tint.b * tint_strength);
       }
-      else {
-        if (s_depth_data[idx] != 0) {
-          if (t_depth_data[idx] > s_depth_data[idx]) {
-            t_depth_data[idx] = s_depth_data[idx];
-            t_color_data[idx] = s_color_data[idx];
-          }
-        }
-      }
+
     }
   }
 }
@@ -900,13 +901,11 @@ void InstanceReconstructor::CompositeInstanceDepthMaps(ITMFloatImage *out,
     if (t.GetLastFrame().frame_idx == current_frame_idx - 1 && t.HasReconstruction()) {
       Option<Eigen::Matrix4d> pose = t.GetFramePoseDeprecated(t.GetSize() - 1);
       if (pose.IsPresent()) {
-        /// XXX: experimental freeview fused code
-        Eigen::Matrix4d pose_mat = pose.Get();
-        auto pango_object_pose = model_view * pangolin::OpenGlMatrix::ColMajor4x4(pose_mat.data());
+        /// XXX: experimental freeview fused code. This works but may wreck the evaluation a little. Care is needed.
+        auto pango_object_pose = model_view * pangolin::OpenGlMatrix::ColMajor4x4(pose.Get().data());
         t.GetReconstruction()->GetFloatImage(&instance_depth_buffer_,
                                              dynslam::PreviewType::kDepth,
                                              pango_object_pose);
-//                                             pangolin::IdentityMatrix());
         CompositeDepth(out, &instance_depth_buffer_);
       }
     }
@@ -918,6 +917,22 @@ void InstanceReconstructor::CompositeInstances(ITMUChar4Image *out_color,
                                                const pangolin::OpenGlMatrix &model_view
 ) {
   int current_frame_idx = this->frame_idx_;
+  const float kTintStrength = 0.66f;
+
+  // Replicates the matplotlib 2.0 color palette.
+  const std::vector<Vector4u> kTintPalette = {
+      Vector4u(0x1f, 0x77, 0xb4, 255),
+      Vector4u(0xff, 0x7f, 0x0e, 255),
+      Vector4u(0x2c, 0xa0, 0x2c, 255),
+      Vector4u(0xd6, 0x27, 0x28, 255),
+      Vector4u(0x94, 0x67, 0xbd, 255),
+      Vector4u(0x8c, 0x56, 0x4b, 255),
+      Vector4u(0xe3, 0x77, 0xc2, 255),
+      Vector4u(0x71, 0x71, 0x71, 255),
+      Vector4u(0xbc, 0xbd, 0x22, 255),
+      Vector4u(0x17, 0xbe, 0xcf, 255)
+  };
+
   for (auto &entry : instance_tracker_->GetActiveTracks()) {
     Track &track = instance_tracker_->GetTrack(entry.first);
 
@@ -930,8 +945,13 @@ void InstanceReconstructor::CompositeInstances(ITMUChar4Image *out_color,
             &instance_color_buffer_,
             dynslam::PreviewType::kColor,   // TODO support others
             pangolin_pose);
+        track.GetReconstruction()->GetFloatImage(&instance_depth_buffer_,
+                                                 dynslam::PreviewType::kDepth,
+                                                 pangolin_pose);
 
-        CompositeColor(out_color, out_depth, &instance_color_buffer_, &instance_depth_buffer_);
+        const Vector4u &tint = kTintPalette[track.GetId() % kTintPalette.size()];
+        CompositeColor(out_color, out_depth, &instance_color_buffer_, &instance_depth_buffer_,
+                       tint, kTintStrength);
       }
     }
 

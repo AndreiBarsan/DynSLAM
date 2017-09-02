@@ -134,8 +134,8 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePoseDeprecated(size_t fra
 
       const Eigen::Matrix4d &rel_pose = frames_[i].relative_pose_world->Get().cast<double>();
       const Eigen::Matrix4d new_pose = rel_pose * (*pose);
-
-      cout << "relative pose [" << i << "]: " << endl << rel_pose << endl;
+//
+//      cout << "relative pose [" << i << "]: " << endl << rel_pose << endl;
 
       *pose = new_pose;
     }
@@ -151,13 +151,14 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePoseDeprecated(size_t fra
   }
 
   if (found_good_pose) {
-    cout << "Returning instance #" << GetId() << " pose at frame idx = " << frame_idx << ". "
-        "First good cam pose:" << endl << first_good_cam_pose << endl << endl;
+//    cout << "Returning instance #" << GetId() << " pose at frame idx = " << frame_idx << ". "
+//        "First good cam pose:" << endl << first_good_cam_pose << endl << endl;
     Eigen::Matrix4d aux = first_good_cam_pose * *pose;
-    cout << "Pose (relative): " << endl << *pose << endl << endl;
-    // XXX: something seems weird with 'pose'. Why does it lead to an offset with static objects?
-    // It seems to be doing weird things with dynamic objects too. Perhaps when dealing with
-    // static objects the egomotion doesn't get compensated for properly?
+//    cout << "Pose (relative): " << endl << *pose << endl << endl;
+
+    /// XXX: Looks like the computed relative pose still doesn't model rotation right (e.g., in the
+    /// car crossing in front bit).
+
     *pose = aux;
     cout << "Result:" << endl << *pose << endl << endl;
     return dynslam::utils::Option<Eigen::Matrix4d>(pose);
