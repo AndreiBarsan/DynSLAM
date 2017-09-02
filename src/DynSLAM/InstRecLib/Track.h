@@ -53,7 +53,13 @@ struct TrackFrame {
   Eigen::Matrix4f camera_pose;
 
   /// \brief The relative pose to the previous frame in the track, if it could be computed.
+  /// Includes the camera egomotion component, if present.
   dynslam::utils::Option<Pose> *relative_pose;
+
+  // XXX: consider only storing this and using the camera egomotion history for aligning the frames
+  // while reconstructing => correct compositing, as well as conceptually cleaner.
+  /// \brief Relative pose to the previous frame, in world coordinates.
+  dynslam::utils::Option<Eigen::Matrix4f> *relative_pose_world;
 
   TrackFrame(int frame_idx, const InstanceView& instance_view, const Eigen::Matrix4f &camera_pose)
       : frame_idx(frame_idx), instance_view(instance_view), camera_pose(camera_pose) {}
@@ -85,7 +91,8 @@ class Track {
   /// \see kMaxUncertainFramesStatic
   int kMaxUncertainFramesDynamic = 2;
   /// \brief Translation error threshold used to differentiate static from dynamic objects.
-  float kTransErrorTreshold = 0.20f;
+  float kTransErrorThreshold = 0.20f;
+  // TODO(andrei): Make this into two thresholds: <0.1 = static, >0.25 = dynamic, within, stay uncertain.
 
   Track(int id) : id_(id),
                   reconstruction_(nullptr),

@@ -126,14 +126,18 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePoseDeprecated(size_t fra
   first_good_cam_pose.setIdentity();
 
   for (size_t i = 1; i <= frame_idx; ++i) {
-    if (frames_[i].relative_pose->IsPresent()) {
+    if (frames_[i].relative_pose_world->IsPresent()) {
       if (! found_good_pose) {
         first_good_cam_pose = frames_[i].camera_pose.cast<double>();
         found_good_pose = true;
       }
 
-      const Eigen::Matrix4d &rel_pose = frames_[i].relative_pose->Get().matrix_form;
-      *pose = rel_pose * (*pose);
+      const Eigen::Matrix4d &rel_pose = frames_[i].relative_pose_world->Get().cast<double>();
+      const Eigen::Matrix4d new_pose = rel_pose * (*pose);
+
+      cout << "relative pose [" << i << "]: " << endl << rel_pose << endl;
+
+      *pose = new_pose;
     }
     else {
       if (found_good_pose) {
@@ -189,8 +193,10 @@ Option<Pose>* Track::EstimateInstanceMotion(
     } else {
       cout << "Successfully estimated the relative instance pose from " << flow_count
            << " matches." << endl;
+      // This is a libviso2 matrix.
       Matrix delta_mx = VisualOdometry::transformationVectorToMatrix(instance_motion_delta);
 
+      // We then invert it and convert it into an Eigen matrix.
       // TODO(andrei): Make this a utility.
       return new Option<Pose>(new Pose(
           instance_motion_delta,
@@ -221,19 +227,29 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
     }
   }
 
+  // Vehicle motion INCLUDING camera egomotion.
   Option<Pose> *motion_delta = EstimateInstanceMotion(
       GetLastFrame().instance_view.GetFlow(),
       ssf_provider,
       initial_estimate
   );
   GetLastFrame().relative_pose = motion_delta;
-  auto &latest_motion = GetLastFrame().relative_pose;
+  if (motion_delta->IsPresent()) {
+    GetLastFrame().relative_pose_world = new Option<Eigen::Matrix4f>(new Eigen::Matrix4f(
+        egomotion * motion_delta->Get().matrix_form.cast<float>()));
+  }
+  else {
+    GetLastFrame().relative_pose_world = new Option<Eigen::Matrix4f>();
+  }
+
   int current_frame_idx = GetLastFrame().frame_idx;
 
+  // TODO(andrei): Buffer region for rot/trans error within which the state of the track is still
+  // left as uncertain.
   switch(track_state_) {
     case kUncertain:
-      if (latest_motion->IsPresent()) {
-        Eigen::Matrix4f error = egomotion * latest_motion->Get().matrix_form.cast<float>();
+      if (motion_delta->IsPresent()) {
+        Eigen::Matrix4f error = egomotion * motion_delta->Get().matrix_form.cast<float>();
         float trans_error = TranslationError(error);
         float rot_error = RotationError(error);
 
@@ -242,10 +258,10 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
                << " translational error w.r.t. the egomotion." << endl;
           cout << "Rotation error: " << rot_error << "(currently unused)" << endl;
           cout << endl << "ME: " << endl << egomotion << endl;
-          cout << endl << "Object: " << endl << latest_motion->Get().matrix_form << endl;
+          cout << endl << "Object: " << endl << motion_delta->Get().matrix_form << endl;
         }
 
-        if (trans_error > kTransErrorTreshold) {
+        if (trans_error > kTransErrorThreshold) {
           if (verbose) {
             cout << id_ << ": Uncertain -> Dynamic object!" << endl;
           }
@@ -257,11 +273,11 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
           }
           // If the motion is below the threshold, meaning that the object is stationary, set it to
           // identity to make the result more accurate.
-          latest_motion->Get().SetIdentity();
+          motion_delta->Get().SetIdentity();
           this->track_state_ = kStatic;
         }
 
-        this->last_known_motion_ = latest_motion->Get();
+        this->last_known_motion_ = motion_delta->Get();
         this->last_known_motion_time_ = current_frame_idx;
       }
 
@@ -288,12 +304,15 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
       int frameThreshold = (track_state_ == kStatic) ? kMaxUncertainFramesStatic :
                            kMaxUncertainFramesDynamic;
 
-      if (latest_motion->IsPresent()) {
+      if (motion_delta->IsPresent()) {
         if (track_state_ == kStatic) {
+          // XXX: is this sensible? Shouldn't we set this to the VO? (in an ideal world yes;)
           this->last_known_motion_.SetIdentity();
+
+          GetLastFrame().relative_pose_world->Get().setIdentity();
         }
         else {
-          this->last_known_motion_ = latest_motion->Get();
+          this->last_known_motion_ = motion_delta->Get();
         }
         this->last_known_motion_time_ = current_frame_idx;
       }
