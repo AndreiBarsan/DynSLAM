@@ -344,7 +344,8 @@ public:
             message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
                                      depth_result.GetCorrectPixelRatio(true),
                                      depth_result.GetCorrectPixelRatio(false));
-            vis_callback.Render();
+            /// XXX: while developing composite rendering.
+//            vis_callback.Render();
           }
         }
 
