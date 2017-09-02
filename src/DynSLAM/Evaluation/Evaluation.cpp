@@ -33,7 +33,8 @@ void PrettyPrintStats(const string &label, const DepthFrameEvaluation &evals) {
 void Evaluation::EvaluateFrame(Input *input,
                                DynSlam *dyn_slam,
                                int frame_idx,
-                               bool enable_compositing) {
+                               bool enable_compositing
+) {
   if (frame_idx < 0) {
     cerr << "Cannot evaluate negative frame [" << frame_idx << "]." << endl;
     return;

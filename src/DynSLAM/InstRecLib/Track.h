@@ -90,9 +90,10 @@ class Track {
   int kMaxUncertainFramesStatic = 0;
   /// \see kMaxUncertainFramesStatic
   int kMaxUncertainFramesDynamic = 2;
-  /// \brief Translation error threshold used to differentiate static from dynamic objects.
-  float kTransErrorThreshold = 0.20f;
-  // TODO(andrei): Make this into two thresholds: <0.1 = static, >0.25 = dynamic, within, stay uncertain.
+  /// \brief Translation error threshold used to differentiate static from uncertain objects.
+  float kTransErrorThresholdLow =  0.033f;
+  /// \brief Translation error threshold used to differentiate dynamic from uncertain objects.
+  float kTransErrorThresholdHigh = 0.300f;
 
   Track(int id) : id_(id),
                   reconstruction_(nullptr),

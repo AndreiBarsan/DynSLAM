@@ -105,9 +105,16 @@ class DynSlam {
   /// \brief Returns an RGBA preview of the reconstructed static map.
   const unsigned char* GetStaticMapRaycastPreview(
       const pangolin::OpenGlMatrix &model_view,
-      PreviewType preview
+      PreviewType preview,
+      bool enable_compositing
   ) {
     static_scene_->GetImage(out_image_, preview, model_view);
+    static_scene_->GetFloatImage(out_image_float_, PreviewType::kDepth, model_view);
+
+    if (dynamic_mode_ && enable_compositing) {
+      instance_reconstructor_->CompositeInstances(out_image_, out_image_float_, model_view);
+    }
+
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
   }
 
