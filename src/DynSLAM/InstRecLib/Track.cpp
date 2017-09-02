@@ -261,13 +261,13 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
           cout << endl << "Object: " << endl << motion_delta->Get().matrix_form << endl;
         }
 
-        if (trans_error > kTransErrorThreshold) {
+        if (trans_error > kTransErrorThresholdHigh) {
           if (verbose) {
             cout << id_ << ": Uncertain -> Dynamic object!" << endl;
           }
           this->track_state_ = kDynamic;
         }
-        else {
+        else if (trans_error < kTransErrorThresholdLow) {
           if (verbose) {
             cout << id_ << ": Uncertain -> Static object!" << endl;
           }
@@ -275,6 +275,11 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
           // identity to make the result more accurate.
           motion_delta->Get().SetIdentity();
           this->track_state_ = kStatic;
+        }
+        else {
+          if (verbose) {
+            cout << id_ << ": Uncertain -> Still uncertain because of ambiguous motion!" << endl;
+          }
         }
 
         this->last_known_motion_ = motion_delta->Get();

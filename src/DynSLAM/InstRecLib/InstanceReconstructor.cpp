@@ -203,7 +203,7 @@ void InstanceReconstructor::UpdateTracks(const dynslam::DynSlam *dyn_slam,
 {
   for (const auto &pair : instance_tracker_->GetActiveTracks()) {
     Track &track = instance_tracker_->GetTrack(pair.first);
-    bool verbose = false;
+    bool verbose = true;
     track.Update(dyn_slam->GetLastEgomotion(), ssf_provider, verbose);
     if (track.GetLastFrame().frame_idx == dyn_slam->GetCurrentFrameNo() - 1) {
       ProcessSilhouette(track, main_view, frame_size, scene_flow, always_separate);
@@ -852,13 +852,50 @@ void CompositeDepth(ITMFloatImage *target, const ITMFloatImage *source) {
   }
 }
 
+/// \brief Z-buffering in software as a first prototype.
+void CompositeColor(ITMUChar4Image *target_color, ITMFloatImage *target_depth,
+                    const ITMUChar4Image *instance_color, const ITMFloatImage *instance_depth
+) {
+  assert(target_color->noDims == target_depth->noDims &&
+         target_color->noDims == instance_color->noDims &&
+         instance_color->noDims == instance_depth->noDims);
+
+  int width = target_color->noDims.width;
+  int height = target_color->noDims.height;
+
+  float* t_depth_data = target_depth->GetData(MEMORYDEVICE_CPU);
+  const float *s_depth_data = instance_depth->GetData(MEMORYDEVICE_CPU);
+  Vector4u *t_color_data = target_color->GetData(MEMORYDEVICE_CPU);
+  const Vector4u *s_color_data = instance_color->GetData(MEMORYDEVICE_CPU);
+
+  for(int i = 0; i < height; i++) {
+    for(int j = 0; j < width; j++) {
+      int idx = i * width + j;
+
+      if (t_depth_data[idx] == 0) {
+        t_depth_data[idx] = s_depth_data[idx];
+        t_color_data[idx] = s_color_data[idx];
+      }
+      else {
+        if (s_depth_data[idx] != 0) {
+          if (t_depth_data[idx] > s_depth_data[idx]) {
+            t_depth_data[idx] = s_depth_data[idx];
+            t_color_data[idx] = s_color_data[idx];
+          }
+        }
+      }
+    }
+  }
+}
+
+
 void InstanceReconstructor::CompositeInstanceDepthMaps(ITMFloatImage *out,
                                                        const pangolin::OpenGlMatrix &model_view) {
   // TODO(andrei): With a little bit of massaging, this could be implemented using the OpenGL zbuffer.
   // => much better perf.
+  int current_frame_idx = this->frame_idx_;
   for(auto &entry : instance_tracker_->GetActiveTracks()) {
     Track &t = instance_tracker_->GetTrack(entry.first);
-    int current_frame_idx = this->frame_idx_;
 
     if (t.GetLastFrame().frame_idx == current_frame_idx - 1 && t.HasReconstruction()) {
       Option<Eigen::Matrix4d> pose = t.GetFramePoseDeprecated(t.GetSize() - 1);
@@ -874,6 +911,33 @@ void InstanceReconstructor::CompositeInstanceDepthMaps(ITMFloatImage *out,
       }
     }
   }
+}
+
+void InstanceReconstructor::CompositeInstances(ITMUChar4Image *out_color,
+                                               ITMFloatImage *out_depth,
+                                               const pangolin::OpenGlMatrix &model_view
+) {
+  int current_frame_idx = this->frame_idx_;
+  for (auto &entry : instance_tracker_->GetActiveTracks()) {
+    Track &track = instance_tracker_->GetTrack(entry.first);
+
+    if (track.GetLastFrame().frame_idx == current_frame_idx - 1 && track.HasReconstruction()) {
+      auto pose = track.GetFramePoseDeprecated(track.GetSize() - 1);
+
+      if (pose.IsPresent()) {
+        auto pangolin_pose = model_view * pangolin::OpenGlMatrix::ColMajor4x4(pose.Get().data());
+        track.GetReconstruction()->GetImage(
+            &instance_color_buffer_,
+            dynslam::PreviewType::kColor,   // TODO support others
+            pangolin_pose);
+
+        CompositeColor(out_color, out_depth, &instance_color_buffer_, &instance_depth_buffer_);
+      }
+    }
+
+  }
+
+
 }
 
 }  // namespace reconstruction

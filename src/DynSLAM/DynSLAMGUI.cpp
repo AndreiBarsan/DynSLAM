@@ -252,10 +252,10 @@ public:
             else {
               message = "Free cam preview";
             }
-            // Render the normal preview with no lidar overlay
             preview = dyn_slam_->GetStaticMapRaycastPreview(
                 pane_cam_->GetModelViewMatrix(),
-                static_cast<PreviewType>(current_preview_type_));
+                static_cast<PreviewType>(current_preview_type_),
+                enable_compositing);
             pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
             pane_texture_->RenderToViewport(true);
             DrawPoses(time_ms);
@@ -1238,12 +1238,6 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
   sf_params.calib.cu = left_color_proj(0, 2);
   sf_params.calib.cv = left_color_proj(1, 2);
   sf_params.calib.f  = left_color_proj(0, 0);
-
-  // For fast VO (does not support instance reconstruction!), but can save time when evaluating
-  // DynSLAM in static mode!
-//  sf_params.ransac_iters = 100;
-//  sf_params.inlier_threshold = 2.0;
-//  sf_params.bucket.max_features = 2;
 
   auto sparse_sf_provider = new instreclib::VisoSparseSFProvider(sf_params);
 

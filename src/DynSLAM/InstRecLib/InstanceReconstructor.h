@@ -47,7 +47,8 @@ class InstanceReconstructor {
         driver_(driver),
         use_decay_(use_decay),
         enable_direct_refinement_(enable_direct_refinement),
-        instance_depth_buffer_(driver->GetImageSize(), true, true)
+        instance_depth_buffer_(driver->GetImageSize(), true, true),
+        instance_color_buffer_(driver->GetImageSize(), true, true)
   {}
 
   /// \brief Uses the segmentation result to remove dynamic objects from the main view and save
@@ -106,6 +107,11 @@ class InstanceReconstructor {
   /// TODO(andrei): Improve performance.
   void CompositeInstanceDepthMaps(ITMFloatImage *out, const pangolin::OpenGlMatrix &model_view);
 
+  /// \brief Adds instance color and depth onto the indicated buffers, using 'out_depth' as a
+  ///        software Z-buffer.
+  void CompositeInstances(ITMUChar4Image *out_color, ITMFloatImage *out_depth,
+                          const pangolin::OpenGlMatrix &model_view);
+
   /// Hacky method for checking whether there's an object getting reconstructed at the given coords.
   const Track& GetTrackAtPoint(int x, int y) const {
     return instance_tracker_->GetTrackAtPoint(x, y, frame_idx_);
@@ -141,8 +147,9 @@ class InstanceReconstructor {
   /// \brief Alternative approach based on semidense direct image alignment.
   bool enable_direct_refinement_;
 
-  /// \brief Used for rendering instance-specific depth maps.
+  /// \brief Used for rendering instance-specific depth and color maps.
   ITMFloatImage instance_depth_buffer_;
+  ITMUChar4Image instance_color_buffer_;
 
   /// \brief Updates the reconstruction associated with the object tracks, where applicable.
   void ProcessReconstructions(bool always_separate);
