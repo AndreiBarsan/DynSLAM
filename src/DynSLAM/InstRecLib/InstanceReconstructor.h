@@ -1,6 +1,8 @@
 #ifndef INSTRECLIB_INSTANCERECONSTRUCTOR_H
 #define INSTRECLIB_INSTANCERECONSTRUCTOR_H
 
+#include <Eigen/StdVector>
+
 #include <map>
 #include <memory>
 
@@ -26,6 +28,8 @@ class InstanceReconstructor {
  public:
   static const vector<string> kClassesToReconstructVoc2012;
   static const vector<string> kPossiblyDynamicClassesVoc2012;
+
+  static const std::vector<Eigen::Vector4i, Eigen::aligned_allocator<Eigen::Vector4i>> kMatplotlib2Palette;
 
   static bool ShouldReconstruct(const std::string &class_name) {
     return (find(
