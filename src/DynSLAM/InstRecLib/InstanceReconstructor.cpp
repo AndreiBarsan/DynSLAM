@@ -42,6 +42,19 @@ const vector<string> InstanceReconstructor::kPossiblyDynamicClassesVoc2012 = {
     "train"       // MNC is not very good at segmenting trains anyway
 };
 
+const vector<Eigen::Vector4i, Eigen::aligned_allocator<Eigen::Vector4i>> InstanceReconstructor::kMatplotlib2Palette = {
+    Eigen::Vector4i(0x1f, 0x77, 0xb4, 255),
+    Eigen::Vector4i(0xff, 0x7f, 0x0e, 255),
+    Eigen::Vector4i(0x2c, 0xa0, 0x2c, 255),
+    Eigen::Vector4i(0xd6, 0x27, 0x28, 255),
+    Eigen::Vector4i(0x94, 0x67, 0xbd, 255),
+    Eigen::Vector4i(0x8c, 0x56, 0x4b, 255),
+    Eigen::Vector4i(0xe3, 0x77, 0xc2, 255),
+    Eigen::Vector4i(0x71, 0x71, 0x71, 255),
+    Eigen::Vector4i(0xbc, 0xbd, 0x22, 255),
+    Eigen::Vector4i(0x17, 0xbe, 0xcf, 255)
+};
+
 // TODO(andrei): Implement this in CUDA. It should be easy.
 // TODO(andrei): Consider renaming to copysilhouette or something.
 template <typename DEPTH_T>
@@ -856,7 +869,7 @@ void CompositeDepth(ITMFloatImage *target, const ITMFloatImage *source) {
 /// Z-buffering in software as a first prototype (yes, very slow and silly).
 void CompositeColor(ITMUChar4Image *target_color, ITMFloatImage *target_depth,
                     const ITMUChar4Image *instance_color, const ITMFloatImage *instance_depth,
-                    const Vector4u &tint, const float tint_strength
+                    const Eigen::Vector4i &tint, const float tint_strength
 ) {
   assert(target_color->noDims == target_depth->noDims &&
          target_color->noDims == instance_color->noDims &&
@@ -880,9 +893,9 @@ void CompositeColor(ITMUChar4Image *target_color, ITMFloatImage *target_depth,
 
       if (instance_on_top) {
         t_depth_data[idx] = s_depth_data[idx];
-        t_color_data[idx].r = static_cast<uchar>(s_color_data[idx].r * (1.0 - tint_strength) + tint.r * tint_strength);
-        t_color_data[idx].g = static_cast<uchar>(s_color_data[idx].g * (1.0 - tint_strength) + tint.g * tint_strength);
-        t_color_data[idx].b = static_cast<uchar>(s_color_data[idx].b * (1.0 - tint_strength) + tint.b * tint_strength);
+        t_color_data[idx].r = static_cast<uchar>(s_color_data[idx].r * (1.0 - tint_strength) + tint(0) * tint_strength);
+        t_color_data[idx].g = static_cast<uchar>(s_color_data[idx].g * (1.0 - tint_strength) + tint(1) * tint_strength);
+        t_color_data[idx].b = static_cast<uchar>(s_color_data[idx].b * (1.0 - tint_strength) + tint(2) * tint_strength);
       }
 
     }
@@ -917,26 +930,27 @@ void InstanceReconstructor::CompositeInstances(ITMUChar4Image *out_color,
                                                const pangolin::OpenGlMatrix &model_view
 ) {
   int current_frame_idx = this->frame_idx_;
-  const float kTintStrength = 0.66f;
+  const float kTintStrength = 0.50f;
 
-  // Replicates the matplotlib 2.0 color palette.
-  const std::vector<Vector4u> kTintPalette = {
-      Vector4u(0x1f, 0x77, 0xb4, 255),
-      Vector4u(0xff, 0x7f, 0x0e, 255),
-      Vector4u(0x2c, 0xa0, 0x2c, 255),
-      Vector4u(0xd6, 0x27, 0x28, 255),
-      Vector4u(0x94, 0x67, 0xbd, 255),
-      Vector4u(0x8c, 0x56, 0x4b, 255),
-      Vector4u(0xe3, 0x77, 0xc2, 255),
-      Vector4u(0x71, 0x71, 0x71, 255),
-      Vector4u(0xbc, 0xbd, 0x22, 255),
-      Vector4u(0x17, 0xbe, 0xcf, 255)
-  };
+  // TODO-LOW(andrei): consider compositing the most recent depth/color frames in the final view,
+  // even if tracking in 3D is not yet successful. Should be OK for visualization, since the object
+  // is segmented out and prevented from corrupting the actual map anyway.
 
   for (auto &entry : instance_tracker_->GetActiveTracks()) {
     Track &track = instance_tracker_->GetTrack(entry.first);
 
-    if (track.GetLastFrame().frame_idx == current_frame_idx - 1 && track.HasReconstruction()) {
+    // For dynamic objects, we have to have just seen them in order to know where they are without
+    // assuming things or making them freeze into the last place we saw them, but we can safely
+    // assume static objects stay put even when we're no longer looking at them, as long as they're
+    // not those stupid angel things from Doctor Who like seriously they're silly and still give
+    // me horrible nightmares oh god why won't it stop. Our resulting map is thus maximally
+    // consistent, to the best of our knowledge.
+    /// XXX: This doesn't work since often tracks flip to becoming uncertain as they get overtaken
+    /// in the few last frames where only parts of a parked vehicle are visible. Fix this.
+    bool can_render_correctly = (track.GetLastFrame().frame_idx == current_frame_idx - 1 ||
+        track.GetState() == TrackState::kStatic);
+
+    if (can_render_correctly && track.HasReconstruction()) {
       auto pose = track.GetFramePoseDeprecated(track.GetSize() - 1);
 
       if (pose.IsPresent()) {
@@ -949,9 +963,13 @@ void InstanceReconstructor::CompositeInstances(ITMUChar4Image *out_color,
                                                  dynslam::PreviewType::kDepth,
                                                  pangolin_pose);
 
-        const Vector4u &tint = kTintPalette[track.GetId() % kTintPalette.size()];
-        CompositeColor(out_color, out_depth, &instance_color_buffer_, &instance_depth_buffer_,
-                       tint, kTintStrength);
+        const Eigen::Vector4i &tint = kMatplotlib2Palette[track.GetId() % kMatplotlib2Palette.size()];
+        CompositeColor(out_color,
+                       out_depth,
+                       &instance_color_buffer_,
+                       &instance_depth_buffer_,
+                       tint,
+                       kTintStrength);
       }
     }
 

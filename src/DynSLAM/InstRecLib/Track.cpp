@@ -150,14 +150,22 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePoseDeprecated(size_t fra
     }
   }
 
-  if (found_good_pose) {
-//    cout << "Returning instance #" << GetId() << " pose at frame idx = " << frame_idx << ". "
-//        "First good cam pose:" << endl << first_good_cam_pose << endl << endl;
-    Eigen::Matrix4d aux = first_good_cam_pose * *pose;
-//    cout << "Pose (relative): " << endl << *pose << endl << endl;
+  if (track_state_ == TrackState::kStatic) {
+    return dynslam::utils::Option<Eigen::Matrix4d>(new Eigen::Matrix4d(first_good_cam_pose));
+  }
 
-    /// XXX: Looks like the computed relative pose still doesn't model rotation right (e.g., in the
-    /// car crossing in front bit).
+  if (found_good_pose) {
+    Eigen::Matrix4d aux = first_good_cam_pose * *pose;
+
+    /// XXX: the flashing car issue is caused by missing frames "covered" by setting the motion to
+    /// the latest good motion when reconstructing, but not "covered" in the relative poses.
+    /// I've lowered the SF vector count threshold for estimating the motion to lower this issues's
+    /// frequency, but that's not a permanent solution. Options:
+    ///  a) when making that assumption in fusion, actually SET the rel pose to the prev value, inst.
+    ///     of leaving it empty
+    ///  b) duplicate that functionality in our object world pose est fn.
+
+    // TODO(andrei): The rotation seems to be OK in my recorded gifs.
 
     *pose = aux;
     cout << "Result:" << endl << *pose << endl << endl;
@@ -179,7 +187,7 @@ Option<Pose>* Track::EstimateInstanceMotion(
   // Note: 25 => OK results in most cases, but where cars are advancing from opposite direction
   //             in the hill sequence, this no longer works.
 //  uint32_t kMinFlowVectorsForPoseEst = 25;
-  uint32_t kMinFlowVectorsForPoseEst = 15;
+  uint32_t kMinFlowVectorsForPoseEst = 10;
   // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
   // we're being a little paranoid).
   size_t flow_count = instance_raw_flow.size();

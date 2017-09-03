@@ -215,7 +215,7 @@ public:
         pangolin::OpenGlMatrix pm(cam_mv);
         pm = pangolin::OpenGlMatrix::RotateY(M_PI * 0.5 * 0.05f) *
              pangolin::OpenGlMatrix::RotateX(M_PI * 0.5 * 0.02f) *
-             pangolin::OpenGlMatrix::Translate(-0.5, 1.2, 8.0) *
+             pangolin::OpenGlMatrix::Translate(-0.5, 1.2, 20.0) *
              pm;
         pane_cam_->SetModelViewMatrix(pm);
       }
