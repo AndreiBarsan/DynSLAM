@@ -89,12 +89,13 @@ class Track {
   ///        object is reverted to the "Uncertain" state.
   int kMaxUncertainFramesStatic = 5;
   /// \see kMaxUncertainFramesStatic
-  int kMaxUncertainFramesDynamic = 2;
+  int kMaxUncertainFramesDynamic = 1;
   /// \brief Translation error threshold used to differentiate static from uncertain objects.
 //  float kTransErrorThresholdLow =  0.033f;
-  float kTransErrorThresholdLow =  0.015f;
+// Note: 0.015 works better usually.
+  float kTransErrorThresholdLow =  0.030f;
   /// \brief Translation error threshold used to differentiate dynamic from uncertain objects.
-  float kTransErrorThresholdHigh = 0.300f;
+  float kTransErrorThresholdHigh = 0.550f;
 
   Track(int id) : id_(id),
                   reconstruction_(nullptr),
@@ -221,7 +222,7 @@ class Track {
   void ReapReconstruction() {
     // TODO(andrei): Pass max fusion weight here and compute this in a smarter way.
     float factor = 0.33;
-    int max_weight = 5;
+    int max_weight = 3;
     int reap_weight = max(1, min(max_weight, static_cast<int>(factor * fused_frames_)));
     cout << "Reaping track with max weight [" << reap_weight << "]." << endl;
     reconstruction_->Reap(reap_weight);

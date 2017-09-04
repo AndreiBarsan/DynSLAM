@@ -112,7 +112,7 @@ class DynSlam {
     static_scene_->GetFloatImage(out_image_float_, PreviewType::kDepth, model_view);
 
     if (dynamic_mode_ && enable_compositing) {
-      instance_reconstructor_->CompositeInstances(out_image_, out_image_float_, model_view);
+      instance_reconstructor_->CompositeInstances(out_image_, out_image_float_, preview, model_view);
     }
 
     return out_image_->GetData(MEMORYDEVICE_CPU)->getValues();
