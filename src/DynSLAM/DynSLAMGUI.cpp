@@ -219,14 +219,14 @@ public:
             // Good for tracking 02
 //             pangolin::OpenGlMatrix::RotateY(-M_PI * 0.5 * 0.20f) *
 
-             pangolin::OpenGlMatrix::RotateX(M_PI * 0.5 * 0.02f) *
+             pangolin::OpenGlMatrix::RotateX(M_PI * 0.5 * 0.03f) *
             // Good for odo 05
 //             pangolin::OpenGlMatrix::Translate(-0.5, 1.2, 20.0) *
             // Good for tracking 02
 //             pangolin::OpenGlMatrix::Translate(1.5, 1.2, 12.0) *
 
 
-             pangolin::OpenGlMatrix::Translate(-0.5, 1.2, 10.0) *
+             pangolin::OpenGlMatrix::Translate(-0.5, 1.0, 15.0) *
              pm;
         pane_cam_->SetModelViewMatrix(pm);
       }
@@ -236,10 +236,8 @@ public:
         auto velodyne = dyn_slam_->GetEvaluation()->GetVelodyneIO();
         int input_frame_idx = dyn_slam_input_->GetFrameOffset() + evaluated_frame_idx;
 
-//        Eigen::Matrix4f epose = dyn_slam_->GetPoseHistory()[evaluated_frame_idx + 1];
-        /// XXX: experiment for compositing in free view
-//        auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
-        auto pango_pose = pane_cam_->GetModelViewMatrix();
+        Eigen::Matrix4f epose = dyn_slam_->GetPoseHistory()[evaluated_frame_idx + 1];
+        auto pango_pose = pangolin::OpenGlMatrix::ColMajor4x4(epose.data());
 
         bool enable_compositing = (FLAGS_evaluation_delay == 0);
         const float *synthesized_depthmap = dyn_slam_->GetStaticMapRaycastDepthPreview(pango_pose, enable_compositing);
@@ -265,6 +263,7 @@ public:
             }
             preview = dyn_slam_->GetStaticMapRaycastPreview(
                 pane_cam_->GetModelViewMatrix(),
+//                pango_pose,
                 static_cast<PreviewType>(current_preview_type_),
                 enable_compositing);
             pane_texture_->Upload(preview, GL_RGBA, GL_UNSIGNED_BYTE);
@@ -355,8 +354,7 @@ public:
             message += utils::Format(" | Acc (with missing): %.3lf | Acc (ignore missing): %.3lf",
                                      depth_result.GetCorrectPixelRatio(true),
                                      depth_result.GetCorrectPixelRatio(false));
-            /// XXX: while developing composite rendering.
-//            vis_callback.Render();
+            vis_callback.Render();
           }
         }
 
@@ -1241,7 +1239,7 @@ void BuildDynSlamKittiOdometry(const string &dataset_root,
   sf_params.match.half_resolution = 0;
   sf_params.match.multi_stage = 1;    // Default = 1 (= 0 => much slower)
   sf_params.match.refinement = 1;     // Default = 1 (per-pixel); 2 = sub-pixel, slower
-  sf_params.ransac_iters = 200;       // Default = 200
+  sf_params.ransac_iters = 500;       // Default = 200
   sf_params.inlier_threshold = 2.0;   // Default = 2.0 (insufficient for e.g., hill sequence)
 //  sf_params.inlier_threshold = 2.7;   // May be required for the hill sequence
   sf_params.bucket.max_features = 15;    // Default = 2

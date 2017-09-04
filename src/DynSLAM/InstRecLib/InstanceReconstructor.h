@@ -113,7 +113,9 @@ class InstanceReconstructor {
 
   /// \brief Adds instance color and depth onto the indicated buffers, using 'out_depth' as a
   ///        software Z-buffer.
-  void CompositeInstances(ITMUChar4Image *out_color, ITMFloatImage *out_depth,
+  void CompositeInstances(ITMUChar4Image *out_color,
+                          ITMFloatImage *out_depth,
+                          dynslam::PreviewType preview_type,
                           const pangolin::OpenGlMatrix &model_view);
 
   /// Hacky method for checking whether there's an object getting reconstructed at the given coords.

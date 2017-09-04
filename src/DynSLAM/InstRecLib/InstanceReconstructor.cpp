@@ -927,8 +927,8 @@ void InstanceReconstructor::CompositeInstanceDepthMaps(ITMFloatImage *out,
 
 void InstanceReconstructor::CompositeInstances(ITMUChar4Image *out_color,
                                                ITMFloatImage *out_depth,
-                                               const pangolin::OpenGlMatrix &model_view
-) {
+                                               dynslam::PreviewType preview_type,
+                                               const pangolin::OpenGlMatrix &model_view) {
   int current_frame_idx = this->frame_idx_;
   const float kTintStrength = 1.00f;
 
@@ -951,14 +951,8 @@ void InstanceReconstructor::CompositeInstances(ITMUChar4Image *out_color,
   for (auto &entry : instance_tracker_->GetActiveTracks()) {
     Track &track = instance_tracker_->GetTrack(entry.first);
 
-    // For dynamic objects, we have to have just seen them in order to know where they are without
-    // assuming things or making them freeze into the last place we saw them, but we can safely
-    // assume static objects stay put even when we're no longer looking at them, as long as they're
-    // not those stupid angel things from Doctor Who like seriously they're silly and still give
-    // me horrible nightmares oh god why won't it stop. Our resulting map is thus maximally
-    // consistent, to the best of our knowledge.
-    /// XXX: This doesn't work since often tracks flip to becoming uncertain as they get overtaken
-    /// in the few last frames where only parts of a parked vehicle are visible. Fix this.
+    // If an object is dynamic, we need precise pose info, so we can only show them if we've seen
+    // them in the latest frame. Static objects don't impose this constraint.
     bool can_render_correctly = (track.GetLastFrame().frame_idx == current_frame_idx - 1 ||
         track.GetState() == TrackState::kStatic);
 
@@ -969,7 +963,7 @@ void InstanceReconstructor::CompositeInstances(ITMUChar4Image *out_color,
         auto pangolin_pose = model_view * pangolin::OpenGlMatrix::ColMajor4x4(pose.Get().data());
         track.GetReconstruction()->GetImage(
             &instance_color_buffer_,
-            dynslam::PreviewType::kColor,   // TODO support others
+            preview_type,
             pangolin_pose);
         track.GetReconstruction()->GetFloatImage(&instance_depth_buffer_,
                                                  dynslam::PreviewType::kDepth,

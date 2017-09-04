@@ -84,17 +84,26 @@ void DynSlam::ProcessFrame(Input *input) {
 
     utils::Tic("Visual Odometry");
     Eigen::Matrix4f delta = sparse_sf_provider_->GetLatestMotion();
-    Eigen::Matrix4f new_pose = delta * pose_history_[pose_history_.size() - 1];
-    static_scene_->SetPose(new_pose.inverse());
-    pose_history_.push_back(new_pose);
+
+    // TODO(andrei): Nicer way to do this switch.
+    bool external_odo = true;
+    if (external_odo) {
+      Eigen::Matrix4f new_pose = delta * pose_history_[pose_history_.size() - 1];
+      static_scene_->SetPose(new_pose.inverse());
+      pose_history_.push_back(new_pose);
+    }
+    else {
+      // Used when we're *not* computing VO as part of the SF estimation process.
+      static_scene_->Track();
+      Eigen::Matrix4f new_pose = static_scene_->GetPose();
+      pose_history_.push_back(new_pose);
+    }
 
     if (! original_gray) {
       delete left_gray;
       delete right_gray;
     }
 
-    // Used when we're *not* computing VO as part of the SF estimation process.
-//    static_scene_->Track();
     utils::Toc("Visual Odometry", false);
   });
 

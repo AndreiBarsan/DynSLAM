@@ -134,8 +134,6 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePoseDeprecated(size_t fra
 
       const Eigen::Matrix4d &rel_pose = frames_[i].relative_pose_world->Get().cast<double>();
       const Eigen::Matrix4d new_pose = rel_pose * (*pose);
-//
-//      cout << "relative pose [" << i << "]: " << endl << rel_pose << endl;
 
       *pose = new_pose;
     }
@@ -156,19 +154,7 @@ dynslam::utils::Option<Eigen::Matrix4d> Track::GetFramePoseDeprecated(size_t fra
 
   if (found_good_pose) {
     Eigen::Matrix4d aux = first_good_cam_pose * *pose;
-
-    /// XXX: the flashing car issue is caused by missing frames "covered" by setting the motion to
-    /// the latest good motion when reconstructing, but not "covered" in the relative poses.
-    /// I've lowered the SF vector count threshold for estimating the motion to lower this issues's
-    /// frequency, but that's not a permanent solution. Options:
-    ///  a) when making that assumption in fusion, actually SET the rel pose to the prev value, inst.
-    ///     of leaving it empty
-    ///  b) duplicate that functionality in our object world pose est fn.
-
-    // TODO(andrei): The rotation seems to be OK in my recorded gifs.
-
     *pose = aux;
-    cout << "Result:" << endl << *pose << endl << endl;
     return dynslam::utils::Option<Eigen::Matrix4d>(pose);
   }
   else {
@@ -187,7 +173,7 @@ Option<Pose>* Track::EstimateInstanceMotion(
   // Note: 25 => OK results in most cases, but where cars are advancing from opposite direction
   //             in the hill sequence, this no longer works.
 //  uint32_t kMinFlowVectorsForPoseEst = 25;
-  uint32_t kMinFlowVectorsForPoseEst = 15;
+  uint32_t kMinFlowVectorsForPoseEst = 18;
   // technically 3 should be enough (because they're stereo-and-time 4-way correspondences, but
   // we're being a little paranoid).
   size_t flow_count = instance_raw_flow.size();
@@ -197,7 +183,7 @@ Option<Pose>* Track::EstimateInstanceMotion(
     if (instance_motion_delta.size() != 6) {
       // track information not available yet; idea: we could move this computation into the
       // track object, and use data from many more frames (if available).
-      cerr << "Could not compute instance delta motion from " << flow_count << " matches." << endl;
+      cerr << "Could not compute instance #" << GetId() << " delta motion from " << flow_count << " matches." << endl;
       return new Option<Pose>;
     } else {
       cout << "Successfully estimated the relative instance pose from " << flow_count
