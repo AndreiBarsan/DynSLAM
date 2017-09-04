@@ -69,7 +69,7 @@ DEFINE_bool(chase_cam, false, "Whether to preview the reconstruction in chase ca
                              "the camera from a third person view.");
 DEFINE_int32(fusion_every, 1, "Fuse every kth frame into the map. Used for evaluating the system's "
                               "behavior under reduced temporal resolution.");
-// TODO-LOW(andrei): autoplay toggling flag.
+DEFINE_bool(autoplay, false, "Whether to start with autoplay enabled. Useful for batch experiments.");
 
 // Note: the [RIP] tags signal spots where I wasted more than 30 minutes debugging a small, silly
 // issue, which could easily be avoided in the future.
@@ -213,9 +213,20 @@ public:
       if (FLAGS_chase_cam) {
         Eigen::Matrix4f cam_mv = dyn_slam_->GetPose().inverse();
         pangolin::OpenGlMatrix pm(cam_mv);
-        pm = pangolin::OpenGlMatrix::RotateY(M_PI * 0.5 * 0.05f) *
+        pm =
+            // Good for odo 05
+             pangolin::OpenGlMatrix::RotateY(M_PI * 0.5 * 0.05f) *
+            // Good for tracking 02
+//             pangolin::OpenGlMatrix::RotateY(-M_PI * 0.5 * 0.20f) *
+
              pangolin::OpenGlMatrix::RotateX(M_PI * 0.5 * 0.02f) *
-             pangolin::OpenGlMatrix::Translate(-0.5, 1.2, 20.0) *
+            // Good for odo 05
+//             pangolin::OpenGlMatrix::Translate(-0.5, 1.2, 20.0) *
+            // Good for tracking 02
+//             pangolin::OpenGlMatrix::Translate(1.5, 1.2, 12.0) *
+
+
+             pangolin::OpenGlMatrix::Translate(-0.5, 1.2, 10.0) *
              pm;
         pane_cam_->SetModelViewMatrix(pm);
       }
@@ -752,7 +763,7 @@ public:
     /***************************************************************************
      * GUI Checkboxes
      **************************************************************************/
-    autoplay_ = new pangolin::Var<bool>("ui.[A]utoplay", true, true);
+    autoplay_ = new pangolin::Var<bool>("ui.[A]utoplay", FLAGS_autoplay, true);
     pangolin::RegisterKeyPressCallback('a', [this]() {
       *(this->autoplay_) = ! *(this->autoplay_);
     });
