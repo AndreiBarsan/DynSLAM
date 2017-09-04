@@ -18,16 +18,15 @@ namespace reconstruction {
 
 /// \brief Minimum overlap score required to add a new frame to an existing feature track.
 /// Between 0.0 and 1.0.
-const float kTrackScoreThreshold = 0.15f;
+const float kTrackScoreThreshold = 0.10f;
 
 /// \brief Default age of the last frame in an object track after which we discard it.
 /// The smaller this is, the less memory the system uses, but the likelier it is to fragment object
 /// reconstructions into multiple volumes.
-const int kDefaultInactiveFrameThreshold = 100;
+const int kDefaultInactiveFrameThreshold = 50;
 
 /// \brief Tracks instances over time by associating multiple isolated detections.
 /// Currently implemented by best-overlap using the bounding boxes.
-// TODO(andrei): Once complete, refactor this into an interface + MaxOverlapTracker.
 class InstanceTracker {
  private:
   using TrackMap = std::map<int, Track, std::less<int>, Eigen::aligned_allocator<std::pair<const int, Track>>>;

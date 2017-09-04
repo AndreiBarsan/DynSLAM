@@ -292,6 +292,7 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
         }
 
         this->last_known_motion_ = motion_delta->Get();
+        this->last_known_motion_world_ = egomotion * motion_delta->Get().matrix_form.cast<float>();
         this->last_known_motion_time_ = current_frame_idx;
       }
 
@@ -320,14 +321,16 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
 
       if (motion_delta->IsPresent()) {
         if (track_state_ == kStatic) {
-          // XXX: is this sensible? Shouldn't we set this to the VO? (in an ideal world yes;)
           this->last_known_motion_.SetIdentity();
+          this->last_known_motion_world_.setIdentity();
 
           GetLastFrame().relative_pose_world->Get().setIdentity();
         }
         else {
           this->last_known_motion_ = motion_delta->Get();
+          this->last_known_motion_world_ = motion_delta->Get().matrix_form.cast<float>();
         }
+
         this->last_known_motion_time_ = current_frame_idx;
       }
       else {
@@ -344,6 +347,7 @@ void Track::Update(const Eigen::Matrix4f &egomotion,
         else {
           // Assume constant motion for small gaps in the track.
           GetLastFrame().relative_pose = new Option<Pose>(new Pose(last_known_motion_));
+          GetLastFrame().relative_pose_world = new Option<Eigen::Matrix4f>(new Eigen::Matrix4f(last_known_motion_world_));
         }
       }
       break;
