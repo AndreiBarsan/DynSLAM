@@ -87,7 +87,7 @@ class Track {
  public:
   /// \brief The maximum number of frames with relative motion estimation failure before a static
   ///        object is reverted to the "Uncertain" state.
-  int kMaxUncertainFramesStatic = 0;
+  int kMaxUncertainFramesStatic = 5;
   /// \see kMaxUncertainFramesStatic
   int kMaxUncertainFramesDynamic = 2;
   /// \brief Translation error threshold used to differentiate static from uncertain objects.
@@ -243,6 +243,7 @@ class Track {
   // Used for the constant velocity assumption in tracking.
   int last_known_motion_time_ = -1;
   Pose last_known_motion_;
+  Eigen::Matrix4f last_known_motion_world_;
 
   /// \brief The number of frames fused in the reconstruction.
   int fused_frames_ = 0;

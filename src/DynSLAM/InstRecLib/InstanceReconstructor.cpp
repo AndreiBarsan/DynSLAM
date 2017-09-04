@@ -882,6 +882,7 @@ void CompositeColor(ITMUChar4Image *target_color, ITMFloatImage *target_depth,
   const float *s_depth_data = instance_depth->GetData(MEMORYDEVICE_CPU);
   Vector4u *t_color_data = target_color->GetData(MEMORYDEVICE_CPU);
   const Vector4u *s_color_data = instance_color->GetData(MEMORYDEVICE_CPU);
+  const float kColorBoost = 0.33f;
 
   for(int i = 0; i < height; i++) {
     for(int j = 0; j < width; j++) {
@@ -893,9 +894,10 @@ void CompositeColor(ITMUChar4Image *target_color, ITMFloatImage *target_depth,
 
       if (instance_on_top) {
         t_depth_data[idx] = s_depth_data[idx];
-        t_color_data[idx].r = static_cast<uchar>(s_color_data[idx].r * (1.0 - tint_strength) + tint(0) * tint_strength);
-        t_color_data[idx].g = static_cast<uchar>(s_color_data[idx].g * (1.0 - tint_strength) + tint(1) * tint_strength);
-        t_color_data[idx].b = static_cast<uchar>(s_color_data[idx].b * (1.0 - tint_strength) + tint(2) * tint_strength);
+        double col_strength = 1.0 + kColorBoost - tint_strength;
+        t_color_data[idx].r = static_cast<uchar>(min(255.0, s_color_data[idx].r * col_strength + tint(0) * tint_strength));
+        t_color_data[idx].g = static_cast<uchar>(min(255.0, s_color_data[idx].g * col_strength + tint(1) * tint_strength));
+        t_color_data[idx].b = static_cast<uchar>(min(255.0, s_color_data[idx].b * col_strength + tint(2) * tint_strength));
       }
 
     }
@@ -930,11 +932,23 @@ void InstanceReconstructor::CompositeInstances(ITMUChar4Image *out_color,
                                                const pangolin::OpenGlMatrix &model_view
 ) {
   int current_frame_idx = this->frame_idx_;
-  const float kTintStrength = 0.50f;
+  const float kTintStrength = 0.66f;
 
   // TODO-LOW(andrei): consider compositing the most recent depth/color frames in the final view,
   // even if tracking in 3D is not yet successful. Should be OK for visualization, since the object
   // is segmented out and prevented from corrupting the actual map anyway.
+
+  // Dim the background a little to highlight the instances better.
+  float dim_factor = 0.66f;
+  Vector4u *color_vals = out_color->GetData(MEMORYDEVICE_CPU);
+  for (int i = 0; i < out_color->noDims.height; ++i) {
+    for (int j = 0; j < out_color->noDims.width; ++j) {
+      int idx = i * out_color->noDims.width + j;
+      color_vals[idx].r = static_cast<uchar>(color_vals[idx].r * dim_factor);
+      color_vals[idx].g = static_cast<uchar>(color_vals[idx].g * dim_factor);
+      color_vals[idx].b = static_cast<uchar>(color_vals[idx].b * dim_factor);
+    }
+  }
 
   for (auto &entry : instance_tracker_->GetActiveTracks()) {
     Track &track = instance_tracker_->GetTrack(entry.first);

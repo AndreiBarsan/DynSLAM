@@ -88,7 +88,7 @@ vector<InstanceDetection> PrecomputedSegmentationProvider::ReadInstanceInfo(
   // We ignore detections smaller than this since they are not in any way useful in 3D object
   // reconstruction.
   // (bigger than 40x40 can mess up e.g., the hill sequence @ 25m range)
-  int min_area = static_cast<int>(round(60 * 50 * input_scale_));
+  int min_area = static_cast<int>(round(55 * 50 * input_scale_));
 
   int instance_idx = 0;
   vector<InstanceDetection> detections;
