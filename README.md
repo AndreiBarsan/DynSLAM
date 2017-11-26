@@ -70,44 +70,39 @@ don't forget the `--recursive` flag when cloning the repository. If you did
 forget it, just run `git submodule update --init --recursive`.
 
  1. Clone the repository if you haven't already:
- ```bash
- git clone --recursive https://github.com/AndreiBarsan/DynSLAM
- ```
- 2. Install OpenCV 2.4.9 and CUDA (no special version requirements at the moment).
- 
- 3. Install the "easy" prerequisites (Ubuntu example):
- ```bash
- sudo apt-get install libxmu-dev libxi-dev freeglut3 freeglut3-dev glew-utils libglew-dev libglew-dbg
- ```
- 3. CMake refuses to use the in-tree Eigen for some reason, but it's OK to install it from your package manager. DynSLAM doesn't need a super up-to-date version.
- ```bash
- sudo apt install libeigen3-dev
- ```
- 
- 4. Build Pangolin to make sure it gets put into the CMake registry:
- ```bash
- cd src/Pangolin && mkdir build/ && cd $_ && cmake ../ && make -j8
- ```
- 
- 4. Build the project in the standard CMake fashion:
- ```bash
- mkdir build && cd build && cmake .. && make -j
- ```
- 5. Grab any raw KITTI data sequence [from the official website](http://www.cvlibs.net/datasets/kitti/raw_data.php). Make sure it's a synced+rectified
+    ```bash
+    git clone --recursive https://github.com/AndreiBarsan/DynSLAM
+    ```
+ 1. Install OpenCV 2.4.9 and CUDA (no special version requirements at the moment).
+ 1. Install the "easy" prerequisites (Ubuntu example):
+    ```bash
+    sudo apt-get install libxmu-dev libxi-dev freeglut3 freeglut3-dev glew-utils libglew-dev libglew-dbg
+    ```
+ 1. CMake refuses to use the in-tree Eigen for some reason, but it's OK to install it from your package manager. DynSLAM doesn't need a super up-to-date version.
+    ```bash
+    sudo apt install libeigen3-dev
+    ```
+ 1. Build Pangolin to make sure it gets put into the CMake registry:
+    ```bash
+    cd src/Pangolin && mkdir build/ && cd $_ && cmake ../ && make -j8
+    ```
+ 1. Build the project in the standard CMake fashion:
+    ```bash
+    mkdir build && cd build && cmake .. && make -j
+    ```
+ 1. Grab any raw KITTI data sequence [from the official website](http://www.cvlibs.net/datasets/kitti/raw_data.php). Make sure it's a synced+rectified
  sequence.
- 
- 6. Use the [MNC pre-trained neural network](http://github.com/AndreiBarsan/MNC)
+ 1. Use the [MNC pre-trained neural network](http://github.com/AndreiBarsan/MNC)
     to process the KITTI sequence. In the future, this will be integrated into
     the main pipeline but right now Caffe is a bit capricious.
-    Please see `Input.h` for the appropriate directory structure and where to put the semantic segmentations.
-    
- 6. Precompute DispNet disparity maps using [the DispNet docker image](https://github.com/lmb-freiburg/dispnet-flownet-docker).
+    Please see `Input.h` for the appropriate directory structure and where to put the semantic segmentations.  
+ 1. Precompute DispNet disparity maps using [the DispNet docker image](https://github.com/lmb-freiburg/dispnet-flownet-docker).
     Please see `Input.h` for the appropriate directory structure and where to put the disparity maps.
     
- 7. Run the pipeline on the KITTI sequence you downloaded.
- ```bash
- ./DynSLAM --dataset_root --use_dispnet path/to/kitti/sequence
- ```
+ 1. Run the pipeline on the KITTI sequence you downloaded.
+    ```bash
+    ./DynSLAM --dataset_root --use_dispnet path/to/kitti/sequence
+    ```
  
  You can also use `DynSLAM --help` to view info on additional commandline arguments.
 
