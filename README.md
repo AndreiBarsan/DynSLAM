@@ -59,7 +59,7 @@ where the system is confident in its reconstruction.
 The pipeline depends on two different neural networks implemented
 in Caffe, and uses several libraries like Eigen3, Pangolin, and
 OpenCV to do its job. As such, it is a bit time-consuming to get
-it running. I plan on improving this process. See #15!
+it running. I plan on improving this process. See [this issue](https://github.com/AndreiBarsan/DynSLAM/issues/15)!
 
 Important: if you're interested in this project and it's after January 1st
 2018, please email me! My email is on my GitHub profile page. I will update the
