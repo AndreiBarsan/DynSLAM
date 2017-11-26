@@ -1,11 +1,14 @@
 # DynSLAM: Simultaneous Localization and Mapping in Dynamic Environments
 
 This is a dense SLAM system written in C++. It builds on [InfiniTAM](https://github.com/victorprad/InfiniTAM), adding support
-for stereo input and separate dynamic object (e.g., car) reconstruction.
+for stereo input, outdoor operation, voxel garbage collection,
+and separate dynamic object (e.g., car) reconstruction.
 
-Currently under development as my Master's Thesis, as part of the [Computer
+Developed as part of my Master's Thesis, in the [Computer
 Vision and Geometry Group](https://cvg.ethz.ch) of [ETH
-Zurich](https://ethz.ch).
+Zurich](https://ethz.ch). Submitted to ICRA 2018 accompanying
+the paper "Robust Dense Mapping for Large-Scale Dynamic 
+Environments".
 
 ## Preview
 
@@ -51,16 +54,15 @@ where the system is confident in its reconstruction.
   the depth computation to happen on the fly, and investigating other
   methods for estimating depth from stereo.
 
-## Getting Started
+### Installation Pointers
 
-Coming soon! Right now the system is a bit tangled up, so it can't be run out
-of the box without jumping through a lot of hoops. This will change over the 
-course of the next few months.
+The pipeline depends on two different neural networks implemented
+in Caffe, and uses several libraries like Eigen3, Pangolin, and
+OpenCV to do its job. As such, it is a bit time-consuming to get
+it running. I plan on improving this process. See #15!
 
-### (Currently not Working) Steps
-
-Important: if you're interested in this project and it's after September 1st
-2017, please email me! My email is on my GitHub profile page. I will update the
+Important: if you're interested in this project and it's after January 1st
+2018, please email me! My email is on my GitHub profile page. I will update the
 instructions accordingly. Reproducibility is VERY important to me.
 
 Note that the system is under *heavy* development at the moment, so that these
