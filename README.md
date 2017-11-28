@@ -10,6 +10,8 @@ Zurich](https://ethz.ch). Submitted to ICRA 2018 accompanying
 the paper "Robust Dense Mapping for Large-Scale Dynamic 
 Environments".
 
+The source code is [hosted on GitHub](https://github.com/AndreiBarsan/DynSLAM).
+
 ## Preview
 
 The following screenshot shows an early preview of DynSLAM in action. It
@@ -56,10 +58,14 @@ where the system is confident in its reconstruction.
 
 ### Installation Pointers
 
-The pipeline depends on two different neural networks implemented
-in Caffe, and uses several libraries like Eigen3, Pangolin, and
-OpenCV to do its job. As such, it is a bit time-consuming to get
-it running. I plan on improving this process. See [this issue](https://github.com/AndreiBarsan/DynSLAM/issues/15)!
+If you want to check out the system very quickly, you're in luck!
+There's a pre-preprocessed sequence you can download to see how it works.
+
+If you want to run on any KITTI sequence, there are a few additinal
+steps. The pipeline depends on two different neural networks implemented
+in Caffe to perform semantic segmentation and disparity estimation from
+stere. As such, it is a bit time-consuming to get preprocessing
+running. I plan on improving this process. See [this issue](https://github.com/AndreiBarsan/DynSLAM/issues/15)!
 
 Important: if you're interested in this project and it's after January 1st
 2018, please email me! My email is on my GitHub profile page. I will update the
@@ -92,21 +98,30 @@ forget it, just run `git submodule update --init --recursive`.
     ```bash
     mkdir build && cd build && cmake .. && make -j
     ```
- 1. Grab any raw KITTI data sequence [from the official website](http://www.cvlibs.net/datasets/kitti/raw_data.php). Make sure it's a synced+rectified
- sequence.
- 1. Use the [MNC pre-trained neural network](http://github.com/AndreiBarsan/MNC)
-    to process the KITTI sequence. In the future, this will be integrated into
-    the main pipeline but right now Caffe is a bit capricious.
-    Please see `Input.h` for the appropriate directory structure and where to put the semantic segmentations.  
- 1. Precompute DispNet disparity maps using [the DispNet docker image](https://github.com/lmb-freiburg/dispnet-flownet-docker).
-    Please see `Input.h` for the appropriate directory structure and where to put the disparity maps.
-    
- 1. Run the pipeline on the KITTI sequence you downloaded.
-    ```bash
-    ./DynSLAM --dataset_root --use_dispnet path/to/kitti/sequence
-    ```
+ 1. Try processing the demo sequence: It's a bit annoying to preprocess a KITTI sequence for the system,
+    so [here is a short sample from KITTI Odometry Sequence 06](http://www.cs.toronto.edu/~iab/dynslam/mini-kitti-odometry-seq-06-for-dynslam.7z).
+      1. Extract that to a directory, and run DynSLAM on it (the mkdir circumvents a silly bug):
+      ```bash
+      mkdir -p csv/ && build/DynSLAM --dataset_root --use_dispnet path/to/extracted/archive
+      ```
+ 1. Run on arbitrary video sequences: The system can run on any KITTI Odometry and Tracking sequence. Raw sequences
+ should also work, but have not been tested since the evaluation is trickier, as their LIDAR data is not
+ cleaned up to account for the rolling shutter effect. 
+    1. Grab the KITTI Odometry dataset [from the official website](www.cvlibs.net/datasets/kitti/eval_odometry.php).
+    Make sure you download everything and extract it all in the same directory (see the demo sequence archive
+    for the canonical directory structure, or `Input.h` to see how DynSLAM loads it).
+    1. Use the [MNC pre-trained neural network](http://github.com/AndreiBarsan/MNC)
+       to process the KITTI sequence. In the future, this will be integrated into
+       the main pipeline but right now Caffe is a bit capricious.
+       Please see `Input.h` for the appropriate directory structure and where to put the semantic segmentations.  
+    1. Precompute DispNet disparity maps using [the DispNet docker image](https://github.com/lmb-freiburg/dispnet-flownet-docker).
+       Please see `Input.h` for the appropriate directory structure and where to put the disparity maps.
+    1. Run the pipeline on the KITTI sequence you downloaded.
+       ```bash
+       ./DynSLAM --dataset_root --use_dispnet path/to/kitti/sequence
+       ```
  
- You can also use `DynSLAM --help` to view info on additional commandline arguments.
+ You can also use `DynSLAM --help` to view info on additional commandline arguments. (There are a lot of them!)
 
 ## Remarks
 
