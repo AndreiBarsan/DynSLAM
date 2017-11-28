@@ -101,9 +101,9 @@ forget it, just run `git submodule update --init --recursive`.
  1. Try processing the demo sequence: It's a bit annoying to preprocess a KITTI sequence for the system,
     so [here is a short sample from KITTI Odometry Sequence 06](http://www.cs.toronto.edu/~iab/dynslam/mini-kitti-odometry-seq-06-for-dynslam.7z).
       1. Extract that to a directory, and run DynSLAM on it (the mkdir circumvents a silly bug):
-      ```bash
-      mkdir -p csv/ && build/DynSLAM --dataset_root --use_dispnet path/to/extracted/archive
-      ```
+        ```bash
+        mkdir -p csv/ && build/DynSLAM --use_dispnet --dataset_root=path/to/extracted/archive
+        ```
  1. Run on arbitrary video sequences: The system can run on any KITTI Odometry and Tracking sequence. Raw sequences
  should also work, but have not been tested since the evaluation is trickier, as their LIDAR data is not
  cleaned up to account for the rolling shutter effect. 
@@ -118,7 +118,7 @@ forget it, just run `git submodule update --init --recursive`.
        Please see `Input.h` for the appropriate directory structure and where to put the disparity maps.
     1. Run the pipeline on the KITTI sequence you downloaded.
        ```bash
-       ./DynSLAM --dataset_root --use_dispnet path/to/kitti/sequence
+       ./DynSLAM --use_dispnet --dataset_root=path/to/kitti/sequence
        ```
  
  You can also use `DynSLAM --help` to view info on additional commandline arguments. (There are a lot of them!)
