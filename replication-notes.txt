@@ -1,0 +1,35 @@
+# Notes to self written while attempting to dockerize the project
+
+ * Can we run the GUI from the container? Or will we have to resort to running
+   DynSLAM in a headless mode instead and just dump metrics and screenshots in
+   some directory?
+
+## Steps
+ * Clone
+ * Install libpng++ (libpng++-dev). (TODO add)
+ * Mention min Eigen version ?
+ * Mention min g++ version? (4.8.4 is a bit too old) 
+    * Trying v5 from here: https://gist.github.com/beci/2a2091f282042ed20cda
+    * PLEASE use v5 and NOT the antique v4, since it does tons of things
+    better (in addition to supporting newer stuff, more optimizations, more
+    static checks (see my SO question on subtle bug in libviso)), such as
+    having much nicer output by default.
+    * Still getting an error with v5 (but seems fixable), but let's be lazy and
+    try v6. Still getting errors in v6. Must be old eigen? I had 3.3, but the
+    current machine has 3.2 and I shouldn't change that because of weird
+    dependencies. Anyway, let's just try to fix that stupid initializer
+    problem.
+    * Hacked everything so it sees my in-tree Eigen 3.3 and NOT the system one
+    (why the fuck is it SO difficult???), and it seems to be doing better.
+    * My weird project structure may be to blame... I had to symlink
+    include/eigen3 to src/eigen3, so maybe that's the issue? Dunno.
+    * Also, I think it may be required to cmake Eigen in its own dir first?
+    * Got it to build with another (hacky) flag for nvcc, CUDA 8, gcc 4.8 and
+    Eigen 3.3 (using the in-root one, albeit with a huge hack).
+ * Install OpenCV and CUDA
+ * Install libbfd OR fix your CMakeLists to ensure it doesn't try to link it if
+ it's not there yo.
+ * TODO make CMake use the in-tree Eigen automatically, always
+ * Install an up-to-date CMake locally (see script; can automate with no sudo).
+ * Build Pangolin (can automate with no sudo)
+ * Build the main project (can automate with no sudo)
