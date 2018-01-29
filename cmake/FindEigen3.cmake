@@ -78,8 +78,8 @@ else (EIGEN3_INCLUDE_DIR)
         ENV EIGEN3_ROOT 
         ENV EIGEN3_ROOT_DIR
         PATHS
+        ${CMAKE_INSTALL_PREFIX}
         ${CMAKE_INSTALL_PREFIX}/include
-        ${CMAKE_SOURCE_DIR}/src           # This supports our particular project structure
         ${KDE4_INCLUDE_DIR}
         PATH_SUFFIXES eigen3 eigen
       )

@@ -21,14 +21,17 @@ OPTION(WITH_BACKWARDS_CPP "Build with backwards-cpp stack trace dumping library?
 message(STATUS "backwards-cpp-enhanced stack traces? " ${WITH_BACKWARDS_CPP})
 
 # We use Eigen for generic matrix support and linear algebra routines.
-find_package(Eigen3 REQUIRED)
+# set(EIGEN3_ROOT ${PROJECT_SOURCE_DIR}/src/eigen)
+# set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+
+find_package(Eigen3 3.3 REQUIRED)
 find_package(GLUT REQUIRED)
 find_package(OpenGL REQUIRED)
 
-find_package(CUDA QUIET)
+find_package(CUDA 8.0 REQUIRED)
 CANONIFY_BOOL(CUDA_FOUND)
 message(STATUS "CUDA found: " ${CUDA_FOUND})
-# TODO(andrei): Is this optional any more?
+# TODO(andrei): Get rid of this. We now ALWAYS need CUDA.
 OPTION(WITH_CUDA "Build with CUDA support?" ${CUDA_FOUND})
 
 IF(MSVC_IDE)
@@ -71,9 +74,14 @@ find_package(Pangolin REQUIRED)
 add_subdirectory(src/gflags)
 # Library for stereo visual odometry and sparse scene flow estimation.
 add_subdirectory(src/libviso2)
+
+# We don't really use this any more. 
+# TODO(andrei): Clean up direct alignment code but don't delete it completely,
+# and mention it in the docs, so people know you've tried it and it doesn't
+# really work. Remove the dep on Sophus in that case.
 # Work with Lie Groups using Eigen3
-add_subdirectory(src/Sophus)
-find_package(Sophus REQUIRED)
+# add_subdirectory(src/Sophus)
+# find_package(Sophus REQUIRED)
 
 IF(WITH_CUDA)
   include_directories(${CUDA_INCLUDE_DIRS})
@@ -92,7 +100,7 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 include_directories(${Viso2_INCLUDE_DIRS})
 include_directories(${Pangolin_INCLUDE_DIRS})
 include_directories(${OpenCV_INCLUDE_DIRS})
-include_directories(${Sophus_INCLUDE_DIRS})
+# include_directories(${Sophus_INCLUDE_DIRS})
 
 # TODO(andrei): You may want to have these dependencies in src/DynSLAM/CMakeLists.txt.
 add_subdirectory(src/InfiniTAM/InfiniTAM)
@@ -105,17 +113,17 @@ set(DYNSLAM_SOURCES
     src/pfmLib/ImageIOpfm.cpp
 
     # Experimental
-    src/DynSLAM/Direct/pinholeCameraModel.cpp
-    src/DynSLAM/Direct/helperFunctions.cpp
-    src/DynSLAM/Direct/feature/feature_depthMap.cpp
-    src/DynSLAM/Direct/frame/frame.cpp
-    src/DynSLAM/Direct/robustLoss/pseudoHuberLoss.cpp
-    src/DynSLAM/Direct/robustLoss/tDistributionLoss.cpp
-    src/DynSLAM/Direct/transformation/transformation.cpp
+    # src/DynSLAM/Direct/pinholeCameraModel.cpp
+    # src/DynSLAM/Direct/helperFunctions.cpp
+    # src/DynSLAM/Direct/feature/feature_depthMap.cpp
+    # src/DynSLAM/Direct/frame/frame.cpp
+    # src/DynSLAM/Direct/robustLoss/pseudoHuberLoss.cpp
+    # src/DynSLAM/Direct/robustLoss/tDistributionLoss.cpp
+    # src/DynSLAM/Direct/transformation/transformation.cpp
     # TODO(andrei): Support CUDA directly in DynSLAM project, and build the CUDA frame as well.
-    src/DynSLAM/Direct/frame/device/cpu/frame_cpu.cpp
-    src/DynSLAM/Direct/image_alignment/dirImgAlignBase.cpp
-    src/DynSLAM/Direct/image_alignment/device/cpu/dirImgAlignCPU.cpp
+    # src/DynSLAM/Direct/frame/device/cpu/frame_cpu.cpp
+    # src/DynSLAM/Direct/image_alignment/dirImgAlignBase.cpp
+    # src/DynSLAM/Direct/image_alignment/device/cpu/dirImgAlignCPU.cpp
     # End experimental parts
 
     src/DynSLAM/Evaluation/EvaluationCallback.cpp
@@ -170,7 +178,7 @@ if(WITH_BACKWARDS_CPP)
   # such as source code mappings. The '-lbfd' dependency is optional, and if it is disabled, the
   # stack traces will still work, but won't show unmangled symbol names or source code snippets.
   # You may need to set BACKWARD_USE_BFD to 0 in its `hpp` and `cpp` files to avoid linker errors.
-  target_link_libraries(DynSLAMGUI -lbfd)
+  # target_link_libraries(DynSLAMGUI -lbfd)
   target_link_libraries(DynSLAMGUI backward)
 endif()
 
