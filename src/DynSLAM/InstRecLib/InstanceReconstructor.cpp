@@ -1,15 +1,14 @@
 
 #include <algorithm>
-#include <Eigen/StdVector>
 
 #include "InstanceReconstructor.h"
 #include "InstanceView.h"
 #include "../DynSlam.h"
 #include "../../libviso2/src/viso.h"
-#include "../Direct/frame/device/cpu/frame_cpu.h"
-#include "../Direct/frame/frame.hpp"
-#include "../Direct/pinholeCameraModel.h"
-#include "../Direct/image_alignment/device/cpu/dirImgAlignCPU.h"
+// #include "../Direct/frame/device/cpu/frame_cpu.h"
+// #include "../Direct/frame/frame.hpp"
+// #include "../Direct/pinholeCameraModel.h"
+// #include "../Direct/image_alignment/device/cpu/dirImgAlignCPU.h"
 
 namespace instreclib {
 namespace reconstruction {
@@ -411,6 +410,7 @@ uchar RgbToGrayscale(uchar r, uchar g, uchar b) {
 /// This function basically just massages data from the DynSLAM side into the format required in the
 /// direct alignment code, which is based on Liu et al., 2017 "Direct Visual Odometry for a
 /// Fisheye-Stereo Camera."
+/*
 vector<DepthHypothesis_GMM> GenHyps(const uchar *intensity, const float *depth, CameraBase &camera,
                                     int rows, int cols) {
   // Note: variance not used in depth alignment code, so there's no point in trying to estimate it
@@ -439,6 +439,7 @@ vector<DepthHypothesis_GMM> GenHyps(const uchar *intensity, const float *depth, 
 
   return hypotheses;
 }
+*/
 
 uchar* RgbToGrayscaleImage(const Vector4u *rgb_image, int rows, int cols) {
   auto grayscale_image = new uchar[rows * cols];
@@ -456,6 +457,7 @@ uchar* RgbToGrayscaleImage(const Vector4u *rgb_image, int rows, int cols) {
 /// \brief Refines an existing pose using a direct method.
 /// The actual pose we're starting from is hidden in the latest frame of the track.
 /// \return Whether the refinement could run.
+/*
 bool ExperimentalDirectRefine(Track &track,
                               int first_idx,
                               int second_idx,
@@ -561,6 +563,7 @@ bool ExperimentalDirectRefine(Track &track,
   delete uchar_data_second;
   return true;
 }
+*/
 
 
 void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
@@ -595,13 +598,15 @@ void InstanceReconstructor::FuseFrame(Track &track, size_t frame_idx) const {
 
       // Ensure we have a previous frame to align to, and do the direct alignment.
       Eigen::Matrix4f new_relative_pose_matrix;
+      throw std::runtime_error("Deprecated.");
       // TODO If that doesn't work, try to align against a raycast of the model...
-      bool success = ExperimentalDirectRefine(track,
-                               static_cast<int>(frame_idx - 1),
-                               static_cast<int>(frame_idx),
-                               rel_dyn_pose.Get(),
-                               *(frame.instance_view.GetView()->calib),
-                               new_relative_pose_matrix);
+      // bool success = ExperimentalDirectRefine(track,
+                               // static_cast<int>(frame_idx - 1),
+                               // static_cast<int>(frame_idx),
+                               // rel_dyn_pose.Get(),
+                               // *(frame.instance_view.GetView()->calib),
+                               // new_relative_pose_matrix);
+      bool success = false;
       if(success) {
         delete frame.relative_pose;
         // TODO same as before... try updating se3 representation.
