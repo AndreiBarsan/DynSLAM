@@ -5,8 +5,10 @@
 namespace instreclib {
 
 Eigen::Matrix4d VisoToEigen(const Matrix &viso_matrix) {
+  Matrix viso_matrix_copy = viso_matrix;
   //  The '~' transposes the matrix...
-  return Eigen::Matrix4d((~viso_matrix).val[0]);
+  //  TODO(andrei): Instead of making a copy, create the Eigen matrix and transpose that.
+  return Eigen::Matrix4d((~viso_matrix_copy).val[0]);
 }
 
 void VisoSparseSFProvider::ComputeSparseSF(const ViewPair &, const ViewPair &current_view) {
