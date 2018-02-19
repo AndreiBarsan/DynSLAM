@@ -7,16 +7,20 @@ CPU_COUNT=${CPU_COUNT:-8}
 
 set -eu
 
-cd ~/work/DynSLAM
+cd /tmp/
 
-mkdir -p deps
-cd deps
-wget http://www.cmake.org/files/v3.2/cmake-3.2.2.tar.gz || exit 1
-tar xf cmake-3.2.2.tar.gz >/dev/null
-cd cmake-3.2.2
+mkdir -p cmake
+cd cmake
+wget --no-check-certificate https://github.com/Kitware/CMake/archive/v3.2.2.tar.gz || exit 1
+tar xf v3.2.2.tar.gz >/dev/null
+cd CMake-3.2.2
 
 echo "Configuring CMake 3.2.2..."
-./configure --prefix=~/.local >/dev/null || exit 3
+if [[ "$1" == "sudo" ]]; then
+    ./configure >/dev/null || exit 3
+else
+    ./configure --prefix=~/.local >/dev/null || exit 3
+fi
 
 echo "Building CMake 3.2.2..."
 make -j$CPU_COUNT || exit 4

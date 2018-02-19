@@ -1,0 +1,11 @@
+build/
+build-old/
+cmake-build-debug/
+data/
+fig/
+raw-data-archives/
+.git/
+csv/
+.idea/
+deps/
+notebooks/

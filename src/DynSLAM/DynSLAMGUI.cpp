@@ -4,7 +4,8 @@
 #include <iomanip>
 #include <iostream>
 
-#include <backward.hpp>
+// Disabled since it was causing problems within Docker.
+//#include <backward.hpp>
 #include <gflags/gflags.h>
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
@@ -75,7 +76,7 @@ DEFINE_bool(autoplay, false, "Whether to start with autoplay enabled. Useful for
 // issue, which could easily be avoided in the future.
 
 // Handle SIGSEGV and its friends by printing sensible stack traces with code snippets.
-backward::SignalHandling sh;
+//backward::SignalHandling sh;
 
 namespace dynslam {
 namespace gui {
