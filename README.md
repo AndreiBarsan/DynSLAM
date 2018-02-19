@@ -56,6 +56,28 @@ where the system is confident in its reconstruction.
   the depth computation to happen on the fly, and investigating other
   methods for estimating depth from stereo.
 
+## Results
+
+The plots in the corresponding ICRA paper can all be regenerated from the raw
+data as follows:
+
+  1. Unzip `./raw-data-archives/raw-logz.7z` to `./csv`.
+  1. Install the data analysis dependencies (e.g., in a Python virtual
+     environment or using Anaconda). Installing the pacakges using the Anaconda
+     option can be done as:
+     ```bash
+     conda install --yes jupyter pandas numpy scipy scikit-learn matplotlib seaborn
+     ```
+  1. Start Jupyter:
+     ```bash
+     cd notebooks && jupyter notebook
+     ```
+  1. Regenerate Figure 6 using `./notebooks/StaticAndDynamicDepthAnalysis.ipynb`
+  1. Regenerate Figure 7 using `./notebooks/Voxel GC Stats.ipynb`
+  1. The other notebooks can be used to generate the various figures from [the
+     supplementary material](http://andreibarsan.github.io/dynslam).
+
+
 ### Installation Pointers
 
 If you want to check out the system very quickly, you're in luck!
