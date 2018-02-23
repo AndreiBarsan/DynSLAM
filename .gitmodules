@@ -19,3 +19,6 @@
 [submodule "src/Sophus"]
 	path = src/Sophus
 	url = https://github.com/strasdat/Sophus
+[submodule "preprocessing/dispnet-flownet-docker"]
+	path = preprocessing/dispnet-flownet-docker
+	url = https://github.com/AndreiBarsan/dispnet-flownet-docker

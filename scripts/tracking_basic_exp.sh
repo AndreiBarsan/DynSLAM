@@ -59,9 +59,10 @@ for (( i = 0; i < $SEQ_COUNT; i++ )); do
                 --voxel_decay=true                      \
                 --use_depth_weighting=true              \
                 --close_on_complete=true"
-            echo "Command: $cmd"
+            echo "Command:"
+            echo "   $cmd"
             echo "$cmd" >> command_log.txt
-            echo "Away we go.."
+            echo "Away we go..."
             echo
             eval $cmd
         done

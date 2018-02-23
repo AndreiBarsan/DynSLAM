@@ -4,6 +4,7 @@ LABEL maintainer andrei.ioan.barsan@gmail.com
 
 # !!! IMPORTANT !!!
 # This does NOT work yet. The dockerization effort is still a work in progress!
+# Running OpenGL GUIs with CUDA in containers is non-trivial.
 
 # Build and run this with 'nvidia-docker'. If you forget to do so, the build
 # will NOT fail, but you will start getting strange issues when attempting
