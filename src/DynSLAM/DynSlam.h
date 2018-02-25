@@ -228,7 +228,7 @@ class DynSlam {
   }
 
   void WaitForJobs() {
-    // TODO fix this; it does not work.
+    // TODO(andrei): fix this; it does not actually work and never blocks...
     static_scene_->WaitForMeshDump();
   }
 

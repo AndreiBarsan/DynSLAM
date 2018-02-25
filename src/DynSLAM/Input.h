@@ -94,33 +94,33 @@ class Input {
     Config config;
     config.dataset_name           = utils::Format("kitti-tracking-sequence-%04d", sequence_id);
 
-    config.left_gray_folder       = utils::Format("training/image_02/%04d/", sequence_id);
-    config.right_gray_folder      = utils::Format("training/image_03/%04d/", sequence_id);
-    config.left_color_folder      = utils::Format("training/image_02/%04d/", sequence_id);
-    config.right_color_folder     = utils::Format("training/image_03/%04d/", sequence_id);
+    config.left_gray_folder       = utils::Format("image_02/%04d/", sequence_id);
+    config.right_gray_folder      = utils::Format("image_03/%04d/", sequence_id);
+    config.left_color_folder      = utils::Format("image_02/%04d/", sequence_id);
+    config.right_color_folder     = utils::Format("image_03/%04d/", sequence_id);
     config.fname_format           = "%06d.png";
-    config.calibration_fname      = utils::Format("training/calib/%04d.txt", sequence_id);
+    config.calibration_fname      = utils::Format("calib/%04d.txt", sequence_id);
 
     config.min_depth_m = 0.5f;
     config.max_depth_m = 20.0f;
-    config.depth_folder           = utils::Format("training/precomputed-depth/%04d/Frames", sequence_id);
+    config.depth_folder           = utils::Format("precomputed-depth/%04d/Frames", sequence_id);
     config.depth_fname_format     = "%04d.xml";
     config.read_depth = true;
-    config.segmentation_folder    = utils::Format("training/seg_image_02/%04d/mnc", sequence_id);
+    config.segmentation_folder    = utils::Format("seg_image_02/%04d/mnc", sequence_id);
 
     config.odometry_oxts          = false;
     config.odometry_fname         = "";
 
-    config.velodyne_folder        = utils::Format("training/velodyne/%04d/", sequence_id);
+    config.velodyne_folder        = utils::Format("velodyne/%04d/", sequence_id);
     config.velodyne_fname_format  = "%06d.bin";
 
-    config.tracklet_folder        = utils::Format("training/label_02/%04d.txt", sequence_id);
+    config.tracklet_folder        = utils::Format("label_02/%04d.txt", sequence_id);
     return config;
   }
 
   static Config KittiTrackingDispnetConfig(int sequence_id) {
     Config config                 = KittiTrackingConfig(sequence_id);
-    config.depth_folder           = utils::Format("training/precomputed-depth-dispnet/%04d", sequence_id);
+    config.depth_folder           = utils::Format("precomputed-depth-dispnet/%04d", sequence_id);
     config.depth_fname_format     = "%06d.pfm";
     config.read_depth             = false;
     return config;

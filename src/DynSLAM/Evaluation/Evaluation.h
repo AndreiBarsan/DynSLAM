@@ -190,7 +190,11 @@ class Evaluation {
         csv_memory_(GetMemoryCsvName(dataset_root, input, voxel_size_meters,
                                                        direct_refinement, is_dynamic,
                                                        use_depth_weighting)),
-        eval_tracklets_(! input->GetConfig().tracklet_folder.empty())
+        // This used to be required for evaluating the object tracking, but that
+        // was dropped in the final version of the paper since our main focus is
+        // the mapping performance.
+        eval_tracklets_(false)
+//        eval_tracklets_(! input->GetConfig().tracklet_folder.empty())
   {
     if (this->eval_tracklets_) {
       std::string tracklet_fpath = utils::Format("%s/%s", dataset_root.c_str(),
