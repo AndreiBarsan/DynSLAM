@@ -206,7 +206,7 @@ prepare_semantic_mnc () {
     path="$ds_root/$ds_split"
     # TODO(andreib): Use functions to compute these paths so you can easily
     # support both KITTI tracking and odometry.
-    seq_seg_root="$path/seg_image_02/$(printf '%04d' $seq_id)"
+    seq_seg_root="$path/seg_image_02/$(printf '%04d' $seq_id)/mnc"
     seq_image_02_root="$path/image_02/$(printf '%04d' $seq_id)"
 
     local mnc_dir="preprocessing/MNC"
@@ -244,4 +244,14 @@ prepare_semantic   "$DATASET_TYPE" "$DATASET_ROOT" "$DATASET_SPLIT" "$SEQUENCE_I
 echo
 echo "Finished preprocessing [$DATASET_TYPE]-[$DATASET_SPLIT]-[$SEQUENCE_ID]"
 echo "Dataset root:          [$DATASET_ROOT]"
+echo
+echo "Consider using a command like this to run your newly processed sequence:"
+echo
+cat <<EOF
+build/DynSLAMGUI --dataset_root $DATASET_ROOT/$DATASET_SPLIT \
+--dataset_type=$DATASET_TYPE \
+--kitti_tracking_sequence_id=$SEQUENCE_ID \
+--enable-evaluation=false \
+--use-dispnet
+EOF
 echo

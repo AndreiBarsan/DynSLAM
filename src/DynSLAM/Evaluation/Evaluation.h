@@ -60,7 +60,7 @@ class Evaluation {
       bool direct_refinement,
       bool is_dynamic,
       bool use_depth_weighting,
-      const string &base_folder = "../csv"
+      const string &base_folder = "csv"
   ) {
     return utils::Format(
         "%s/k-%d-%s-offset-%d-depth-%s-voxelsize-%.4f-max-depth-m-%.2f-%s-%s-%s%s",
