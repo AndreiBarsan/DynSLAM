@@ -6,9 +6,9 @@ and separate dynamic object (e.g., car) reconstruction.
 
 Developed as part of my Master's Thesis, in the [Computer
 Vision and Geometry Group](https://cvg.ethz.ch) of [ETH
-Zurich](https://ethz.ch). Submitted to ICRA 2018 accompanying
+Zurich](https://ethz.ch). Accepted to ICRA 2018 accompanying
 the paper "Robust Dense Mapping for Large-Scale Dynamic 
-Environments".
+Environments" by Andrei Bârsan, Peidong Liu, Marc Pollefeys, and Andreas Geiger.
 
 The source code is [hosted on GitHub](https://github.com/AndreiBarsan/DynSLAM).
 
@@ -56,10 +56,10 @@ where the system is confident in its reconstruction.
   the depth computation to happen on the fly, and investigating other
   methods for estimating depth from stereo.
 
-## Results
+## Regenerating Plots
 
 The plots in the corresponding ICRA paper can all be regenerated from the raw
-data as follows:
+data included in this repository as follows:
 
   1. Unzip `./raw-data-archives/raw-logz.7z` to `./csv`.
   1. Install the data analysis dependencies (e.g., in a Python virtual
@@ -78,69 +78,104 @@ data as follows:
      supplementary material](http://andreibarsan.github.io/dynslam).
 
 
-### Installation Pointers
+## Building and Running DynSLAM
 
 If you want to check out the system very quickly, you're in luck!
-There's a pre-preprocessed sequence you can download to see how it works.
+There's a pre-preprocessed sequence you can download to see how it works (see 
+the "Demo Sequence" section).
 
-If you want to run on any KITTI sequence, there are a few additinal
-steps. The pipeline depends on two different neural networks implemented
-in Caffe to perform semantic segmentation and disparity estimation from
-stere. As such, it is a bit time-consuming to get preprocessing
-running. I plan on improving this process. See [this issue](https://github.com/AndreiBarsan/DynSLAM/issues/15)!
+If you want to preprocess your own sequences, see the "Preprocessing" section.
 
-Important: if you're interested in this project and it's after January 1st
-2018, please email me! My email is on my GitHub profile page. I will update the
-instructions accordingly. Reproducibility is VERY important to me.
+### Building 
 
-Note that the system is under *heavy* development at the moment, so that these
-instructions could quickly go out of date. Generally speaking, this project is
-built using CMake, and it depends on several submodules. As such, make sure you
-don't forget the `--recursive` flag when cloning the repository. If you did
+This project is built using CMake, and it depends on several submodules. 
+As such, make sure you don't forget the `--recursive` flag when cloning the 
+repository. If you did
 forget it, just run `git submodule update --init --recursive`.
 
  1. Clone the repository if you haven't already:
     ```bash
     git clone --recursive https://github.com/AndreiBarsan/DynSLAM
     ```
- 1. Install OpenCV 2.4.9 and CUDA (no special version requirements at the moment).
- 1. Install the "easy" prerequisites (Ubuntu example):
+ 1. [Install docker and nvidia-docker](https://github.com/NVIDIA/nvidia-docker).
+    They are a requirement for preprocessing the data so that it can be consumed
+    by DynSLAM.
+ 1. Install OpenCV 2.4.9 and CUDA 8.
+ 1. Install the prerequisites (Ubuntu example):
     ```bash
-    sudo apt-get install libxmu-dev libxi-dev freeglut3 freeglut3-dev glew-utils libglew-dev libglew-dbg
-    ```
- 1. CMake refuses to use the in-tree Eigen for some reason, but it's OK to install it from your package manager. DynSLAM doesn't need a super up-to-date version.
-    ```bash
-    sudo apt install libeigen3-dev
+    sudo apt-get install libxmu-dev libxi-dev freeglut3 freeglut3-dev glew-utils libglew-dev libglew-dbg libpthread-stubs0-dev binutils-dev libgflags-dev libpng++-dev libeigen3-dev
     ```
  1. Build Pangolin to make sure it gets put into the CMake registry:
     ```bash
-    cd src/Pangolin && mkdir build/ && cd $_ && cmake ../ && make -j8
+    cd src/Pangolin && mkdir build/ && cd $_ && cmake ../ && make -j$(nproc)
     ```
  1. Build the project in the standard CMake fashion:
     ```bash
-    mkdir build && cd build && cmake .. && make -j
+    mkdir build && cd build && cmake .. && make -j$(nproc)
     ```
- 1. Try processing the demo sequence: It's a bit annoying to preprocess a KITTI sequence for the system,
-    so [here is a short sample from KITTI Odometry Sequence 06](http://www.cs.toronto.edu/~iab/dynslam/mini-kitti-odometry-seq-06-for-dynslam.7z).
+    
+### Building DynSLAM Inside Docker
+
+While the preprocessing makes heavy use of `nvidia-docker` in order to simplify
+the process, and does so very effectively, running the main DynSLAM program 
+inside Docker is still not supported.
+
+The `Dockerfile` in the root of this project *can* be used to build DynSLAM 
+inside a Docker container, but, due to its OpenGL GUI, it cannot run inside it
+(as of February 2018).
+
+Solutions to this problem include using one of the newly released CUDA+OpenGL 
+Docker images from NVIDIA as a base image, or fully supporting CLI-only 
+operation. Both of these tasks remain part of future work.
+
+
+### Demo Sequence
+ 1. After building the project, try processing the demo sequence: 
+    [here is a short sample from KITTI Odometry Sequence 06](http://www.cs.toronto.edu/~iab/dynslam/mini-kitti-odometry-seq-06-for-dynslam.7z).
       1. Extract that to a directory, and run DynSLAM on it (the mkdir circumvents a silly bug):
         ```bash
-        mkdir -p csv/ && build/DynSLAM --use_dispnet --dataset_root=path/to/extracted/archive
+        mkdir -p csv/ && build/DynSLAM --use_dispnet --dataset_root=path/to/extracted/archive --dataset_type=kitti-odometry
         ```
- 1. Run on arbitrary video sequences: The system can run on any KITTI Odometry and Tracking sequence. Raw sequences
- should also work, but have not been tested since the evaluation is trickier, as their LIDAR data is not
- cleaned up to account for the rolling shutter effect. 
-    1. Grab the KITTI Odometry dataset [from the official website](www.cvlibs.net/datasets/kitti/eval_odometry.php).
-    Make sure you download everything and extract it all in the same directory (see the demo sequence archive
-    for the canonical directory structure, or `Input.h` to see how DynSLAM loads it).
-    1. Use the [MNC pre-trained neural network](http://github.com/AndreiBarsan/MNC)
-       to process the KITTI sequence. In the future, this will be integrated into
-       the main pipeline but right now Caffe is a bit capricious.
-       Please see `Input.h` for the appropriate directory structure and where to put the semantic segmentations.  
-    1. Precompute DispNet disparity maps using [the DispNet docker image](https://github.com/lmb-freiburg/dispnet-flownet-docker).
-       Please see `Input.h` for the appropriate directory structure and where to put the disparity maps.
+
+### KITTI Tracking and Odometry Sequences
+ 1. The system can run on any KITTI Odometry and Tracking sequence. 
+    KITTI Raw sequences should also work, but have not been 
+    tested since the evaluation is trickier, as their LIDAR data is not cleaned
+    up to account for the rolling shutter effect. In order to run the system on
+    these sequences, the instance-aware semantic segmentations and dense depth
+    maps must be preprocessed, since DynSLAM does not yet support computing them
+    on the fly. 
+    
+    These instructions are for the KITTI Tracking dataset, which is
+    the only one currently supported using helper scripts, but I plan on adding
+    support for easy KITTI Odometry preprocessing, since the only difference
+    between the two datasets is the path structure.
+    1. Use the following download script to grab the KITTI Tracking dataset. Bear in mind
+       that it is a very large dataset which takes up a little over 100Gb of
+       disk space. Sadly, the download is structured such that downloading 
+       individual sequences is not possible.
+       ```bash
+       scripts/download_kitti_tracking.py [target-dir]
+       ```
+       By default, this script downloads the data to the `data/kitti/tracking`
+       folder of the DynSLAM project.
+    1. (Alternative) You can also manually grab the KITTI Tracking dataset 
+    [from the official website](www.cvlibs.net/datasets/kitti/eval_odometry.php).
+    Make sure you download everything and extract it all in the same directory 
+    (see the demo sequence archive for the canonical directory structure, or 
+    `Input.h` to see how DynSLAM loads it).
+    1. Preprocess the data using the preprocessing script:
+        ```bash
+        scripts/preprocess-sequence.sh kitti-tracking <dataset-root> <training/testing> <number>
+        ```
+        For example,
+        ```bash
+        scripts/preprocess-sequence.sh kitti-tracking data/kitti/tracking training 6
+        ```
+        prepares the 6th KITTI Tracking training sequence for DynSLAM.
     1. Run the pipeline on the KITTI sequence you downloaded.
        ```bash
-       ./DynSLAM --use_dispnet --dataset_root=path/to/kitti/sequence
+       ./DynSLAM --use_dispnet --enable-evaluation=false --dataset_root=<dataset-root> --dataset_type=kitti-tracking --kitti_tracking_sequence_id=<number>
        ```
  
  You can also use `DynSLAM --help` to view info on additional commandline arguments. (There are a lot of them!)

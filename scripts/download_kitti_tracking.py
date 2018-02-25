@@ -38,7 +38,6 @@ def parse_args():
     return parser.parse_args(sys.argv[1:])
 
 
-
 def main():
     args = parse_args()
     kitti_dir = args.kitti_root
