@@ -22,3 +22,6 @@
 [submodule "preprocessing/dispnet-flownet-docker"]
 	path = preprocessing/dispnet-flownet-docker
 	url = https://github.com/AndreiBarsan/dispnet-flownet-docker
+[submodule "preprocessing/MNC"]
+	path = preprocessing/MNC
+	url = git@github.com:AndreiBarsan/MNC
