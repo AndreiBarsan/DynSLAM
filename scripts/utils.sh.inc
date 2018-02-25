@@ -1,6 +1,6 @@
 
 fail () {
     ERROR="$?"
-    echo >&2 "Failure: $@"
+    echo >&2 -e "Failure: $@"
     exit "$ERROR"
 }
