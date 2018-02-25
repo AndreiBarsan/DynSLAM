@@ -97,10 +97,10 @@ forget it, just run `git submodule update --init --recursive`.
     ```bash
     git clone --recursive https://github.com/AndreiBarsan/DynSLAM
     ```
+ 1. Install OpenCV 2.4.9 and CUDA 8.
  1. [Install docker and nvidia-docker](https://github.com/NVIDIA/nvidia-docker).
     They are a requirement for preprocessing the data so that it can be consumed
     by DynSLAM.
- 1. Install OpenCV 2.4.9 and CUDA 8.
  1. Install the prerequisites (Ubuntu example):
     ```bash
     sudo apt-get install libxmu-dev libxi-dev freeglut3 freeglut3-dev glew-utils libglew-dev libglew-dbg libpthread-stubs0-dev binutils-dev libgflags-dev libpng++-dev libeigen3-dev
