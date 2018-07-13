@@ -18,7 +18,7 @@ from subprocess import call
 #  - data_odometry_velodyne.zip
 #  - data_odometry_calib.zip
 
-URL_BASE="http://kitti.is.tue.mpg.de/kitti/"
+URL_BASE = "https://s3.eu-central-1.amazonaws.com/avg-kitti/"
 tracking_dir_names = ['image_02', 'image_03', 'velodyne', 'calib']
 tracking_dir_zip_tags = ['image_2', 'image_3', 'velodyne', 'calib']
 odo_dir_names = ['gray', 'color', 'velodyne', 'calib']
@@ -78,4 +78,3 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
-
