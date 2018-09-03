@@ -180,6 +180,21 @@ operation. Both of these tasks remain part of future work.
  
  You can also use `DynSLAM --help` to view info on additional commandline arguments. (There are a lot of them!)
 
+
+## Citing DynSLAM
+
+If you use DynSLAM in your research, or build your system off of it, please
+consider citing the relevant publication:
+
+```
+@INPROCEEDINGS{Barsan2018ICRA,
+  author = {Ioan Andrei B\^{a}rsan and Peidong Liu and Marc Pollefeys and Andreas Geiger},
+  title = {Robust Dense Mapping for Large-Scale Dynamic Environments},
+  booktitle = {International Conference on Robotics and Automation (ICRA)},
+  year = {2018}
+}
+```
+
 ## Remarks
 
   * The code follows
