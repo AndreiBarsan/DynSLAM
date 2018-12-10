@@ -24,20 +24,23 @@ Usage: $0 <type> <dataset-root> <split> <sequence-id>
 Example (if your KITTI tracking data was downloaded in data/kittti/tracking):
    ./preprocess-sequence.sh kitti-tracking ./data/kitti/tracking training 0
 
-
+Example (if your KITTI odometry data was downloaded in data/kittti/odometry):
+   ./preprocess-sequence.sh kitti-odometry ./data/kitti/odometry/sequences/00
 
 EOF
     exit 1
 }
 
-if [[ "$#" -ne 4 ]]; then
+if [[ "$#" -lt 1 ]]; then
     usage
 fi
 
 DATASET_TYPE="$1"
-DATASET_ROOT="$2"
-DATASET_SPLIT="$3"
-SEQUENCE_ID="$4"
+if [[ "$DATASET_TYPE" == "kitti-odometry" && "$#" -ne 2 ]]; then
+    usage
+elif [[ "$DATASET_TYPE" == "kitti-tracking" && "$#" -ne 4 ]]; then
+    usage
+fi
 
 submodule_update_or_fail () {
     # Helper which prompts the user to grab the necessary git submodule, in
@@ -91,12 +94,20 @@ EOM
 
 fail_odometry_structure () {
     # Called when the KITTI Odometry Dataset directory structure is incorrect.
-    # TODO(andreib): Print out the expected odometry dataset structure.
-    fail "Not yet implemented."
+    good_tree=""
+    read -r -d '' good_tree <<EOM
+    Expected directory structure:
+        ├── image_0
+        ├── image_1
+        └── velodyne
+EOM
+    fail "Invalid directory structure for the KITTI odometry sequence. \n$good_tree."
 }
 
 ensure_tracking_ok () {
     # Ensures the KITTI tracking dataset is downloaded and valid.
+    # A KITTI tracking sequence is identified by its root, split, and ID. (A bit more complicated than the odometry
+    # sequences.)
     ds_root="$1"
     ds_split="$2"
     seq_id="$3"
@@ -124,8 +135,14 @@ ensure_tracking_ok () {
 
 ensure_odometry_ok () {
     # Ensures the KITTI odometry dataset is downloaded and valid.
+    # A KITTI odometry sequence is fully identified by its root.
     # TODO(andreib): Implement.
-    fail "Odometry sequence preprocessing not yet implemented (only difference from tracking is a different directory structure)."
+    ds_root="$1"
+
+    cd "$ds_root"
+    if ! [[ -f calib.txt && -d image_0 && -d image_1 && -d velodyne ]]; then
+        fail_odometry_structure
+    fi
 }
 
 ensure_sequence_ok () {
@@ -151,8 +168,15 @@ prepare_depth_dispnet () {
 
     cd "$DYNSLAM_ROOT"
 
-    path="$ds_root/$ds_split"
-    seq_depth_root="$path/precomputed-depth-dispnet/$(printf '%04d' $seq_id)"
+    if [[ "$ds_type" == "kitti-tracking" ]]; then
+        path="$ds_root/$ds_split"
+        seq_depth_root="$path/precomputed-depth-dispnet/$(printf '%04d' $seq_id)"
+    elif [[ "$ds_type" == "kitti-odometry" ]]; then
+        path="$ds_root/"
+        seq_depth_root="$path/precomputed-depth-dispnet"
+    else
+        fail "Unknown dataset type [$ds_type]."
+    fi
 
     DISPNET_DIR="preprocessing/dispnet-flownet-docker"
     if ! [[ -d "$DISPNET_DIR" ]]; then
@@ -174,7 +198,7 @@ prepare_depth_dispnet () {
         if [[ "$ds_type" == "kitti-tracking" ]]; then
             ./process-kitti-tracking.sh "$ds_root" "$ds_split" "$seq_id"
         elif [[ "$ds_type" == "kitti-odometry" ]]; then
-            ./process-kitti.sh "$ds_root" "$ds_split" "$seq_id"
+            ./process-kitti.sh "$ds_root"
         else
             echo >&2 "Unknown dataset type [$ds_type] when attempting to preprocess depth using DispNet."
             exit 1
@@ -237,21 +261,46 @@ prepare_semantic () {
 
 
 # This is where the actual work starts.
-ensure_sequence_ok "$DATASET_TYPE" "$DATASET_ROOT" "$DATASET_SPLIT" "$SEQUENCE_ID"
-prepare_depth      "$DATASET_TYPE" "$DATASET_ROOT" "$DATASET_SPLIT" "$SEQUENCE_ID"
-prepare_semantic   "$DATASET_TYPE" "$DATASET_ROOT" "$DATASET_SPLIT" "$SEQUENCE_ID"
+DATASET_ROOT="$2"
 
-echo
-echo "Finished preprocessing [$DATASET_TYPE]-[$DATASET_SPLIT]-[$SEQUENCE_ID]"
-echo "Dataset root:          [$DATASET_ROOT]"
-echo
-echo "Consider using a command like this to run your newly processed sequence:"
-echo
-cat <<EOF
-build/DynSLAMGUI --dataset_root $DATASET_ROOT/$DATASET_SPLIT \
---dataset_type=$DATASET_TYPE \
---kitti_tracking_sequence_id=$SEQUENCE_ID \
---enable-evaluation=false \
---use-dispnet
+# TODO(andreib): Reduce code duplication.
+if [[ "$DATASET_TYPE" -eq "kitti-tracking" ]]; then
+    DATASET_SPLIT="$3"
+    SEQUENCE_ID="$4"
+    ensure_sequence_ok "$DATASET_TYPE" "$DATASET_ROOT" "$DATASET_SPLIT" "$SEQUENCE_ID"
+    prepare_depth      "$DATASET_TYPE" "$DATASET_ROOT" "$DATASET_SPLIT" "$SEQUENCE_ID"
+    prepare_semantic   "$DATASET_TYPE" "$DATASET_ROOT" "$DATASET_SPLIT" "$SEQUENCE_ID"
+    echo
+    echo "Finished preprocessing [$DATASET_TYPE]-[$DATASET_SPLIT]-[$SEQUENCE_ID]"
+    echo "Dataset root:          [$DATASET_ROOT]"
+    echo
+    echo "Consider using a command like this to run your newly processed sequence:"
+    echo
+    cat <<EOF
+    build/DynSLAMGUI --dataset_root $DATASET_ROOT/$DATASET_SPLIT \
+    --dataset_type=$DATASET_TYPE \
+    --kitti_tracking_sequence_id=$SEQUENCE_ID \
+    --enable-evaluation=false \
+    --use-dispnet
 EOF
-echo
+    echo
+else
+    ensure_sequence_ok "$DATASET_TYPE" "$DATASET_ROOT"
+    prepare_depth      "$DATASET_TYPE" "$DATASET_ROOT"
+    prepare_semantic   "$DATASET_TYPE" "$DATASET_ROOT"
+    echo
+    echo "Finished preprocessing [$DATASET_TYPE]"
+    echo "Dataset root:          [$DATASET_ROOT]"
+    echo
+    echo "Consider using a command like this to run your newly processed sequence:"
+    echo
+    cat <<EOF
+    build/DynSLAMGUI --dataset_root $DATASET_ROOT \
+    --dataset_type=$DATASET_TYPE \
+    --enable-evaluation=false \
+    --use-dispnet
+EOF
+    echo
+fi
+
+
