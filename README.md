@@ -131,7 +131,7 @@ operation. Both of these tasks remain part of future work.
 
 ### Demo Sequence
  1. After building the project, try processing the demo sequence: 
-    [here is a short sample from KITTI Odometry Sequence 06](http://www.cs.toronto.edu/~iab/dynslam/mini-kitti-odometry-seq-06-for-dynslam.7z).
+    [here is a short sample from KITTI Odometry Sequence 06](https://drive.google.com/uc?export=download&confirm=Nnbd&id=1V-I4Tle7MNbmnf2qRe6aTpjxOld2M2i8).
       1. Extract that to a directory, and run DynSLAM on it (the mkdir circumvents a silly bug):
         ```bash
         mkdir -p csv/ && build/DynSLAM --use_dispnet --dataset_root=path/to/extracted/archive --dataset_type=kitti-odometry
