@@ -15,7 +15,7 @@
 	url = git@github.com:AndreiBarsan/libviso2-mirror
 [submodule "src/eigen"]
 	path = src/eigen
-	url = https://github.com/RLovelett/eigen
+	url = https://github.com/eigenteam/eigen-git-mirror
 [submodule "src/Sophus"]
 	path = src/Sophus
 	url = https://github.com/strasdat/Sophus
