@@ -115,7 +115,7 @@ void Input::ReadLeftGray(int frame_idx, cv::Mat1b &out) const {
                                 config_.left_gray_folder,
                                 config_.fname_format,
                                 frame_idx),
-                   CV_LOAD_IMAGE_UNCHANGED);
+                   cv::ImreadModes::IMREAD_UNCHANGED);
 }
 
 void Input::ReadRightGray(int frame_idx, cv::Mat1b &out) const {
@@ -124,7 +124,7 @@ void Input::ReadRightGray(int frame_idx, cv::Mat1b &out) const {
                                 config_.right_gray_folder,
                                 config_.fname_format,
                                 frame_idx),
-                   CV_LOAD_IMAGE_UNCHANGED);
+                   cv::ImreadModes::IMREAD_UNCHANGED);
 
 }
 

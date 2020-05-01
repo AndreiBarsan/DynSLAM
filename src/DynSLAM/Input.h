@@ -3,7 +3,6 @@
 #define DYNSLAM_INPUT_H
 
 #include <string>
-#include <highgui.h>
 #include <memory>
 
 #include "DepthProvider.h"

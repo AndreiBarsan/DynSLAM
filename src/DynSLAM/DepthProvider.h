@@ -4,7 +4,7 @@
 
 #include <limits>
 
-#include <opencv/cv.h>
+#include <opencv2/opencv.hpp>
 #include "Utils.h"
 
 // Some necessary forward declarations

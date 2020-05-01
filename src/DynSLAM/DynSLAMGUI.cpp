@@ -7,8 +7,7 @@
 // Disabled since it was causing problems within Docker.
 //#include <backward.hpp>
 #include <gflags/gflags.h>
-#include <opencv/cv.h>
-#include <opencv/highgui.h>
+#include <opencv2/opencv.hpp>
 #include <pangolin/pangolin.h>
 
 #include "DynSlam.h"
@@ -935,9 +934,9 @@ public:
    int thickness = static_cast<int>(round(1.1 * scale));
    int outline_factor = 3;
    cv::putText(target, text, cv::Point_<int>(x, y),
-               cv::FONT_HERSHEY_DUPLEX, scale, cv::Scalar(0, 0, 0), outline_factor * thickness, CV_AA);
+               cv::FONT_HERSHEY_DUPLEX, scale, cv::Scalar(0, 0, 0), outline_factor * thickness, cv::LINE_AA);
    cv::putText(target, text, cv::Point_<int>(x, y),
-               cv::FONT_HERSHEY_DUPLEX, scale, cv::Scalar(230, 230, 230), thickness, CV_AA);
+               cv::FONT_HERSHEY_DUPLEX, scale, cv::Scalar(230, 230, 230), thickness, cv::LINE_AA);
  }
 
  private:

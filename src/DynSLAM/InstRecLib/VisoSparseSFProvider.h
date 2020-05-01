@@ -6,8 +6,6 @@
 #include "../Utils.h"
 #include "SparseSFProvider.h"
 
-#include <opencv/highgui.h>
-
 #include "../../libviso2/src/viso_stereo.h"
 
 namespace instreclib {

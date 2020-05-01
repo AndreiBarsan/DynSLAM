@@ -8,7 +8,6 @@
 #include <memory>
 #include <sys/time.h>
 
-#include <opencv/cv.h>
 #include <mutex>
 
 namespace dynslam {

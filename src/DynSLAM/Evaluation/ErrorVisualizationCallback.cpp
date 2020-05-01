@@ -1,7 +1,7 @@
 #include "ErrorVisualizationCallback.h"
 
 #include <pangolin/pangolin.h>
-#include <opencv/cv.h>
+#include <opencv2/opencv.hpp>
 
 #include "../Utils.h"
 

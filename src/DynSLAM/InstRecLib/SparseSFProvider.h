@@ -3,7 +3,7 @@
 #ifndef INSTRECLIB_SPARSESCENEFLOWCOMPONENT_H
 #define INSTRECLIB_SPARSESCENEFLOWCOMPONENT_H
 
-#include <opencv/cv.h>
+#include <opencv2/opencv.hpp>
 #include "../../libviso2/src/matcher.h"
 #include "../../DynSLAM/Defines.h"
 

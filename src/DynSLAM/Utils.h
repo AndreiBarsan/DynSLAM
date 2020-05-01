@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <Eigen/Core>
+#include <opencv2/opencv.hpp>
 
 namespace dynslam {
 namespace utils {

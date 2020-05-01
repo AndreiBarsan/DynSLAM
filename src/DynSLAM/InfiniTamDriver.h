@@ -5,7 +5,7 @@
 
 #include <iostream>
 
-#include <opencv/cv.h>
+#include <opencv2/opencv.hpp>
 #include <pangolin/pangolin.h>
 #include <Eigen/Core>
 #include <gflags/gflags.h>
