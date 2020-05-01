@@ -88,7 +88,8 @@ If you want to preprocess your own sequences, see the "Preprocessing" section.
 
 ### Building 
 
-This project is built using CMake, and it depends on several submodules. 
+This project is built using CMake, and it depends on several submodules. The
+steps below are designed for Ubuntu 18.04.
 As such, make sure you don't forget the `--recursive` flag when cloning the 
 repository. If you did
 forget it, just run `git submodule update --init --recursive`.
@@ -103,7 +104,7 @@ forget it, just run `git submodule update --init --recursive`.
     by DynSLAM.
  1. Install the prerequisites (Ubuntu example):
     ```bash
-    sudo apt-get install libxmu-dev libxi-dev freeglut3 freeglut3-dev glew-utils libglew-dev libglew-dbg libpthread-stubs0-dev binutils-dev libgflags-dev libpng++-dev libeigen3-dev
+    sudo apt-get install libxmu-dev libxi-dev freeglut3 freeglut3-dev libglew-dev glew-utils libpthread-stubs0-dev binutils-dev libgflags-dev libpng++-dev libeigen3-dev
     ```
  1. Build Pangolin to make sure it gets put into the CMake registry:
     ```bash
