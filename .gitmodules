@@ -1,6 +1,6 @@
 [submodule "src/InfiniTAM"]
 	path = src/InfiniTAM
-	url = git@github.com:AndreiBarsan/InfiniTAM
+	url = https://github.com/AndreiBarsan/InfiniTAM
 [submodule "src/Pangolin"]
 	path = src/Pangolin
 	url = https://github.com/stevenlovegrove/Pangolin
@@ -9,10 +9,10 @@
 	url = https://github.com/gflags/gflags
 [submodule "src/pfmLib"]
 	path = src/pfmLib
-	url = git@github.com:AndreiBarsan/pfmLib
+	url = https://github.com/AndreiBarsan/pfmLib
 [submodule "src/libviso2"]
 	path = src/libviso2
-	url = git@github.com:AndreiBarsan/libviso2-mirror
+	url = https://github.com/AndreiBarsan/libviso2-mirror
 [submodule "src/eigen"]
 	path = src/eigen
 	url = https://github.com/eigenteam/eigen-git-mirror
@@ -21,7 +21,7 @@
 	url = https://github.com/strasdat/Sophus
 [submodule "preprocessing/dispnet-flownet-docker"]
 	path = preprocessing/dispnet-flownet-docker
-	url = git@github.com:AndreiBarsan/dispnet-flownet-docker
+	url = https://github.com/AndreiBarsan/dispnet-flownet-docker
 [submodule "preprocessing/MNC"]
 	path = preprocessing/MNC
-	url = git@github.com:AndreiBarsan/MNC
+	url = https://github.com/AndreiBarsan/MNC
