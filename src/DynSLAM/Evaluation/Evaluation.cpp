@@ -1,8 +1,9 @@
-
 #include "Evaluation.h"
 #include "ILidarEvalCallback.h"
 #include "EvaluationCallback.h"
 #include "SegmentedEvaluationCallback.h"
+
+#include <iomanip>
 
 namespace dynslam {
 namespace eval {

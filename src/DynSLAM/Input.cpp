@@ -2,6 +2,8 @@
 #include "Input.h"
 #include "PrecomputedDepthProvider.h"
 
+#include <opencv2/imgproc/imgproc.hpp>
+
 namespace dynslam {
 
 using namespace std;
@@ -111,21 +113,16 @@ void Input::GetCvStereoColor(cv::Mat3b **left_rgb, cv::Mat3b **right_rgb) {
 
 void Input::ReadLeftGray(int frame_idx, cv::Mat1b &out) const {
   // TODO(andrei): Support rescaling here.
-  out = cv::imread(GetFrameName(dataset_folder_,
-                                config_.left_gray_folder,
-                                config_.fname_format,
-                                frame_idx),
-                   cv::ImreadModes::IMREAD_UNCHANGED);
+  out = cv::imread(
+      GetFrameName(dataset_folder_, config_.left_gray_folder, config_.fname_format, frame_idx));
+                  //  cv::ImreadModes::IMREAD_UNCHANGED);
 }
 
 void Input::ReadRightGray(int frame_idx, cv::Mat1b &out) const {
   // TODO(andrei): Support rescaling here.
-  out = cv::imread(GetFrameName(dataset_folder_,
-                                config_.right_gray_folder,
-                                config_.fname_format,
-                                frame_idx),
-                   cv::ImreadModes::IMREAD_UNCHANGED);
-
+  out = cv::imread(
+      GetFrameName(dataset_folder_, config_.right_gray_folder, config_.fname_format, frame_idx));
+  //  cv::ImreadModes::IMREAD_UNCHANGED);
 }
 
 void Input::ReadLeftColor(int frame_idx, cv::Mat3b &out) const {

@@ -933,10 +933,11 @@ public:
   static void DrawOutlinedText(cv::Mat &target, const string &text, int x, int y, float scale = 1.5f) {
    int thickness = static_cast<int>(round(1.1 * scale));
    int outline_factor = 3;
+   // XXX(andrei): Fix this with OpenCV 3 or 4. Seriously, it's not 2017 any more, lol.
    cv::putText(target, text, cv::Point_<int>(x, y),
-               cv::FONT_HERSHEY_DUPLEX, scale, cv::Scalar(0, 0, 0), outline_factor * thickness, cv::LINE_AA);
-   cv::putText(target, text, cv::Point_<int>(x, y),
-               cv::FONT_HERSHEY_DUPLEX, scale, cv::Scalar(230, 230, 230), thickness, cv::LINE_AA);
+               cv::FONT_HERSHEY_DUPLEX, scale, cv::Scalar(0, 0, 0), outline_factor * thickness); //, cv::LINE_AA);
+   cv::putText(target, text, cv::Point_<int>(x, y), cv::FONT_HERSHEY_DUPLEX, scale,
+               cv::Scalar(230, 230, 230), thickness); //, cv::LINE_AA);
  }
 
  private:

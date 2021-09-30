@@ -4,6 +4,8 @@
 #include "InstanceTracker.h"
 #include "../../libviso2/src/viso.h"
 
+#include <iomanip>
+
 namespace instreclib {
 namespace reconstruction {
 
